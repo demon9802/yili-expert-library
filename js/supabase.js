@@ -1,9 +1,8 @@
 /* ===== Supabase 数据层 ===== */
-/* 初始化 Supabase 客户端 */
+/* 初始化 Supabase 客户端 — currentUser/isAdmin/supabase 已在 index.html 中用 var 全局声明 */
 const SUPABASE_URL = 'https://owjdwwdipfsnumgoxzih.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j';
 
-let supabase = null;
 try {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   console.log('Supabase client initialized');
@@ -12,8 +11,8 @@ try {
 }
 
 // ===== Auth 状态 =====
-let currentUser = null;
-let isAdmin = false;
+currentUser = null;
+isAdmin = false;
 
 // 仅在 supabase 可用时初始化 auth
 if (supabase) {
@@ -65,7 +64,7 @@ async function fetchExperts() {
 async function createExpert(expert) {
   if (!supabase) throw new Error('Supabase unavailable');
   const row = expertToRow(expert);
-  delete row.id; // let DB auto-generate
+  delete row.id;
   if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
   const { data, error } = await supabase.from('experts').insert(row).select().single();
   if (error) throw error;
@@ -188,7 +187,7 @@ async function isFavorite(expertId) {
   return !!data;
 }
 
-// ===== 复合加载：一次性获取页面所需数据 =====
+// ===== 复合加载 =====
 async function loadAppData() {
   const [expertsResult, fieldsResult, projectsResult, favsResult] = await Promise.all([
     fetchExperts(),
@@ -204,7 +203,7 @@ async function loadAppData() {
   };
 }
 
-// ===== 数据转换：Supabase row ↔ App model =====
+// ===== 数据转换 =====
 function rowToExpert(row) {
   return {
     id: row.id,

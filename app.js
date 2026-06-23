@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 46; // v4.0 — global var fallback + full debug info
+let _latestVersion = 47; // v4.0 — inline var globals + full debug
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
