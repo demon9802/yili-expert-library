@@ -4,6 +4,10 @@
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
 console.log('%c[专家资源库 v4.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
+// v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
+if (typeof currentUser === 'undefined') var currentUser = null;
+if (typeof isAdmin === 'undefined') var isAdmin = false;
+
 // ===== DATA STORE =====
 const STORAGE_KEY = 'yili_expert_db';
 const ADMIN_KEY = 'yili_admin_config';
@@ -42,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 45; // v4.0 — simplified boot + debug info
+let _latestVersion = 48; // v4.0 — no-redeclare supabase.js + full guard
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
