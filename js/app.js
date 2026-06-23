@@ -42,7 +42,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 43; // v4.0 — Supabase 云端数据库 + GitHub Pages 部署
+let _latestVersion = 44; // v4.0 — boot timeout + error handling
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -5306,40 +5306,54 @@ function renderSettingsTab(panel) {
   ));
 }
 
-// ===== INIT (v4.0 — async Supabase load) =====
+// ===== INIT (v4.0 — async Supabase load with timeout) =====
 async function boot() {
   initState();
-  // 显示加载中
   const app = document.getElementById('app');
-  app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:16px;color:#64748b;"><div style="text-align:center;"><div style="font-size:40px;margin-bottom:12px;">⏳</div><div>正在加载专家资源库...</div></div></div>';
   
-  // 异步加载数据
-  appState.db = await getDB();
-  
-  // 初始化 AI 评分
-  if (appState.db.ratingConfig.aiScoringEnabled) {
-    let needsUpdate = false;
-    const cfg = appState.db.ratingConfig;
-    const expectedProfKeys = new Set((cfg.dimensions.find(d => d.id === 'professional')?.subDimensions || []).map(sd => sd.name));
-    const expectedInflKeys = new Set((cfg.dimensions.find(d => d.id === 'influence')?.subDimensions || []).map(sd => sd.name));
+  try {
+    // 显示加载中
+    app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:16px;color:#64748b;"><div style="text-align:center;"><div style="font-size:40px;margin-bottom:12px;">⏳</div><div>正在加载专家资源库...</div></div></div>';
     
-    appState.db.experts.forEach(e => {
-      if (!e.subScores) { aiScoreExpert(e); needsUpdate = true; }
-      else {
-        const profKeys = new Set(Object.keys(e.subScores.professional || {}));
-        const inflKeys = new Set(Object.keys(e.subScores.influence || {}));
-        if (!setsEqual(profKeys, expectedProfKeys) || !setsEqual(inflKeys, expectedInflKeys)) {
-          e.subScores = null; aiScoreExpert(e); needsUpdate = true;
+    // 异步加载数据，5秒超时兜底到 localStorage/data.js
+    appState.db = await Promise.race([
+      getDB(),
+      new Promise(function(resolve) {
+        setTimeout(function() {
+          console.warn('Supabase load timeout, falling back to localStorage/dat.js');
+          resolve(loadFromLocalOrFallback());
+        }, 5000);
+      })
+    ]);
+    
+    // 初始化 AI 评分
+    if (appState.db.ratingConfig && appState.db.ratingConfig.aiScoringEnabled) {
+      var needsUpdate = false;
+      var cfg = appState.db.ratingConfig;
+      var expectedProfKeys = new Set((cfg.dimensions.find(function(d) { return d.id === 'professional'; })?.subDimensions || []).map(function(sd) { return sd.name; }));
+      var expectedInflKeys = new Set((cfg.dimensions.find(function(d) { return d.id === 'influence'; })?.subDimensions || []).map(function(sd) { return sd.name; }));
+      
+      appState.db.experts.forEach(function(e) {
+        if (!e.subScores) { aiScoreExpert(e); needsUpdate = true; }
+        else {
+          var profKeys = new Set(Object.keys(e.subScores.professional || {}));
+          var inflKeys = new Set(Object.keys(e.subScores.influence || {}));
+          if (!setsEqual(profKeys, expectedProfKeys) || !setsEqual(inflKeys, expectedInflKeys)) {
+            e.subScores = null; aiScoreExpert(e); needsUpdate = true;
+          }
         }
+      });
+      if (needsUpdate) {
+        appState.db.experts.forEach(function(e) { recalcExpertFromSubscores(e); });
+        saveDB(appState.db);
       }
-    });
-    if (needsUpdate) {
-      appState.db.experts.forEach(e => { recalcExpertFromSubscores(e); });
-      saveDB(appState.db);
     }
+    
+    renderFrontend();
+  } catch(e) {
+    console.error('Boot failed:', e);
+    app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#ef4444;flex-direction:column;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="margin-bottom:8px;">页面加载失败</div><div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">' + (e.message || '未知错误') + '</div><button onclick="location.reload()" style="padding:8px 20px;background:#2563EB;color:#fff;border:none;border-radius:6px;cursor:pointer;">重新加载</button></div>';
   }
-  
-  renderFrontend();
 }
 
 document.addEventListener('DOMContentLoaded', boot);

@@ -3,30 +3,37 @@
 const SUPABASE_URL = 'https://owjdwwdipfsnumgoxzih.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let supabase = null;
+try {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('Supabase client initialized');
+} catch(e) {
+  console.warn('Supabase SDK not loaded, running in offline mode:', e.message);
+}
 
 // ===== Auth 状态 =====
 let currentUser = null;
 let isAdmin = false;
 
-// 初始化：检查已登录状态
-supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session) {
-    currentUser = session.user;
-    checkAdminStatus();
-  }
-});
-
-// 监听 auth 状态变化
-supabase.auth.onAuthStateChange((event, session) => {
-  if (session) {
-    currentUser = session.user;
-    checkAdminStatus();
-  } else {
-    currentUser = null;
-    isAdmin = false;
-  }
-});
+// 仅在 supabase 可用时初始化 auth
+if (supabase) {
+  supabase.auth.getSession().then(function(res) {
+    var session = res.data && res.data.session;
+    if (session) {
+      currentUser = session.user;
+      checkAdminStatus();
+    }
+  });
+  supabase.auth.onAuthStateChange(function(event, session) {
+    if (session) {
+      currentUser = session.user;
+      checkAdminStatus();
+    } else {
+      currentUser = null;
+      isAdmin = false;
+    }
+  });
+}
 
 async function checkAdminStatus() {
   if (!currentUser) { isAdmin = false; return; }
@@ -49,12 +56,14 @@ async function signOut() {
 
 // ===== 专家 CRUD =====
 async function fetchExperts() {
+  if (!supabase) return [];
   const { data, error } = await supabase.from('experts').select('*').order('sort_order', { ascending: true }).order('id', { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToExpert);
 }
 
 async function createExpert(expert) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const row = expertToRow(expert);
   delete row.id; // let DB auto-generate
   if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
@@ -64,6 +73,7 @@ async function createExpert(expert) {
 }
 
 async function updateExpert(id, expert) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const row = expertToRow(expert);
   row.updated_at = new Date().toISOString();
   const { data, error } = await supabase.from('experts').update(row).eq('id', id).select().single();
@@ -72,12 +82,14 @@ async function updateExpert(id, expert) {
 }
 
 async function deleteExpert(id) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const { error } = await supabase.from('experts').delete().eq('id', id);
   if (error) throw error;
 }
 
 // ===== 项目 CRUD =====
 async function fetchProjects() {
+  if (!supabase) return [];
   if (isAdmin) {
     const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
     if (error) throw error;
@@ -89,6 +101,7 @@ async function fetchProjects() {
 }
 
 async function createProject(project) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const row = projectToRow(project);
   if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
   const { data, error } = await supabase.from('projects').insert(row).select().single();
@@ -97,6 +110,7 @@ async function createProject(project) {
 }
 
 async function updateProject(id, project) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const row = projectToRow(project);
   row.updated_at = new Date().toISOString();
   const { data, error } = await supabase.from('projects').update(row).eq('id', id).select().single();
@@ -105,18 +119,21 @@ async function updateProject(id, project) {
 }
 
 async function deleteProject(id) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const { error } = await supabase.from('projects').delete().eq('id', id);
   if (error) throw error;
 }
 
 // ===== 分类/领域 CRUD =====
 async function fetchFields() {
+  if (!supabase) return [];
   const { data, error } = await supabase.from('fields').select('*').order('sort_order', { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToField);
 }
 
 async function createField(field) {
+  if (!supabase) throw new Error('Supabase unavailable');
   const { data, error } = await supabase.from('fields').insert({
     name: field.name,
     color: field.color || '#2563EB',
@@ -129,6 +146,7 @@ async function createField(field) {
 }
 
 async function updateField(name, field) {
+  if (!supabase) return;
   const { error } = await supabase.from('fields').update({
     color: field.color,
     text_color: field.textColor,
@@ -139,32 +157,33 @@ async function updateField(name, field) {
 }
 
 async function deleteField(name) {
+  if (!supabase) return;
   const { error } = await supabase.from('fields').delete().eq('name', name);
   if (error) throw error;
 }
 
 // ===== 收藏 CRUD =====
 async function fetchFavorites() {
-  if (!currentUser) return [];
+  if (!supabase || !currentUser) return [];
   const { data, error } = await supabase.from('favorites').select('expert_id').eq('user_id', currentUser.id);
   if (error) return [];
   return (data || []).map(f => f.expert_id);
 }
 
 async function addFavorite(expertId) {
-  if (!currentUser) return false;
+  if (!supabase || !currentUser) return false;
   const { error } = await supabase.from('favorites').upsert({ user_id: currentUser.id, expert_id: expertId });
   return !error;
 }
 
 async function removeFavorite(expertId) {
-  if (!currentUser) return false;
+  if (!supabase || !currentUser) return false;
   const { error } = await supabase.from('favorites').delete().eq('user_id', currentUser.id).eq('expert_id', expertId);
   return !error;
 }
 
 async function isFavorite(expertId) {
-  if (!currentUser) return false;
+  if (!supabase || !currentUser) return false;
   const { data } = await supabase.from('favorites').select('expert_id').eq('user_id', currentUser.id).eq('expert_id', expertId).maybeSingle();
   return !!data;
 }
