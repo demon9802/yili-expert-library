@@ -42,7 +42,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 44; // v4.0 — boot timeout + error handling
+let _latestVersion = 45; // v4.0 — simplified boot + debug info
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -5308,51 +5308,44 @@ function renderSettingsTab(panel) {
 
 // ===== INIT (v4.0 — async Supabase load with timeout) =====
 async function boot() {
-  initState();
-  const app = document.getElementById('app');
+  var app = document.getElementById('app');
+  function showError(msg, detail) {
+    app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#ef4444;flex-direction:column;padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="margin-bottom:8px;font-weight:bold;">' + msg + '</div><div style="font-size:11px;color:#94a3b8;margin-bottom:8px;max-width:500px;word-break:break-all;">' + detail + '</div><div style="font-size:10px;color:#cbd5e1;margin-bottom:16px;">DEBUG: supabase=' + (typeof supabase === 'undefined' ? 'undefined' : (supabase === null ? 'null' : 'ok')) + ' | EXPERT_DATA=' + (typeof EXPERT_DATA === 'undefined' ? 'undefined' : 'ok') + '</div><button onclick="location.reload()" style="padding:8px 20px;background:#2563EB;color:#fff;border:none;border-radius:6px;cursor:pointer;">重新加载</button></div>';
+  }
   
   try {
-    // 显示加载中
+    // Step 1: init state
+    initState();
+    
+    // Step 2: show loading
     app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:16px;color:#64748b;"><div style="text-align:center;"><div style="font-size:40px;margin-bottom:12px;">⏳</div><div>正在加载专家资源库...</div></div></div>';
     
-    // 异步加载数据，5秒超时兜底到 localStorage/data.js
-    appState.db = await Promise.race([
-      getDB(),
-      new Promise(function(resolve) {
-        setTimeout(function() {
-          console.warn('Supabase load timeout, falling back to localStorage/dat.js');
-          resolve(loadFromLocalOrFallback());
-        }, 5000);
-      })
-    ]);
-    
-    // 初始化 AI 评分
-    if (appState.db.ratingConfig && appState.db.ratingConfig.aiScoringEnabled) {
-      var needsUpdate = false;
-      var cfg = appState.db.ratingConfig;
-      var expectedProfKeys = new Set((cfg.dimensions.find(function(d) { return d.id === 'professional'; })?.subDimensions || []).map(function(sd) { return sd.name; }));
-      var expectedInflKeys = new Set((cfg.dimensions.find(function(d) { return d.id === 'influence'; })?.subDimensions || []).map(function(sd) { return sd.name; }));
-      
-      appState.db.experts.forEach(function(e) {
-        if (!e.subScores) { aiScoreExpert(e); needsUpdate = true; }
-        else {
-          var profKeys = new Set(Object.keys(e.subScores.professional || {}));
-          var inflKeys = new Set(Object.keys(e.subScores.influence || {}));
-          if (!setsEqual(profKeys, expectedProfKeys) || !setsEqual(inflKeys, expectedInflKeys)) {
-            e.subScores = null; aiScoreExpert(e); needsUpdate = true;
-          }
-        }
-      });
-      if (needsUpdate) {
-        appState.db.experts.forEach(function(e) { recalcExpertFromSubscores(e); });
-        saveDB(appState.db);
-      }
+    // Step 3: load data with timeout
+    try {
+      appState.db = await Promise.race([
+        getDB(),
+        new Promise(function(resolve) {
+          setTimeout(function() {
+            console.warn('Supabase timeout, falling back');
+            resolve(loadFromLocalOrFallback());
+          }, 5000);
+        })
+      ]);
+    } catch(dbErr) {
+      // getDB() and timeout both failed - force fallback
+      console.error('DB load failed:', dbErr);
+      appState.db = loadFromLocalOrFallback();
     }
     
+    if (!appState.db || !appState.db.experts) {
+      throw new Error('DB object invalid after load');
+    }
+    
+    // Step 4: render
     renderFrontend();
   } catch(e) {
-    console.error('Boot failed:', e);
-    app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#ef4444;flex-direction:column;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="margin-bottom:8px;">页面加载失败</div><div style="font-size:12px;color:#94a3b8;margin-bottom:16px;">' + (e.message || '未知错误') + '</div><button onclick="location.reload()" style="padding:8px 20px;background:#2563EB;color:#fff;border:none;border-radius:6px;cursor:pointer;">重新加载</button></div>';
+    console.error('Boot failed:', e, e.stack);
+    showError('页面加载失败', (e && e.message) || '未知错误');
   }
 }
 
