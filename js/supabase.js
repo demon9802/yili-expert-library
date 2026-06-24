@@ -309,3 +309,21 @@ function rowToField(row) {
     sortOrder: row.sort_order || 0
   };
 }
+
+// ===== 权限数据同步（子管理员账号 + 分享设置）=====
+async function syncPermissions(permissionsData) {
+  if (!supabase) return;
+  const { error } = await supabase.from('app_settings').upsert({
+    key: 'permissions',
+    value: permissionsData,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'key' });
+  if (error) console.warn('Permissions sync warning:', error.message);
+}
+
+async function fetchPermissions() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'permissions').maybeSingle();
+  if (error || !data) return null;
+  return data.value;
+}

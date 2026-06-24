@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 48; // v4.0 — no-redeclare supabase.js + full guard
+let _latestVersion = 49; // v4.0 — clean login UI + permissions sync
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -193,7 +193,7 @@ async function getDB() {
         uiConfig: localConfig.uiConfig || JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)),
         dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' },
         observationLibrary: localConfig.observationLibrary || [],
-        permissions: localConfig.permissions || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
+        permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
         categoryConfig: appData.fields,
         totalExperts: appData.experts.length,
         totalFields: appData.fields.length,
@@ -306,6 +306,10 @@ async function syncToSupabase(db) {
         try { await createField(field); } catch(e2) { console.warn('Field sync error:', field.name, e2.message); }
       }
     }
+  }
+  // Sync permissions (sub-admin accounts, share settings)
+  if (db.permissions) {
+    try { await syncPermissions(db.permissions); } catch(e) { console.warn('Permissions sync error:', e.message); }
   }
   console.log('[Supabase] Sync complete.');
 }
@@ -761,6 +765,13 @@ function renderFrontend() {
     }, label));
   });
   favGroup.appendChild(favFilters);
+  // 登录同步提示
+  if (!currentUser) {
+    favGroup.appendChild(h('span', {
+      style: { fontSize: '11px', color: '#94A3B8', marginLeft: '6px', cursor: 'help' },
+      title: '登录后收藏可跨设备同步'
+    }, '💡'));
+  }
   mergedBar.appendChild(favGroup);
   
   app.appendChild(mergedBar);
@@ -1987,16 +1998,7 @@ function renderDoughnutChart(containerId, labels, data) {
 
 // ===== ADMIN LOGIN (v4.0 — Supabase Auth) =====
 function showAdminLogin() {
-  // v4.0: 如果已 Supabase 登录且是管理员，直接进后台
-  if (currentUser && isAdmin) {
-    appState.currentUser = { role: 'master', email: currentUser.email };
-    appState.mode = 'admin';
-    appState.adminTab = 'experts';
-    renderAdmin();
-    return;
-  }
-  
-  appState.mode = 'admin'; // Ensure side navs are hidden
+  appState.mode = 'admin';
   const app = document.getElementById('app');
   app.innerHTML = '';
 
@@ -2010,58 +2012,16 @@ function showAdminLogin() {
     _floatingNavScrollHandler = null;
   }
   
-  // Clean up vertical field selector visibility
   const vertSel = document.getElementById('vertical-field-selector');
   if (vertSel) vertSel.classList.remove('visible');
 
   const loginBox = h('div', { className: 'admin-login' });
   loginBox.appendChild(h('h2', {}, '管理员登录'));
 
-  // ===== Supabase Magic Link 登录 =====
-  const authSection = h('div', { id: 'supabase-auth-section', style: { marginBottom: '20px' } });
-  
-  if (currentUser) {
-    authSection.appendChild(h('div', { style: { padding: '12px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', marginBottom: '12px', fontSize: '14px', color: '#991B1B' } },
-      '已登录账号 ' + currentUser.email + '，但该账号没有管理员权限。请联系主管理员授权。'
-    ));
-    authSection.appendChild(h('button', {
-      className: 'btn btn-secondary',
-      style: { width: '100%', marginTop: '8px' },
-      onclick: async () => { await signOut(); showAdminLogin(); }
-    }, '切换账号'));
-  } else {
-    authSection.appendChild(h('p', { style: { fontSize: '14px', color: '#475569', marginBottom: '12px' } },
-      '请输入管理员邮箱，系统将发送登录链接到您的邮箱。'
-    ));
-    authSection.appendChild(h('input', { type: 'email', placeholder: '请输入管理员邮箱', id: 'supabase-email', style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', marginBottom: '12px', boxSizing: 'border-box' } }));
-    
-    const msgDiv = h('div', { id: 'auth-msg', style: { fontSize: '13px', marginTop: '8px' } });
-    authSection.appendChild(msgDiv);
-    
-    authSection.appendChild(h('button', {
-      className: 'btn btn-primary',
-      style: { width: '100%' },
-      onclick: async () => {
-        const email = document.getElementById('supabase-email').value.trim();
-        if (!email) { msgDiv.textContent = '请输入邮箱地址'; msgDiv.style.color = '#DC2626'; return; }
-        msgDiv.textContent = '正在发送登录链接...';
-        msgDiv.style.color = '#2563EB';
-        try {
-          await signInWithEmail(email);
-          msgDiv.innerHTML = '✅ 登录链接已发送至 <b>' + email + '</b><br>请查收邮件并点击链接登录。<br>登录后返回此页面，点击"管理员入口"即可。';
-          msgDiv.style.color = '#059669';
-        } catch(e) {
-          msgDiv.textContent = '发送失败：' + e.message;
-          msgDiv.style.color = '#DC2626';
-        }
-      }
-    }, '发送登录链接'));
-  }
-  loginBox.appendChild(authSection);
-
-  // 分隔线
-  loginBox.appendChild(h('div', { style: { borderTop: '1px solid #E2E8F0', margin: '16px 0' } }));
-  loginBox.appendChild(h('p', { style: { fontSize: '12px', color: '#94A3B8', textAlign: 'center' } }, '— 或使用传统密码登录 —'));
+  // 说明文字
+  loginBox.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', marginBottom: '16px', lineHeight: '1.6' } },
+    '主管理员：账号留空，输入主密码即可登录。<br>子管理员：输入主管理员分发的账号和密码。'
+  ));
   
   // Account input
   loginBox.appendChild(h('input', { type: 'text', placeholder: '账号（主管理员留空）', id: 'login-account' }));
