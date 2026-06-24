@@ -3,12 +3,13 @@
 const SUPABASE_URL = 'https://owjdwwdipfsnumgoxzih.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j';
 
-let supabase = null;
+// supabase 全局变量已由 CDN SDK 声明（var supabase = ...），此处不重复声明
 try {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log('Supabase client initialized');
+  console.log('[Supabase] client initialized');
 } catch(e) {
-  console.warn('Supabase SDK not yet loaded, will retry on boot');
+  supabase = null;
+  console.warn('[Supabase] SDK not yet loaded, will retry on boot');
 }
 
 // 以下变量由 index.html 内联脚本声明，此处不重复声明

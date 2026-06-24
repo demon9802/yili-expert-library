@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 52; // v4.1 — debug project loading
+let _latestVersion = 53; // v4.1 — fix 'supabase already declared' conflict
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
