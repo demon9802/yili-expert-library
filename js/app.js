@@ -2,7 +2,7 @@
 /* Version 4.0 | 2026-06-23 | Supabase 云端数据库 + GitHub Pages 部署 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -12,18 +12,113 @@ if (typeof isAdmin === 'undefined') var isAdmin = false;
 const STORAGE_KEY = 'yili_expert_db';
 const ADMIN_KEY = 'yili_admin_config';
 const FAVORITES_KEY = 'yili_expert_favorites';
-const VERSION_CHECK_KEY = 'yili_version_check';
+
+// ===== v4.1 测试模式 =====
+const TEST_MODE_KEY = 'yili_test_mode';
+const TEST_STORAGE_KEY = 'yili_expert_db_test';
+const TEST_FAVORITES_KEY = 'yili_expert_favorites_test';
+var testModeRole = 'user'; // 测试模式默认角色：master | sub | user
+
+function isTestMode() {
+  return localStorage.getItem(TEST_MODE_KEY) === 'true';
+}
+
+function enterTestMode() {
+  localStorage.setItem(TEST_MODE_KEY, 'true');
+  window.location.reload(true);
+}
+
+function exitTestMode() {
+  localStorage.removeItem(TEST_MODE_KEY);
+  localStorage.removeItem(TEST_STORAGE_KEY);
+  localStorage.removeItem(TEST_FAVORITES_KEY);
+  window.location.reload(true);
+}
+
+function switchTestRole(role) {
+  testModeRole = role;
+  if (role === 'user') {
+    isAdmin = false;
+    currentUser = null;
+    appState.currentUser = null;
+    appState.mode = 'frontend';
+    renderFrontend();
+  } else if (role === 'master') {
+    currentUser = { role: 'master' };
+    isAdmin = true;
+    appState.currentUser = { role: 'master' };
+    appState.mode = 'admin';
+    appState.adminTab = 'experts';
+    renderAdmin();
+  } else if (role === 'sub') {
+    currentUser = { role: 'sub', account: 'test_sub', permissions: getDefaultSubPermissions() };
+    isAdmin = true;
+    appState.currentUser = currentUser;
+    appState.mode = 'admin';
+    appState.adminTab = 'experts';
+    renderAdmin();
+  }
+}
+
+// v4.1: 测试模式 — 从 seed 数据初始化，不使用 Supabase
+async function loadTestDB() {
+  // 尝试加载已有的测试数据
+  const raw = localStorage.getItem(TEST_STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.experts && parsed.experts.length > 0) {
+        console.log('[test mode] 使用已有测试数据:', parsed.experts.length, '位专家');
+        return parsed;
+      }
+    } catch(e) { console.warn('[test mode] 测试数据损坏，重新初始化'); }
+  }
+  
+  // 无测试数据 → 从 data.js 种子数据初始化
+  if (typeof EXPERT_DATA === 'undefined') {
+    console.error('[test mode] EXPERT_DATA 未加载');
+    return { experts: [], fields: [], yiliProjects: [], favorites: [], permissions: { adminPassword:'yili2026', users:[], shareSettings:{ linkActive:true, requireLogin:true } }, ratingConfig: JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG)), sortOptions: DEFAULT_SORT_OPTIONS, uiConfig: JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)), categoryConfig:[], dashboardConfig:{}, observationLibrary:[], version: CURRENT_DB_VERSION, updateTime:new Date().toISOString() };
+  }
+  
+  var seedDb = JSON.parse(JSON.stringify(EXPERT_DATA));
+  seedDb.permissions = { adminPassword: 'yili2026', users: [
+    { account: 'testsub', password: 'test123', permissions: getDefaultSubPermissions(), addedAt: new Date().toISOString() }
+  ], shareSettings: { linkActive: true, requireLogin: true } };
+  seedDb.ratingConfig = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG));
+  seedDb.sortOptions = DEFAULT_SORT_OPTIONS;
+  seedDb.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
+  seedDb.categoryConfig = EXPERT_DATA.fields || [];
+  seedDb.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  seedDb.yiliProjects = seedDb.yiliProjects || [];
+  seedDb.observationLibrary = [];
+  seedDb.favorites = [];
+  seedDb.version = CURRENT_DB_VERSION;
+  seedDb.totalExperts = seedDb.experts ? seedDb.experts.length : 0;
+  seedDb.totalFields = seedDb.fields ? seedDb.fields.length : 0;
+  seedDb.updateTime = new Date().toISOString();
+  
+  // 持久化测试数据
+  localStorage.setItem(TEST_STORAGE_KEY, JSON.stringify(seedDb));
+  console.log('[test mode] 从种子数据初始化:', seedDb.experts.length, '位专家, 子管理测试账号:', 'testsub / test123');
+  return seedDb;
+}
 
 // ===== v4.0 收藏功能 — Supabase优先，localStorage兜底 =====
 function getFavorites() {
   // 运行时由 appState.db.favorites 提供（loadAppData 已加载）
-  return appState.db && appState.db.favorites ? appState.db.favorites : [];
+  if (appState.db && appState.db.favorites) return appState.db.favorites;
+  // 测试模式回退
+  if (isTestMode()) {
+    try {
+      var raw = localStorage.getItem(TEST_FAVORITES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch(e) { return []; }
+  }
+  return [];
 }
 async function saveFavorites(arr) {
-  // Supabase 登录用户：直接写数据库
-  // 未登录用户：localStorage 兜底
   appState.db.favorites = arr;
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(arr));
+  localStorage.setItem(isTestMode() ? TEST_FAVORITES_KEY : FAVORITES_KEY, JSON.stringify(arr));
 }
 function isFavorited(expertId) {
   return getFavorites().includes(expertId);
@@ -35,37 +130,15 @@ async function toggleFavorite(expertId) {
   if (idx >= 0) {
     favs.splice(idx, 1);
     isNowFav = false;
-    if (currentUser) await removeFavorite(expertId);
+    if (currentUser && !isTestMode()) await removeFavorite(expertId);
   } else {
     favs.push(expertId);
     isNowFav = true;
-    if (currentUser) await addFavorite(expertId);
+    if (currentUser && !isTestMode()) await addFavorite(expertId);
   }
   await saveFavorites(favs);
   return isNowFav;
 }
-
-// ===== v3.0 版本刷新提示 =====
-let _latestVersion = 53; // v4.1 — fix 'supabase already declared' conflict
-(function checkVersion() {
-  const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
-  const current = parseInt(lastSeen) || 0;
-  if (current < _latestVersion) {
-    // 显示更新提示 — 不显示版本号
-    setTimeout(() => {
-      const banner = document.createElement('div');
-      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#EFF6FF;color:#1E3A5F;text-align:center;padding:8px 16px;font-size:13px;border-bottom:1px solid #93C5FD;cursor:pointer;';
-      banner.title = '点击刷新';
-      banner.innerHTML = '资源库有新内容可用，点击此处刷新页面查看';
-      banner.onclick = () => {
-        localStorage.setItem(VERSION_CHECK_KEY, String(_latestVersion));
-        window.location.reload(true);
-      };
-      document.body.insertBefore(banner, document.body.firstChild);
-      // 点击后自动消失
-    }, 500);
-  }
-})();
 
 // Default ratingConfig with sub-dimensions
 const DEFAULT_RATING_CONFIG = {
@@ -164,6 +237,11 @@ function migrateRatingConfig(cfg) {
 
 // ===== v4.0 Supabase-backed getDB =====
 async function getDB() {
+  // v4.1: 测试模式 — 从 data.js 种子数据初始化，存测试 localStorage
+  if (isTestMode()) {
+    return await loadTestDB();
+  }
+  
   try {
     // 尝试从 Supabase 加载数据
     const appData = await loadAppData();
@@ -280,6 +358,12 @@ function ensureMinimalConfig(db) {
 }
 
 function saveDB(db) {
+  // v4.1: 测试模式 — 只写测试 localStorage，不连 Supabase
+  if (isTestMode()) {
+    localStorage.setItem(TEST_STORAGE_KEY, JSON.stringify(db));
+    console.log('[test mode] 数据已保存（测试隔离）');
+    return;
+  }
   // 保存到 localStorage（配置类和离线缓存）
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   // v4.0: 管理员登录时，后台同步专家/项目/分类到 Supabase
@@ -492,8 +576,67 @@ function h(tag, attrs={}, ...children) {
   return el;
 }
 
+// ===== v4.1 测试模式横幅 =====
+function renderTestBanner() {
+  // Remove existing banner if any
+  var exist = document.getElementById('test-mode-banner');
+  if (exist) exist.remove();
+  
+  var banner = document.createElement('div');
+  banner.id = 'test-mode-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#FEE2E2;color:#991B1B;text-align:center;padding:6px 16px;font-size:13px;font-weight:600;border-bottom:2px solid #FCA5A5;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;';
+  
+  // Left section: icon + text
+  var info = document.createElement('span');
+  info.textContent = '🧪 测试模式 — 数据不会同步到云端';
+  banner.appendChild(info);
+  
+  // Role selector
+  var sel = document.createElement('select');
+  sel.style.cssText = 'padding:2px 8px;font-size:12px;border:1px solid #FCA5A5;border-radius:4px;background:#fff;color:#991B1B;cursor:pointer;';
+  var roles = [
+    { value: 'master', label: '🔑 主管理员' },
+    { value: 'sub', label: '👤 子管理员' },
+    { value: 'user', label: '👥 普通用户' }
+  ];
+  roles.forEach(function(r) {
+    var opt = document.createElement('option');
+    opt.value = r.value;
+    opt.textContent = r.label;
+    if (r.value === testModeRole) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.onchange = function() { switchTestRole(this.value); };
+  banner.appendChild(sel);
+  
+  // Exit button
+  var exitBtn = document.createElement('button');
+  exitBtn.textContent = '退出测试';
+  exitBtn.style.cssText = 'padding:2px 12px;font-size:12px;background:#DC2626;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;';
+  exitBtn.onclick = function() {
+    if (confirm('退出测试模式？\n\n测试数据将被清除，返回正常模式。')) {
+      exitTestMode();
+    }
+  };
+  banner.appendChild(exitBtn);
+  
+  document.body.insertBefore(banner, document.body.firstChild);
+  
+  // Add top padding to body to avoid content overlap
+  var origStyle = document.body.style.paddingTop;
+  document.body.style.paddingTop = '38px';
+  
+  // Clean up on exit
+  window._testBannerCleanup = function() {
+    var b = document.getElementById('test-mode-banner');
+    if (b) b.remove();
+    document.body.style.paddingTop = '0px';
+  };
+}
+
 // ===== RENDER FRONTEND =====
 function renderFrontend() {
+  if (isTestMode()) renderTestBanner();
   const app = document.getElementById('app');
   app.innerHTML = '';
   
@@ -2093,15 +2236,17 @@ function showAdminLogin() {
       const account = document.getElementById('login-account').value.trim();
       const pwd = document.getElementById('admin-pwd').value;
       const db = appState.db;
+      const inTest = isTestMode();
       
       if (!account) {
         // Master admin login
         if (pwd === db.permissions.adminPassword) {
           appState.currentUser = { role: 'master' };
-          isAdmin = true; // v4.1: 标记管理员以启用 Supabase 同步
+          isAdmin = true;
           appState.mode = 'admin';
           appState.adminTab = 'experts';
-          refreshProjectsFromSupabase().then(function() { renderAdmin(); });
+          if (inTest) { testModeRole = 'master'; renderAdmin(); }
+          else refreshProjectsFromSupabase().then(function() { renderAdmin(); });
         } else {
           showLoginError('密码错误，请重试');
         }
@@ -2118,10 +2263,11 @@ function showAdminLogin() {
             account: user.account,
             permissions: user.permissions || getDefaultSubPermissions()
           };
-          isAdmin = true; // v4.1: 标记子管理员以启用 Supabase 同步
+          isAdmin = true;
           appState.mode = 'admin';
           appState.adminTab = 'experts';
-          refreshProjectsFromSupabase().then(function() { renderAdmin(); });
+          if (inTest) { testModeRole = 'sub'; renderAdmin(); }
+          else refreshProjectsFromSupabase().then(function() { renderAdmin(); });
         }
       }
     }
@@ -2132,6 +2278,17 @@ function showAdminLogin() {
     err.style.display = 'block';
     err.textContent = msg;
   }
+  
+  // v4.1: 测试模式入口
+  loginBox.appendChild(h('button', {
+    className: 'btn',
+    style: { width: '100%', marginTop: '8px', background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' },
+    onclick: function() {
+      if (confirm('进入测试模式？\n\n测试模式使用独立的数据空间，不会影响真实生产数据。\n\n支持切换三种角色视角：\n• 主管理员\n• 子管理员（testsub / test123）\n• 普通用户')) {
+        enterTestMode();
+      }
+    }
+  }, '🧪 进入测试模式'));
   
   loginBox.appendChild(h('button', {
     className: 'btn btn-secondary',
@@ -2153,6 +2310,10 @@ function showAdminLogin() {
 
 // ===== USER LOGIN/REGISTER MODAL (v4.1) =====
 function showUserLoginModal() {
+  if (isTestMode()) {
+    toast('🧪 测试模式下无需登录，可使用角色切换器体验不同视角', 'info');
+    return;
+  }
   var overlay = h('div', {
     id: 'user-login-overlay',
     style: {
@@ -2244,7 +2405,7 @@ function showUserLoginModal() {
 }
 
 async function syncFavoritesAfterLogin() {
-  if (!currentUser) return;
+  if (!currentUser || isTestMode()) return;
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -2269,6 +2430,7 @@ function getDefaultSubPermissions() {
 }
 
 function renderAdmin() {
+  if (isTestMode()) renderTestBanner();
   const app = document.getElementById('app');
   app.innerHTML = '';
   
@@ -5414,7 +5576,7 @@ function renderSettingsTab(panel) {
   panel.appendChild(h('button', { className:'btn btn-danger', onclick: () => {
     if (confirm('确认重置所有数据到初始状态？此操作不可恢复！')) {
       if (confirm('再次确认：所有修改将丢失！')) {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(isTestMode() ? TEST_STORAGE_KEY : STORAGE_KEY);
         initState();
         renderAdmin();
         toast('数据已重置', 'success');
