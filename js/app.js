@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.0 | 2026-06-23 | Supabase 云端数据库 + GitHub Pages 部署 */
+/* Version 4.2 | 2026-06-24 | 关闭评分过滤 + 子管理员分类管理限制 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.2] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -60,9 +60,9 @@ function switchTestRole(role) {
   }
 }
 
-// v4.1: 测试模式 — 从 seed 数据初始化，不使用 Supabase
+// v4.2: 测试模式 — 优先从真实环境快照初始化，不使用 Supabase
 async function loadTestDB() {
-  // 尝试加载已有的测试数据
+  // 1. 尝试加载已有的测试数据
   const raw = localStorage.getItem(TEST_STORAGE_KEY);
   if (raw) {
     try {
@@ -74,20 +74,50 @@ async function loadTestDB() {
     } catch(e) { console.warn('[test mode] 测试数据损坏，重新初始化'); }
   }
   
-  // 无测试数据 → 从 data.js 种子数据初始化
-  if (typeof EXPERT_DATA === 'undefined') {
-    console.error('[test mode] EXPERT_DATA 未加载');
-    return { experts: [], fields: [], yiliProjects: [], favorites: [], permissions: { adminPassword:'yili2026', users:[], shareSettings:{ linkActive:true, requireLogin:true } }, ratingConfig: JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG)), sortOptions: DEFAULT_SORT_OPTIONS, uiConfig: JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)), categoryConfig:[], dashboardConfig:{}, observationLibrary:[], version: CURRENT_DB_VERSION, updateTime:new Date().toISOString() };
+  // 2. 无测试数据 → 从真实环境 localStorage 快照初始化（含管理员已设置的分类颜色、项目数据等）
+  var seedDb = null;
+  const realRaw = localStorage.getItem(STORAGE_KEY);
+  if (realRaw) {
+    try {
+      const realDb = JSON.parse(realRaw);
+      if (realDb && realDb.experts && realDb.experts.length > 0) {
+        seedDb = JSON.parse(JSON.stringify(realDb)); // 深拷贝，隔离测试环境
+        console.log('[test mode] 从真实环境数据快照初始化:', seedDb.experts.length, '位专家,', (seedDb.yiliProjects||[]).length, '个项目');
+      }
+    } catch(e) { console.warn('[test mode] 真实数据解析失败，回退到种子数据'); }
   }
   
-  var seedDb = JSON.parse(JSON.stringify(EXPERT_DATA));
+  // 3. 真实环境无数据 → 从 Supabase 异步获取（异步不阻塞，但耗时）
+  if (!seedDb && typeof supabase !== 'undefined') {
+    try {
+      console.log('[test mode] 尝试从 Supabase 获取数据快照...');
+      const { data: expertsData } = await supabase.from('experts').select('*');
+      const { data: fieldsData } = await supabase.from('fields').select('*');
+      const { data: projectsData } = await supabase.from('yili_projects').select('*');
+      if (expertsData && expertsData.length > 0) {
+        seedDb = { experts: expertsData, fields: fieldsData || [], yiliProjects: projectsData || [], favorites: [] };
+        console.log('[test mode] 从 Supabase 快照初始化:', seedDb.experts.length, '位专家');
+      }
+    } catch(e) { console.warn('[test mode] Supabase 快照失败:', e.message); }
+  }
+  
+  // 4. 最终回退：从 data.js 种子数据
+  if (!seedDb) {
+    if (typeof EXPERT_DATA === 'undefined') {
+      console.error('[test mode] 所有数据源均不可用');
+      return { experts: [], fields: [], yiliProjects: [], favorites: [], permissions: { adminPassword:'yili2026', users:[], shareSettings:{ linkActive:true, requireLogin:true } }, ratingConfig: JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG)), sortOptions: DEFAULT_SORT_OPTIONS, uiConfig: JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)), categoryConfig:[], dashboardConfig:{}, observationLibrary:[], version: CURRENT_DB_VERSION, updateTime:new Date().toISOString() };
+    }
+    console.log('[test mode] 回退到 data.js 种子数据');
+    seedDb = JSON.parse(JSON.stringify(EXPERT_DATA));
+  }
+  
+  // 统一设置测试环境固定配置
   seedDb.permissions = { adminPassword: 'yili2026', users: [
     { account: 'testsub', password: 'test123', permissions: getDefaultSubPermissions(), addedAt: new Date().toISOString() }
   ], shareSettings: { linkActive: true, requireLogin: true } };
   seedDb.ratingConfig = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG));
   seedDb.sortOptions = DEFAULT_SORT_OPTIONS;
   seedDb.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
-  seedDb.categoryConfig = EXPERT_DATA.fields || [];
   seedDb.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
   seedDb.yiliProjects = seedDb.yiliProjects || [];
   seedDb.observationLibrary = [];
@@ -99,7 +129,7 @@ async function loadTestDB() {
   
   // 持久化测试数据
   localStorage.setItem(TEST_STORAGE_KEY, JSON.stringify(seedDb));
-  console.log('[test mode] 从种子数据初始化:', seedDb.experts.length, '位专家, 子管理测试账号:', 'testsub / test123');
+  console.log('[test mode] 测试数据就绪:', seedDb.experts.length, '位专家, 项目:', (seedDb.yiliProjects||[]).length, '个, 子管理测试账号: testsub / test123');
   return seedDb;
 }
 
@@ -688,7 +718,7 @@ function renderFrontend() {
   app.appendChild(header);
   
   // Stats bar
-  const activeExperts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  const activeExperts = db.experts.filter(e => e.status !== 'eliminated');
   
   // 前端可见领域数（不含 hideWhenEmpty 且无讲师的标签）
   const frontendFieldSet = new Set(activeExperts.flatMap(e => e.fields || []));
@@ -824,8 +854,8 @@ function renderFrontend() {
   }, '全部');
   fieldFilters.appendChild(allTag);
   
-  // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家（非淘汰且综合分>=7）中无对应讲师时不展示
-  const frontendExperts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家中无对应讲师时不展示
+  const frontendExperts = db.experts.filter(e => e.status !== 'eliminated');
   const usedFieldNames = new Set(frontendExperts.flatMap(e => e.fields || []));
   const visibleFields = db.fields.filter(f => {
     if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
@@ -1089,11 +1119,9 @@ function getFilteredExperts() {
   const db = appState.db;
   let experts = db.experts.filter(e => e.status !== 'eliminated');
   
-  // Score filter (default: >=7)
+  // Score filter (only when user actively selects a threshold)
   if (appState.scoreFilter) {
     experts = experts.filter(e => e.scores.overall >= appState.scoreFilter);
-  } else {
-    experts = experts.filter(e => e.scores.overall >= 7);
   }
   
   // Field filter (multi-select, AND logic - expert must have ALL selected fields)
@@ -1822,7 +1850,7 @@ function renderScoreBar(label, score, colorClass) {
 // ===== DASHBOARD =====
 function renderMainFieldChart() {
   const db = appState.db;
-  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  const experts = db.experts.filter(e => e.status !== 'eliminated');
   
   // Filter fields same as filter bar logic
   const chartUsedFields = new Set(experts.flatMap(e => e.fields || []));
@@ -1986,7 +2014,7 @@ function renderHorizontalBarChart(containerId, displayLabels, fullLabels, data, 
 
 function showDashboard() {
   const db = appState.db;
-  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  const experts = db.experts.filter(e => e.status !== 'eliminated');
   
   const overlay = h('div', { className: 'modal-overlay dashboard-modal', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
   const content = h('div', { className: 'modal-content' });
@@ -2502,7 +2530,7 @@ function renderAdmin() {
     { id: 'settings', name: '系统设置', perm: 'systemSettings' }
   ];
   
-  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm));
+  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories');
   
   visibleTabs.forEach(tab => {
     nav.appendChild(h('button', {
@@ -4397,7 +4425,7 @@ function showImportDialog() {
       newE.scores.professional = Math.round(p * 10) / 10;
       newE.scores.influence = Math.round(inf * 10) / 10;
       newE.scores.overall = Math.round((newE.scores.professional * profDim.weight + newE.scores.influence * inflDim.weight) * 10) / 10;
-      newE.status = newE.scores.overall >= 7 ? 'active' : 'observation';
+      newE.status = 'active';
       db.experts.push(newE);
     });
     updateFieldsList(db);
@@ -4888,7 +4916,7 @@ function renderDashboardTab(panel) {
   // Live preview
   panel.appendChild(h('h4', { style:{ margin:'20px 0 12px', fontSize:'14px' } }, '实时预览'));
   
-  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  const experts = db.experts.filter(e => e.status !== 'eliminated');
   
   const previewGrid = h('div', { className: 'dashboard-grid' });
   
@@ -4958,7 +4986,7 @@ function renderDashboardTab(panel) {
 
 function exportDashboardCSV() {
   const db = appState.db;
-  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall >= 7);
+  const experts = db.experts.filter(e => e.status !== 'eliminated');
   
   // Field distribution
   const fieldCount = {};
@@ -5442,7 +5470,7 @@ function renderSettingsTab(panel) {
       e.scores.professional = Math.round(p * 10) / 10;
       e.scores.influence = Math.round(inf * 10) / 10;
       e.scores.overall = Math.round((e.scores.professional * profDim.weight + e.scores.influence * inflDim.weight) * 10) / 10;
-      e.status = e.scores.overall >= 7 ? 'active' : 'observation';
+      e.status = 'active';
       db.experts.push(e);
     });
     updateFieldsList(db);
