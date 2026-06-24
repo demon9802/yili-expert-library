@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.2 | 2026-06-24 | 关闭评分过滤 + 子管理员分类管理限制 */
+/* Version 4.3 | 2026-06-24 | 关闭评分过滤 + 子管理员分类管理限制 + 图表总数修复 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.2] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.3] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -732,8 +732,8 @@ function renderFrontend() {
   // 领域人数分布：带专家总数头部的整合图表卡片
   const chartCard = h('div', { className: 'stat-card stat-chart-card', style: { flex: '1', minWidth: '400px', padding: '16px 20px' } });
   
-  // v3.0: 专家总数徽章 — 数量以 getFilteredExperts() 实际显示为准
-  const filteredExperts = getFilteredExperts();
+  // v4.2: 专家总数徽章 — 始终显示全部前端可见专家数量，不受筛选影响
+  // 图表数据由 renderMainFieldChart() 独立计算（基于全部非淘汰专家）
   
   // 头部：标题 + 专家总数徽章
   const chartHeader = h('div', { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '4px' } });
@@ -741,8 +741,9 @@ function renderFrontend() {
   chartTitleWrap.appendChild(h('span', { className: 'inline-chart-mini-title', style: { fontSize:'13px' } }, '领域人数分布'));
   chartHeader.appendChild(chartTitleWrap);
   
-  // 专家总数蓝底徽章：合并为"共XX位专家"
-  const totalBadge = h('span', { style: { fontSize:'12px', color:'var(--primary)', background:'var(--primary-light)', padding:'3px 12px', borderRadius:'12px', fontWeight:'600' } }, '共' + filteredExperts.length + '位专家');
+  // 专家总数蓝底徽章：合并为"共XX位专家"（基于全部可见专家，不随筛选变化）
+  const totalCount = activeExperts.length;
+  const totalBadge = h('span', { style: { fontSize:'12px', color:'var(--primary)', background:'var(--primary-light)', padding:'3px 12px', borderRadius:'12px', fontWeight:'600' } }, '共' + totalCount + '位专家');
   chartHeader.appendChild(totalBadge);
   chartCard.appendChild(chartHeader);
   
