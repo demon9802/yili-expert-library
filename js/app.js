@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 49; // v4.0 — clean login UI + permissions sync
+let _latestVersion = 50; // v4.1 — isAdmin fix + field merge + user login flow
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -170,7 +170,7 @@ async function getDB() {
     if (appData.experts.length > 0 || appData.fields.length > 0) {
       // Supabase 有数据 → 优先使用
       const raw = localStorage.getItem(STORAGE_KEY);
-      let localConfig = { ratingConfig: null, sortOptions: null, uiConfig: null, dashboardConfig: null, observationLibrary: [], permissions: null };
+      let localConfig = { ratingConfig: null, sortOptions: null, uiConfig: null, dashboardConfig: null, observationLibrary: [], permissions: null, fields: null };
       if (raw) {
         try {
           const l = JSON.parse(raw);
@@ -180,12 +180,34 @@ async function getDB() {
           localConfig.dashboardConfig = l.dashboardConfig;
           localConfig.observationLibrary = l.observationLibrary || [];
           localConfig.permissions = l.permissions;
+          localConfig.fields = l.fields; // 管理员修改的分类颜色
         } catch(e) {}
+      }
+      
+      // 合并字段：Supabase 提供字段列表，localStorage 提供颜色覆盖
+      // 修复 v4.0 初始阶段管理员修改未同步到 Supabase 导致刷新后颜色丢失
+      let fields = appData.fields;
+      if (localConfig.fields && localConfig.fields.length > 0) {
+        const localFieldMap = {};
+        localConfig.fields.forEach(function(f) { if (f && f.name) localFieldMap[f.name] = f; });
+        fields = fields.map(function(f) {
+          const local = localFieldMap[f.name];
+          if (local && local.color) {
+            return {
+              name: f.name,
+              color: local.color,
+              textColor: local.textColor || '#ffffff',
+              hideWhenEmpty: local.hideWhenEmpty !== undefined ? local.hideWhenEmpty : f.hideWhenEmpty,
+              sortOrder: local.sortOrder !== undefined ? local.sortOrder : f.sortOrder
+            };
+          }
+          return f;
+        });
       }
       
       const db = {
         experts: appData.experts,
-        fields: appData.fields,
+        fields: fields,
         yiliProjects: appData.yiliProjects,
         favorites: appData.favorites,
         ratingConfig: migrateRatingConfig(localConfig.ratingConfig || JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG))),
@@ -194,7 +216,7 @@ async function getDB() {
         dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' },
         observationLibrary: localConfig.observationLibrary || [],
         permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
-        categoryConfig: appData.fields,
+        categoryConfig: fields,
         totalExperts: appData.experts.length,
         totalFields: appData.fields.length,
         version: CURRENT_DB_VERSION,
@@ -765,12 +787,27 @@ function renderFrontend() {
     }, label));
   });
   favGroup.appendChild(favFilters);
-  // 登录同步提示
+  // 用户登录入口（替换原来的 💡 小图标）
   if (!currentUser) {
-    favGroup.appendChild(h('span', {
-      style: { fontSize: '11px', color: '#94A3B8', marginLeft: '6px', cursor: 'help' },
-      title: '登录后收藏可跨设备同步'
-    }, '💡'));
+    var loginBtn = h('button', {
+      className: 'fav-login-btn',
+      style: { fontSize: '12px', padding: '4px 12px', background: '#EEF2FF', color: '#4F46E5', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '8px' },
+      onclick: showUserLoginModal
+    }, '🔐 登录同步');
+    loginBtn.title = '登录后收藏数据可跨设备同步';
+    favGroup.appendChild(loginBtn);
+  } else {
+    var userBadge = h('span', {
+      style: { fontSize: '12px', color: '#059669', marginLeft: '8px', background: '#ECFDF5', padding: '4px 10px', borderRadius: '6px', border: '1px solid #A7F3D0', whiteSpace: 'nowrap' }
+    }, '✅ ' + (currentUser.email || '').split('@')[0]);
+    userBadge.title = '已登录：' + (currentUser.email || '') + '（点击退出）';
+    userBadge.style.cursor = 'pointer';
+    userBadge.onclick = async function() {
+      await signOut();
+      alert('已退出登录');
+      renderFrontend();
+    };
+    favGroup.appendChild(userBadge);
   }
   mergedBar.appendChild(favGroup);
   
@@ -2018,10 +2055,12 @@ function showAdminLogin() {
   const loginBox = h('div', { className: 'admin-login' });
   loginBox.appendChild(h('h2', {}, '管理员登录'));
 
-  // 说明文字
-  loginBox.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', marginBottom: '16px', lineHeight: '1.6' } },
-    '主管理员：账号留空，输入主密码即可登录。<br>子管理员：输入主管理员分发的账号和密码。'
-  ));
+  // 说明文字（用元素避免 br 被当作文本）
+  const hintP = h('p', { style: { fontSize: '13px', color: '#64748B', marginBottom: '16px', lineHeight: '1.6' } });
+  hintP.appendChild(document.createTextNode('主管理员：账号留空，输入主密码即可登录。'));
+  hintP.appendChild(h('br'));
+  hintP.appendChild(document.createTextNode('子管理员：输入主管理员分发的账号和密码。'));
+  loginBox.appendChild(hintP);
   
   // Account input
   loginBox.appendChild(h('input', { type: 'text', placeholder: '账号（主管理员留空）', id: 'login-account' }));
@@ -2044,6 +2083,7 @@ function showAdminLogin() {
         // Master admin login
         if (pwd === db.permissions.adminPassword) {
           appState.currentUser = { role: 'master' };
+          isAdmin = true; // v4.1: 标记管理员以启用 Supabase 同步
           appState.mode = 'admin';
           appState.adminTab = 'experts';
           renderAdmin();
@@ -2063,6 +2103,7 @@ function showAdminLogin() {
             account: user.account,
             permissions: user.permissions || getDefaultSubPermissions()
           };
+          isAdmin = true; // v4.1: 标记子管理员以启用 Supabase 同步
           appState.mode = 'admin';
           appState.adminTab = 'experts';
           renderAdmin();
@@ -2093,6 +2134,112 @@ function showAdminLogin() {
       if (e.key === 'Enter') loginBox.querySelector('.btn-primary').click();
     });
   }, 100);
+}
+
+// ===== USER LOGIN/REGISTER MODAL (v4.1) =====
+function showUserLoginModal() {
+  var overlay = h('div', {
+    id: 'user-login-overlay',
+    style: {
+      position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+      background: 'rgba(0,0,0,0.4)', zIndex: 10000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center'
+    },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+
+  var modal = h('div', { style: {
+    background: '#fff', borderRadius: '12px', padding: '28px 24px',
+    width: '380px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
+  }});
+  
+  modal.appendChild(h('h3', { style: { margin: '0 0 6px 0', fontSize: '18px', color: '#1E293B' } }, '登录 / 注册'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 20px 0', lineHeight: '1.5' } },
+    '登录后收藏数据可跨设备同步。首次使用时将自动注册。'
+  ));
+
+  var emailInput = h('input', { type: 'email', placeholder: '请输入邮箱', id: 'user-email', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px',
+    fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px'
+  }});
+  modal.appendChild(emailInput);
+
+  var pwdInput = h('input', { type: 'password', placeholder: '请输入密码（至少6位）', id: 'user-pwd', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px',
+    fontSize: '14px', boxSizing: 'border-box', marginBottom: '8px'
+  }});
+  modal.appendChild(pwdInput);
+
+  var msgDiv = h('div', { id: 'user-login-msg', style: { fontSize: '13px', minHeight: '20px', marginBottom: '8px' } });
+  modal.appendChild(msgDiv);
+
+  var btnRow = h('div', { style: { display: 'flex', gap: '8px', marginTop: '4px' } });
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 },
+    onclick: async function() {
+      var email = document.getElementById('user-email').value.trim();
+      var pwd = document.getElementById('user-pwd').value;
+      if (!email) { msgDiv.textContent = '请输入邮箱'; msgDiv.style.color = '#DC2626'; return; }
+      if (pwd.length < 6) { msgDiv.textContent = '密码至少6位'; msgDiv.style.color = '#DC2626'; return; }
+      msgDiv.textContent = '正在登录...'; msgDiv.style.color = '#2563EB';
+      try {
+        await signInWithPassword(email, pwd);
+        msgDiv.textContent = '✅ 登录成功！'; msgDiv.style.color = '#059669';
+        setTimeout(function() {
+          overlay.remove();
+          syncFavoritesAfterLogin();
+          renderFrontend();
+        }, 800);
+      } catch(e) {
+        if (e.message && (e.message.includes('Invalid login') || e.message.includes('not found'))) {
+          msgDiv.textContent = '账号不存在，正在自动注册...'; msgDiv.style.color = '#2563EB';
+          try {
+            var result = await signUpWithPassword(email, pwd);
+            if (result.user) {
+              msgDiv.textContent = '✅ 注册成功！已自动登录'; msgDiv.style.color = '#059669';
+              currentUser = result.user;
+              setTimeout(function() {
+                overlay.remove();
+                syncFavoritesAfterLogin();
+                renderFrontend();
+              }, 800);
+            }
+          } catch(e2) {
+            msgDiv.textContent = '注册失败：' + (e2.message || '请重试');
+            msgDiv.style.color = '#DC2626';
+          }
+        } else {
+          msgDiv.textContent = '登录失败：' + (e.message || '请重试');
+          msgDiv.style.color = '#DC2626';
+        }
+      }
+    }
+  }, '登录 / 注册'));
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
+    onclick: function() { overlay.remove(); }
+  }, '取消'));
+
+  modal.appendChild(btnRow);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  setTimeout(function() { document.getElementById('user-email').focus(); }, 100);
+}
+
+async function syncFavoritesAfterLogin() {
+  if (!currentUser) return;
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var db = JSON.parse(raw);
+      var localFavs = db.favorites || [];
+      for (var i = 0; i < localFavs.length; i++) {
+        await addFavorite(localFavs[i]);
+      }
+    }
+  } catch(e) { console.warn('Favorites sync on login failed:', e.message); }
 }
 
 function getDefaultSubPermissions() {
