@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 50; // v4.1 — isAdmin fix + field merge + user login flow
+let _latestVersion = 51; // v4.1 — project RLS fix + fetch all projects
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -334,6 +334,20 @@ async function syncToSupabase(db) {
     try { await syncPermissions(db.permissions); } catch(e) { console.warn('Permissions sync error:', e.message); }
   }
   console.log('[Supabase] Sync complete.');
+}
+
+// v4.1: 管理员登录后重新拉取 Supabase 项目数据
+async function refreshProjectsFromSupabase() {
+  try {
+    const projects = await fetchProjects();
+    if (projects && projects.length > 0 && appState.db) {
+      appState.db.yiliProjects = projects;
+      saveDB(appState.db);
+      console.log('[Supabase] Projects refreshed:', projects.length);
+    }
+  } catch(e) {
+    console.warn('[Supabase] Project refresh failed:', e.message);
+  }
 }
 
 // ===== STATE =====
@@ -2086,7 +2100,7 @@ function showAdminLogin() {
           isAdmin = true; // v4.1: 标记管理员以启用 Supabase 同步
           appState.mode = 'admin';
           appState.adminTab = 'experts';
-          renderAdmin();
+          refreshProjectsFromSupabase().then(function() { renderAdmin(); });
         } else {
           showLoginError('密码错误，请重试');
         }
@@ -2106,7 +2120,7 @@ function showAdminLogin() {
           isAdmin = true; // v4.1: 标记子管理员以启用 Supabase 同步
           appState.mode = 'admin';
           appState.adminTab = 'experts';
-          renderAdmin();
+          refreshProjectsFromSupabase().then(function() { renderAdmin(); });
         }
       }
     }

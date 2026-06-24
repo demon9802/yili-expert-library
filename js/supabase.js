@@ -110,12 +110,7 @@ async function deleteExpert(id) {
 // ===== 项目 CRUD =====
 async function fetchProjects() {
   if (!supabase) return [];
-  if (isAdmin) {
-    const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(rowToProject);
-  }
-  const { data, error } = await supabase.from('projects').select('*').eq('visible', true).order('year', { ascending: false });
+  const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
   if (error) throw error;
   return (data || []).map(rowToProject);
 }
