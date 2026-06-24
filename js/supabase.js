@@ -109,8 +109,9 @@ async function deleteExpert(id) {
 
 // ===== 项目 CRUD =====
 async function fetchProjects() {
-  if (!supabase) return [];
+  if (!supabase) { console.warn('[fetchProjects] supabase client null'); return []; }
   const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
+  console.log('[fetchProjects] result:', { count: (data||[]).length, error: error ? error.message : null });
   if (error) throw error;
   return (data || []).map(rowToProject);
 }

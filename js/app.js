@@ -46,7 +46,7 @@ async function toggleFavorite(expertId) {
 }
 
 // ===== v3.0 版本刷新提示 =====
-let _latestVersion = 51; // v4.1 — project RLS fix + fetch all projects
+let _latestVersion = 52; // v4.1 — debug project loading
 (function checkVersion() {
   const lastSeen = localStorage.getItem(VERSION_CHECK_KEY);
   const current = parseInt(lastSeen) || 0;
@@ -167,6 +167,7 @@ async function getDB() {
   try {
     // 尝试从 Supabase 加载数据
     const appData = await loadAppData();
+    console.log('[getDB] loadAppData result:', { experts: appData.experts.length, fields: appData.fields.length, projects: (appData.yiliProjects||[]).length, favs: (appData.favorites||[]).length });
     if (appData.experts.length > 0 || appData.fields.length > 0) {
       // Supabase 有数据 → 优先使用
       const raw = localStorage.getItem(STORAGE_KEY);
