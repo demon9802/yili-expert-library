@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.9 | 2026-06-25 | 登录弹窗关闭按钮 + 注册错误提示优化 */
+/* Version 4.11 | 2026-06-25 | 管理后台系统文档 + 弹窗仅✕关闭 + 筛选不触发仪表盘折叠 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.9] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.11] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -828,7 +828,7 @@ function renderFrontend() {
       onclick: () => {
         appState.searchQuery = '';
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, '✕ 清除'));
   }
@@ -897,7 +897,7 @@ function renderFrontend() {
     onclick: () => {
       appState.fieldFilter = new Set();
       appState.currentPage = 1;
-      renderFrontend();
+      renderExpertGrid();
     }
   }, '全部');
   fieldFilters.appendChild(allTag);
@@ -938,7 +938,7 @@ function renderFrontend() {
         }
         appState.fieldFilter = newFilter;
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, f.name);
     fieldFilters.appendChild(tag);
@@ -950,7 +950,7 @@ function renderFrontend() {
       onclick: () => {
         appState.fieldsCollapsed = !appState.fieldsCollapsed;
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, showAll ? '收起 ▲' : '更多 ▼');
     fieldFilters.appendChild(toggleBtn);
@@ -975,7 +975,7 @@ function renderFrontend() {
       onclick: () => {
         appState.supplierFilter = filterVal;
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, label));
   });
@@ -998,7 +998,7 @@ function renderFrontend() {
       onclick: () => {
         appState.cooperationFilter = item.value;
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, item.label));
   });
@@ -1018,7 +1018,7 @@ function renderFrontend() {
       onclick: () => {
         appState.favoritesFilter = filterVal ? true : null;
         appState.currentPage = 1;
-        renderFrontend();
+        renderExpertGrid();
       }
     }, label));
   });
@@ -1070,7 +1070,7 @@ function doSearch() {
   if (input) {
     appState.searchQuery = input.value.trim();
     appState.currentPage = 1;
-    renderFrontend();
+    renderExpertGrid();
   }
 }
 
@@ -2398,7 +2398,7 @@ function showUserLoginModal() {
       background: 'rgba(0,0,0,0.4)', zIndex: 10000,
       display: 'flex', alignItems: 'center', justifyContent: 'center'
     },
-    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+    // 移除遮罩点击关闭：仅✕和取消按钮可关闭，防止用户误触重新输入
   });
 
   var modal = h('div', { style: {
@@ -2548,7 +2548,7 @@ function getDefaultSubPermissions() {
     expertImport: true, expertExport: true, expertScore: true,
     categoryManage: true,
     ratingManage: false, dashboardManage: true, observationManage: true,
-    projectsManage: true,
+    projectsManage: true, docsManage: false,
     sortManage: false, permissionManage: false, systemSettings: false
   };
 }
@@ -2623,10 +2623,11 @@ function renderAdmin() {
     { id: 'categories', name: '分类管理', perm: 'categoryManage' },
     { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
-    { id: 'settings', name: '系统设置', perm: 'systemSettings' }
+    { id: 'settings', name: '系统设置', perm: 'systemSettings' },
+    { id: 'docs', name: '📋系统文档', perm: 'docsManage' }
   ];
   
-  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories');
+  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories' && t.id !== 'docs');
   
   visibleTabs.forEach(tab => {
     nav.appendChild(h('button', {
@@ -2655,6 +2656,7 @@ function renderAdmin() {
     case 'observation': renderObservationTab(panel); break;
     case 'permissions': renderPermissionsTab(panel); break;
     case 'settings': renderSettingsTab(panel); break;
+    case 'docs': renderDocsTab(panel); break;
   }
 }
 
@@ -5715,6 +5717,101 @@ function renderSettingsTab(panel) {
     h('div', {}, '1. 将项目文件夹压缩发送给其他用户'),
     h('div', {}, '2. 部署到静态服务器（Nginx、GitHub Pages 等）'),
     h('div', {}, '3. 通过局域网文件共享访问 index.html')
+  ));
+}
+// ===== 系统文档 (v4.11 — 主管理员可见) =====
+function renderDocsTab(panel) {
+  panel.innerHTML = '';
+  panel.appendChild(h('h3', {}, '📋 系统文档'));
+
+  const docs = [
+    {
+      icon: '📊',
+      title: '版本更新进度管理表',
+      desc: '所有功能需求的优先级、排期、完成状态追踪',
+      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+      label: '打开进度表'
+    },
+    {
+      icon: '📁',
+      title: '初始化源数据表',
+      desc: '专家资源库初始数据来源（腾讯文档）',
+      url: '#',
+      label: '敬请期待（联系管理员补充链接）',
+      disabled: true
+    }
+  ];
+
+  docs.forEach(function(doc) {
+    var card = h('div', {
+      style: {
+        background: '#fff',
+        borderRadius: '10px',
+        padding: '20px 24px',
+        marginBottom: '12px',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        border: '1px solid #f0f0f0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px'
+      }
+    });
+
+    var icon = h('div', {
+      style: {
+        fontSize: '28px',
+        width: '48px',
+        height: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0f7ff',
+        borderRadius: '10px',
+        flexShrink: 0
+      }
+    }, doc.icon);
+
+    var body = h('div', { style: { flex: 1 } },
+      h('div', { style: { fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#1e293b' } }, doc.title),
+      h('div', { style: { fontSize: '13px', color: '#94a3b8', marginBottom: '8px' } }, doc.desc),
+      h('a', {
+        href: doc.url,
+        target: '_blank',
+        rel: 'noopener',
+        style: {
+          display: 'inline-block',
+          fontSize: '13px',
+          color: doc.disabled ? '#cbd5e1' : '#2563EB',
+          textDecoration: 'none',
+          cursor: doc.disabled ? 'not-allowed' : 'pointer',
+          padding: '4px 12px',
+          border: '1px solid ' + (doc.disabled ? '#e2e8f0' : '#2563EB'),
+          borderRadius: '6px'
+        },
+        onclick: doc.disabled ? function(e) { e.preventDefault(); } : null
+      }, doc.label)
+    );
+
+    card.appendChild(icon);
+    card.appendChild(body);
+    panel.appendChild(card);
+  });
+
+  // 底部提示
+  panel.appendChild(h('p', {
+    style: {
+      fontSize: '12px',
+      color: '#94a3b8',
+      marginTop: '20px',
+      padding: '12px 16px',
+      background: '#f8fafc',
+      borderRadius: '8px',
+      border: '1px dashed #e2e8f0',
+      lineHeight: 1.8
+    }
+  },
+    h('span', { style: { fontWeight: 600, color: '#64748b' } }, '💡 提示：'),
+    ' 此面板仅主管理员可见。如需补充源数据链接，请联系系统负责人更新。未来可扩展添加部署SOP、功能说明文档等。'
   ));
 }
 
