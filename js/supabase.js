@@ -59,62 +59,70 @@ async function signOut() {
 }
 
 // ===== 用户密码注册/登录（关闭邮件确认） =====
+// 注意事项：
+// 1. Supabase Dashboard → Authentication → Settings → "Confirm email" 须关闭
+// 2. 关闭后 signUp 直接返回 session，无需邮箱验证
+// 3. 注册失败"0"通常是 Supabase SDK 未能正确解析后端错误（如数据库故障）
 async function signUpWithPassword(email, password) {
   if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
-  console.log('[signUp] 开始注册:', email);
+  console.log('[signUp] 开始注册:', email, '| Supabase URL:', SUPABASE_URL);
   try {
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password
-      // 注意：emailRedirectTo 仅用于 OTP/Magic Link，password 模式下移除
     });
+    
     if (error) {
-      console.error('[signUp] Supabase 返回错误:', JSON.stringify(error), 'message:', error.message);
-      var msg = (error.message || '') + '';
+      // 安全获取错误消息
+      var msg = String(error.message != null ? error.message : '');
       var code = error.code || error.status || '';
+      var status = error.status || 0;
+      
+      console.error('[signUp] 错误详情:', JSON.stringify({ message: msg, code: code, status: status, name: error.name }));
+      
+      // 已有账号
       if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate') || code === 'user_already_exists') {
         throw new Error('该邮箱已注册，请直接登录');
       }
-      if (msg === '0' || code === '0' || (msg.includes('network') && msg.includes('fetch'))) {
-        throw new Error('网络请求失败，请检查网络连接后重试');
+      // 网络错误 或 SDK 返回空消息
+      if (msg === '0' || msg === '' || msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+        throw new Error('Supabase 连接失败（code:' + (code || '0') + '），请检查：\n1. 网络是否正常\n2. Supabase 项目状态 → Dashboard 查看项目是否 Active\n3. Database → Extensions 确认 pgcrypto 已启用');
       }
-      if (msg.indexOf('0') === 0 || msg === 'fetch_error') {
-        throw new Error('网络请求失败，请检查网络连接后重试');
+      // 邮箱确认相关
+      if (msg.includes('not confirmed') || msg.includes('verify') || msg.includes('confirm')) {
+        throw new Error('邮箱验证未关闭 → Supabase Dashboard → Authentication → Settings → 关闭 "Confirm email"');
       }
-      throw error;
+      // 频率限制
+      if (status === 429 || msg.includes('rate') || msg.includes('limit')) {
+        throw new Error('请求过于频繁，请稍后再试');
+      }
+      // 数据库错误
+      if (msg.includes('Database error') || msg.includes('unexpected_failure') || status >= 500) {
+        throw new Error('Supabase 数据库错误（' + (msg || 'Code ' + status) + '）→ 请检查 Supabase Dashboard 中 Database 是否正常、Extensions 是否启用');
+      }
+      // 其他错误，原样输出
+      throw new Error(msg || ('Supabase 返回未知错误: ' + (code || '??')));
     }
+    
     console.log('[signUp] 注册返回:', data ? (data.user ? '有user, session='+(data.session?'有':'无') : '有data无user') : '无data');
-    // 如果 Supabase 开启了邮箱确认：返回 user 但 session 为 null
+    // 邮箱确认已开启但未关闭：返回 user 但没有 session
     if (data.user && !data.session) {
-      throw new Error('邮箱验证已开启：请检查收件箱点击确认链接，或联系管理员在 Supabase 中关闭"Confirm email"');
+      throw new Error('邮箱验证未关闭 → 请检查收件箱点击确认链接，或联系管理员在 Supabase 中关闭 "Confirm email"');
     }
     if (!data.user && !data.session) {
       throw new Error('注册返回异常：未获取到用户信息，请稍后重试');
     }
     return data;
   } catch(e) {
-    // 如果已经是翻译过的 Error，直接抛出
-    if (e.message && e.message.indexOf('注册') >= 0) throw e;
-    if (e.message && e.message.indexOf('邮箱') >= 0) throw e;
-    if (e.message && e.message.indexOf('已注册') >= 0) throw e;
-    if (e.message && e.message.indexOf('网络') >= 0) throw e;
-    if (e.message && e.message.indexOf('SDK') >= 0) throw e;
-    // Supabase 返回的原始错误：直接展示给用户
-    var srcMsg = (e.message || '') + '';
-    if (srcMsg && srcMsg !== '0' && srcMsg.indexOf('fetch') < 0) {
-      // 检测常见 Supabase 错误
-      if (srcMsg.includes('already registered') || srcMsg.includes('already exists') || srcMsg.includes('duplicate')) {
-        throw new Error('该邮箱已注册，请直接登录');
-      }
-      if (srcMsg.includes('Email not confirmed') || srcMsg.includes('not confirmed') || srcMsg.includes('verify')) {
-        throw new Error('邮箱验证已开启：请在 Supabase Dashboard 关闭 "Confirm email" 后重试');
-      }
-      // 其他错误：原样展示 Supabase 消息
-      throw new Error('注册失败：' + srcMsg);
-    }
+    // 已经是翻译过的 Error 直接抛出
+    var emsg = String(e.message || '');
+    if (emsg.indexOf('注册') >= 0 || emsg.indexOf('邮箱') >= 0 || emsg.indexOf('已注册') >= 0 || emsg.indexOf('无法连接') >= 0 || emsg.indexOf('请求过于频繁') >= 0 || emsg.indexOf('Supabase') >= 0) throw e;
+    if (emsg.indexOf('网络') >= 0 || emsg.indexOf('SDK') >= 0) throw e;
+    // 原始错误展示
+    if (emsg && emsg !== '0') { throw new Error(emsg); }
     // 兜底
     console.error('[signUp] 未预期的异常:', e);
-    throw new Error('注册请求失败，请检查 Supabase 设置或稍后重试');
+    throw new Error('Supabase 连接失败，请确认项目状态正常（Dashboard → 项目设置）');
   }
 }
 
@@ -122,11 +130,15 @@ async function signInWithPassword(email, password) {
   if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    var msg = error.message || '';
-    if (msg === '0' || msg.includes('network') || msg.includes('fetch')) {
-      throw new Error('网络请求失败，请检查网络连接后重试');
+    var msg = String(error.message != null ? error.message : '');
+    var code = error.code || error.status || '';
+    if (msg === '0' || msg === '' || msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+      throw new Error('Supabase 连接失败（code:' + (code || '0') + '），请检查网络和 Supabase 项目状态');
     }
-    throw error;
+    if (msg.includes('Invalid login') || msg.includes('invalid')) {
+      throw new Error('密码错误，请重试');
+    }
+    throw new Error(msg || ('登录失败: ' + (code || '未知错误')));
   }
   currentUser = data.user;
   await checkAdminStatus();
