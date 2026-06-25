@@ -61,27 +61,44 @@ async function signOut() {
 // ===== 用户密码注册/登录（关闭邮件确认） =====
 async function signUpWithPassword(email, password) {
   if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
-  const { data, error } = await supabase.auth.signUp({ 
-    email, 
-    password,
-    options: { emailRedirectTo: window.location.origin }
-  });
-  if (error) {
-    // 常见错误翻译
-    var msg = error.message || '';
-    if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
-      throw new Error('该邮箱已注册，请直接登录');
+  console.log('[signUp] 开始注册:', email);
+  try {
+    const { data, error } = await supabase.auth.signUp({ 
+      email, 
+      password
+      // 注意：emailRedirectTo 仅用于 OTP/Magic Link，password 模式下移除
+    });
+    if (error) {
+      console.error('[signUp] Supabase 返回错误:', JSON.stringify(error), 'message:', error.message);
+      var msg = (error.message || '') + '';
+      var code = error.code || error.status || '';
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate') || code === 'user_already_exists') {
+        throw new Error('该邮箱已注册，请直接登录');
+      }
+      if (msg === '0' || code === '0' || (msg.includes('network') && msg.includes('fetch'))) {
+        throw new Error('网络请求失败，请检查网络连接后重试');
+      }
+      if (msg.indexOf('0') === 0 || msg === 'fetch_error') {
+        throw new Error('网络请求失败，请检查网络连接后重试');
+      }
+      throw error;
     }
-    if (msg === '0' || msg.includes('network') || msg.includes('fetch')) {
-      throw new Error('网络请求失败，请检查网络连接后重试');
+    console.log('[signUp] 注册返回:', data ? (data.user ? '有user' : '有data无user') : '无data');
+    // 如果 Supabase 开启了邮箱确认，signUp 返回 user 但 session 为 null
+    if (!data.user && !data.session) {
+      throw new Error('注册请求已提交，请检查邮箱确认链接，或联系管理员关闭邮箱验证');
     }
-    throw error;
+    return data;
+  } catch(e) {
+    // 如果已经是翻译过的 Error，直接抛出
+    if (e.message && e.message.indexOf('注册') >= 0) throw e;
+    if (e.message && e.message.indexOf('已注册') >= 0) throw e;
+    if (e.message && e.message.indexOf('网络') >= 0) throw e;
+    if (e.message && e.message.indexOf('SDK') >= 0) throw e;
+    // 否则包装为网络错误
+    console.error('[signUp] 未预期的异常:', e);
+    throw new Error('注册请求失败，请稍后重试（如持续失败，可能需管理员在 Supabase 中关闭邮箱验证）');
   }
-  // 如果 Supabase 开启了邮箱确认，signUp 返回 user 但 session 为 null
-  if (!data.user && !data.session) {
-    throw new Error('注册请求已提交，请检查邮箱确认链接，或联系管理员关闭邮箱验证');
-  }
-  return data;
 }
 
 async function signInWithPassword(email, password) {

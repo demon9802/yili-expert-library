@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.5 | 2026-06-25 | 收藏双向同步 + 游客收藏修复 + 注册修复 */
+/* Version 4.6 | 2026-06-25 | 收藏取消星号修复 + 注册错误增强 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.5] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.6] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -1293,9 +1293,9 @@ function renderExpertGrid() {
     const favStar = h('span', {
       className: 'card-fav-star' + (favved ? ' active' : ''),
       title: favved ? '取消收藏' : '收藏专家',
-      onclick: (e) => {
+      onclick: async (e) => {
         e.stopPropagation();
-        const nowFavved = toggleFavorite(expert.id);
+        const nowFavved = await toggleFavorite(expert.id);
         favStar.className = 'card-fav-star' + (nowFavved ? ' active' : '');
         favStar.title = nowFavved ? '取消收藏' : '收藏专家';
         favStar.textContent = nowFavved ? '⭐' : '☆';
