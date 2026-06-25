@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.3 | 2026-06-24 | 关闭评分过滤 + 子管理员分类管理限制 + 图表总数修复 */
+/* Version 4.4 | 2026-06-25 | 收藏双向同步 + 登录状态完善 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.3] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.4] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -272,6 +272,17 @@ async function getDB() {
     return await loadTestDB();
   }
   
+  // v4.4: 确保 session 在 loadAppData 之前已恢复
+  try {
+    if (typeof supabase !== 'undefined' && supabase && !currentUser) {
+      var sessionRes = await supabase.auth.getSession();
+      if (sessionRes.data && sessionRes.data.session) {
+        currentUser = sessionRes.data.session.user;
+        await checkAdminStatus();
+      }
+    }
+  } catch(e) { /* session 恢复失败，继续以未登录状态运行 */ }
+  
   try {
     // 尝试从 Supabase 加载数据
     const appData = await loadAppData();
@@ -314,11 +325,26 @@ async function getDB() {
         });
       }
       
+      // v4.4: 登录用户收藏双向合并 — localStorage ∪ Supabase
+      var mergedFavorites = appData.favorites.slice();
+      if (currentUser) {
+        var localRaw = localStorage.getItem(STORAGE_KEY);
+        var localFavs = localRaw ? (JSON.parse(localRaw).favorites || []) : [];
+        var supabaseFavSet = new Set(appData.favorites);
+        for (var fi = 0; fi < localFavs.length; fi++) {
+          if (!supabaseFavSet.has(localFavs[fi])) {
+            mergedFavorites.push(localFavs[fi]);
+            addFavorite(localFavs[fi]).catch(function(){}); // 异步推送到 Supabase
+          }
+        }
+        console.log('[getDB] Merged favorites: local=' + localFavs.length + ' supabase=' + appData.favorites.length + ' → merged=' + mergedFavorites.length);
+      }
+      
       const db = {
         experts: appData.experts,
         fields: fields,
         yiliProjects: appData.yiliProjects,
-        favorites: appData.favorites,
+        favorites: mergedFavorites,
         ratingConfig: migrateRatingConfig(localConfig.ratingConfig || JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG))),
         sortOptions: localConfig.sortOptions || DEFAULT_SORT_OPTIONS,
         uiConfig: localConfig.uiConfig || JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)),
@@ -992,8 +1018,9 @@ function renderFrontend() {
     userBadge.title = '已登录：' + (currentUser.email || '') + '（点击退出）';
     userBadge.style.cursor = 'pointer';
     userBadge.onclick = async function() {
+      if (!confirm('确定退出登录？收藏数据将保留在本地。')) return;
       await signOut();
-      alert('已退出登录');
+      appState.db.favorites = (JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}').favorites || []);
       renderFrontend();
     };
     favGroup.appendChild(userBadge);
@@ -2433,17 +2460,48 @@ function showUserLoginModal() {
   setTimeout(function() { document.getElementById('user-email').focus(); }, 100);
 }
 
+// v4.4: 登录后收藏双向同步 — Supabase ↔ localStorage 合并
 async function syncFavoritesAfterLogin() {
   if (!currentUser || isTestMode()) return;
   try {
+    // 1. 读取本地收藏
     var raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      var db = JSON.parse(raw);
-      var localFavs = db.favorites || [];
-      for (var i = 0; i < localFavs.length; i++) {
+    var localFavs = raw ? (JSON.parse(raw).favorites || []) : [];
+    
+    // 2. 读取 Supabase 收藏
+    var remoteFavs = await fetchFavorites();
+    
+    // 3. 双向合并：取并集
+    var remoteSet = new Set(remoteFavs);
+    var localSet = new Set(localFavs);
+    var merged = remoteFavs.slice();
+    
+    // 4. 本地独有 → 推送到 Supabase
+    for (var i = 0; i < localFavs.length; i++) {
+      if (!remoteSet.has(localFavs[i])) {
+        merged.push(localFavs[i]);
         await addFavorite(localFavs[i]);
       }
     }
+    
+    // 5. Supabase 独有 → 写入 appState + localStorage
+    for (var j = 0; j < remoteFavs.length; j++) {
+      if (!localSet.has(remoteFavs[j])) {
+        // 已在 merged 中，确保写入 localStorage
+      }
+    }
+    
+    // 6. 应用合并结果
+    appState.db.favorites = merged;
+    if (appState.db && raw) {
+      var fullDb = JSON.parse(raw);
+      fullDb.favorites = merged;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fullDb));
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState.db));
+    }
+    
+    console.log('[syncFav] 双向同步完成: local=' + localFavs.length + ' supabase=' + remoteFavs.length + ' → merged=' + merged.length);
   } catch(e) { console.warn('Favorites sync on login failed:', e.message); }
 }
 
