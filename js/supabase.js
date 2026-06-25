@@ -83,21 +83,38 @@ async function signUpWithPassword(email, password) {
       }
       throw error;
     }
-    console.log('[signUp] 注册返回:', data ? (data.user ? '有user' : '有data无user') : '无data');
-    // 如果 Supabase 开启了邮箱确认，signUp 返回 user 但 session 为 null
+    console.log('[signUp] 注册返回:', data ? (data.user ? '有user, session='+(data.session?'有':'无') : '有data无user') : '无data');
+    // 如果 Supabase 开启了邮箱确认：返回 user 但 session 为 null
+    if (data.user && !data.session) {
+      throw new Error('邮箱验证已开启：请检查收件箱点击确认链接，或联系管理员在 Supabase 中关闭"Confirm email"');
+    }
     if (!data.user && !data.session) {
-      throw new Error('注册请求已提交，请检查邮箱确认链接，或联系管理员关闭邮箱验证');
+      throw new Error('注册返回异常：未获取到用户信息，请稍后重试');
     }
     return data;
   } catch(e) {
     // 如果已经是翻译过的 Error，直接抛出
     if (e.message && e.message.indexOf('注册') >= 0) throw e;
+    if (e.message && e.message.indexOf('邮箱') >= 0) throw e;
     if (e.message && e.message.indexOf('已注册') >= 0) throw e;
     if (e.message && e.message.indexOf('网络') >= 0) throw e;
     if (e.message && e.message.indexOf('SDK') >= 0) throw e;
-    // 否则包装为网络错误
+    // Supabase 返回的原始错误：直接展示给用户
+    var srcMsg = (e.message || '') + '';
+    if (srcMsg && srcMsg !== '0' && srcMsg.indexOf('fetch') < 0) {
+      // 检测常见 Supabase 错误
+      if (srcMsg.includes('already registered') || srcMsg.includes('already exists') || srcMsg.includes('duplicate')) {
+        throw new Error('该邮箱已注册，请直接登录');
+      }
+      if (srcMsg.includes('Email not confirmed') || srcMsg.includes('not confirmed') || srcMsg.includes('verify')) {
+        throw new Error('邮箱验证已开启：请在 Supabase Dashboard 关闭 "Confirm email" 后重试');
+      }
+      // 其他错误：原样展示 Supabase 消息
+      throw new Error('注册失败：' + srcMsg);
+    }
+    // 兜底
     console.error('[signUp] 未预期的异常:', e);
-    throw new Error('注册请求失败，请稍后重试（如持续失败，可能需管理员在 Supabase 中关闭邮箱验证）');
+    throw new Error('注册请求失败，请检查 Supabase 设置或稍后重试');
   }
 }
 
