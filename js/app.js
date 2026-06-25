@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.11 | 2026-06-25 | 管理后台系统文档 + 弹窗仅✕关闭 + 筛选不触发仪表盘折叠 */
+/* Version 4.12 | 2026-06-25 | 筛选UI高亮修复 + syncFilterUI */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.11] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.12] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -828,6 +828,7 @@ function renderFrontend() {
       onclick: () => {
         appState.searchQuery = '';
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, '✕ 清除'));
@@ -852,6 +853,7 @@ function renderFrontend() {
       onclick: () => {
         appState.scoreFilter = v;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, scoreKeys[i]);
@@ -897,6 +899,7 @@ function renderFrontend() {
     onclick: () => {
       appState.fieldFilter = new Set();
       appState.currentPage = 1;
+      syncFilterUI();
       renderExpertGrid();
     }
   }, '全部');
@@ -938,6 +941,7 @@ function renderFrontend() {
         }
         appState.fieldFilter = newFilter;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, f.name);
@@ -950,6 +954,7 @@ function renderFrontend() {
       onclick: () => {
         appState.fieldsCollapsed = !appState.fieldsCollapsed;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, showAll ? '收起 ▲' : '更多 ▼');
@@ -964,7 +969,7 @@ function renderFrontend() {
   const mergedBar = h('div', { className: 'filter-bar merged-bar-wrapper', style: { marginTop: '8px' } });
   
   // 是否在库
-  const supplierGroup = h('div', { className: 'filter-group' });
+  const supplierGroup = h('div', { className: 'filter-group', id: 'supplier-filter-group' });
   supplierGroup.appendChild(h('span', { className: 'filter-label' }, '是否在库：'));
   const supplierFilters = h('div', { className: 'field-filters' });
   ['全部', '是', '否'].forEach(label => {
@@ -975,6 +980,7 @@ function renderFrontend() {
       onclick: () => {
         appState.supplierFilter = filterVal;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, label));
@@ -983,7 +989,7 @@ function renderFrontend() {
   mergedBar.appendChild(supplierGroup);
   
   // 合作经历
-  const coopGroup = h('div', { className: 'filter-group' });
+  const coopGroup = h('div', { className: 'filter-group', id: 'coop-filter-group' });
   coopGroup.appendChild(h('span', { className: 'filter-label' }, '合作经历：'));
   const coopFilters = h('div', { className: 'field-filters' });
   [
@@ -998,6 +1004,7 @@ function renderFrontend() {
       onclick: () => {
         appState.cooperationFilter = item.value;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, item.label));
@@ -1006,7 +1013,7 @@ function renderFrontend() {
   mergedBar.appendChild(coopGroup);
   
   // 收藏筛选
-  const favGroup = h('div', { className: 'filter-group' });
+  const favGroup = h('div', { className: 'filter-group', id: 'fav-filter-group' });
   favGroup.appendChild(h('span', { className: 'filter-label' }, '收藏：'));
   const favFilters = h('div', { className: 'field-filters' });
   ['全部', '⭐ 我的收藏'].forEach(label => {
@@ -1018,6 +1025,7 @@ function renderFrontend() {
       onclick: () => {
         appState.favoritesFilter = filterVal ? true : null;
         appState.currentPage = 1;
+        syncFilterUI();
         renderExpertGrid();
       }
     }, label));
@@ -1061,6 +1069,84 @@ function renderFrontend() {
   
   // Render main page field chart
   setTimeout(() => renderMainFieldChart(), 200);
+}
+
+// ===== v4.12: 筛选 UI 同步 — 筛选变化后更新按钮高亮状态 =====
+function syncFilterUI() {
+  var db = appState.db;
+  
+  // 1. 分值筛选按钮
+  document.querySelectorAll('.score-btn').forEach(function(btn) {
+    var t = btn.textContent.trim();
+    var valMap = { '全部': null, '9+': 9, '8+': 8, '7+': 7 };
+    if (valMap[t] !== undefined) {
+      btn.classList.toggle('active', appState.scoreFilter === valMap[t]);
+    }
+  });
+  
+  // 2. 领域筛选 "全部" 标签
+  var fieldAll = document.querySelector('#field-filters .field-tag-all');
+  if (fieldAll) fieldAll.classList.toggle('active', appState.fieldFilter.size === 0);
+  
+  // 3. 领域筛选各标签（含颜色内联样式同步）
+  document.querySelectorAll('#field-filters .field-tag:not(.field-tag-all)').forEach(function(tag) {
+    var name = tag.textContent.trim();
+    var isActive = appState.fieldFilter.has(name);
+    tag.classList.toggle('active', isActive);
+    var f = db.fields.find(function(ff) { return ff.name === name; });
+    if (f) {
+      tag.style.background = isActive ? f.color : (f.color + '22');
+      tag.style.color = '#4A4A4A';
+      tag.style.borderColor = f.color;
+    }
+  });
+  
+  // 4. 是否在库筛选
+  var supplierGroup = document.getElementById('supplier-filter-group');
+  if (supplierGroup) {
+    supplierGroup.querySelectorAll('.field-tag').forEach(function(tag) {
+      var t = tag.textContent.trim();
+      var val = t === '全部' ? null : (t === '是');
+      tag.classList.toggle('active', appState.supplierFilter === val);
+    });
+  }
+  
+  // 5. 合作经历筛选
+  var coopGroup = document.getElementById('coop-filter-group');
+  if (coopGroup) {
+    coopGroup.querySelectorAll('.field-tag').forEach(function(tag) {
+      var t = tag.textContent.trim();
+      var val = t === '全部' ? null : (t === '已合作');
+      var isActive = appState.cooperationFilter === val;
+      tag.classList.toggle('active', isActive);
+      // 清除内联样式让 CSS 类控制外观
+      if (isActive) {
+        if (val === true) {
+          tag.style.background = '#dcfce7'; tag.style.borderColor = '#22c55e'; tag.style.color = '#166534';
+        } else if (val === false) {
+          tag.style.background = '#fef2f2'; tag.style.borderColor = '#fca5a5'; tag.style.color = '#991b1b';
+        }
+      } else {
+        tag.style.background = ''; tag.style.borderColor = ''; tag.style.color = '';
+      }
+    });
+  }
+  
+  // 6. 收藏筛选
+  var favGroup = document.getElementById('fav-filter-group');
+  if (favGroup) {
+    favGroup.querySelectorAll('.field-tag').forEach(function(tag) {
+      var t = tag.textContent.trim();
+      var val = t.includes('收藏');
+      var isActive = appState.favoritesFilter === val;
+      tag.classList.toggle('active', isActive);
+      if (isActive && val) {
+        tag.style.background = '#FEF3C7'; tag.style.borderColor = '#F59E0B'; tag.style.color = '#92400E';
+      } else {
+        tag.style.background = ''; tag.style.borderColor = ''; tag.style.color = '';
+      }
+    });
+  }
 }
 
 // ===== v3.0: 垂直领域导航已移除，代码备份在 backup/vertical-nav-backup.js =====
