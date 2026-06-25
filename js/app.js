@@ -5815,16 +5815,15 @@ function renderDocsTab(panel) {
       icon: '📊',
       title: '版本更新进度管理表',
       desc: '所有功能需求的优先级、排期、完成状态追踪',
-      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h&_fid=DTVJIWmh2ZXdBUE14',
       label: '打开进度表'
     },
     {
       icon: '📁',
       title: '初始化源数据表',
       desc: '专家资源库初始数据来源（腾讯文档）',
-      url: '#',
-      label: '敬请期待（联系管理员补充链接）',
-      disabled: true
+      url: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou&_fid=DTUROVmZod2FxSGFO',
+      label: '打开源数据表'
     }
   ];
 
