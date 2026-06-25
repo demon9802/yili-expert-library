@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.8 | 2026-06-25 | 数据库错误透传 + "0"类型修复 */
+/* Version 4.9 | 2026-06-25 | 登录弹窗关闭按钮 + 注册错误提示优化 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.8] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.9] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -2403,8 +2403,20 @@ function showUserLoginModal() {
 
   var modal = h('div', { style: {
     background: '#fff', borderRadius: '12px', padding: '28px 24px',
-    width: '380px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
+    width: '380px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+    position: 'relative'
   }});
+
+  // P0: 关闭按钮（右上角）
+  modal.appendChild(h('button', {
+    style: {
+      position: 'absolute', top: '12px', right: '14px',
+      background: 'none', border: 'none', cursor: 'pointer',
+      fontSize: '18px', color: '#94A3B8', lineHeight: 1, padding: '4px'
+    },
+    title: '关闭',
+    onclick: function() { overlay.remove(); }
+  }, '✕'));
   
   modal.appendChild(h('h3', { style: { margin: '0 0 6px 0', fontSize: '18px', color: '#1E293B' } }, '登录 / 注册'));
   modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 20px 0', lineHeight: '1.5' } },
@@ -2445,12 +2457,13 @@ function showUserLoginModal() {
           renderFrontend();
         }, 800);
       } catch(e) {
-        if (e.message && (e.message.includes('Invalid login') || e.message.includes('not found'))) {
+        var eMsg = e.message || '';
+        // 账号不存在 → 自动注册
+        if (eMsg.includes('Invalid login') || eMsg.includes('invalid_credentials') || eMsg.includes('not found') || eMsg.includes('密码错误')) {
           msgDiv.textContent = '账号不存在，正在自动注册...'; msgDiv.style.color = '#2563EB';
           try {
             var result = await signUpWithPassword(email, pwd);
             if (result.user && result.session) {
-              // 邮箱确认已关闭，注册即登录
               currentUser = result.user;
               msgDiv.textContent = '✅ 注册成功！已自动登录'; msgDiv.style.color = '#059669';
               setTimeout(function() {
@@ -2459,15 +2472,14 @@ function showUserLoginModal() {
                 renderFrontend();
               }, 800);
             } else if (result.user) {
-              // 邮箱确认已开启，注册成功但需验证邮箱
-              msgDiv.textContent = '⚠️ 注册成功，但需验证邮箱后才能登录。请检查收件箱（含垃圾邮件）'; msgDiv.style.color = '#D97706';
+              msgDiv.textContent = '⚠️ 注册成功，请检查收件箱验证邮箱后再登录'; msgDiv.style.color = '#D97706';
             }
           } catch(e2) {
-            msgDiv.textContent = '注册失败：' + (e2.message || '请重试');
+            msgDiv.textContent = (e2.message || '注册失败，请重试');
             msgDiv.style.color = '#DC2626';
           }
         } else {
-          msgDiv.textContent = '登录失败：' + (e.message || '请重试');
+          msgDiv.textContent = eMsg || '登录失败，请重试';
           msgDiv.style.color = '#DC2626';
         }
       }
