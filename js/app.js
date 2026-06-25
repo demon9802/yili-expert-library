@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.4 | 2026-06-25 | 收藏双向同步 + 登录状态完善 */
+/* Version 4.5 | 2026-06-25 | 收藏双向同步 + 游客收藏修复 + 注册修复 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.4] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.5] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -135,20 +135,41 @@ async function loadTestDB() {
 
 // ===== v4.0 收藏功能 — Supabase优先，localStorage兜底 =====
 function getFavorites() {
-  // 运行时由 appState.db.favorites 提供（loadAppData 已加载）
-  if (appState.db && appState.db.favorites) return appState.db.favorites;
-  // 测试模式回退
-  if (isTestMode()) {
-    try {
-      var raw = localStorage.getItem(TEST_FAVORITES_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch(e) { return []; }
+  // v4.5: 游客收藏修复 — appState.db.favorites 可能被 loadAppData() 覆盖为空，
+  // 回退到独立 FAVORITES_KEY 获取正确的收藏数据
+  if (appState.db && appState.db.favorites && appState.db.favorites.length > 0) {
+    return appState.db.favorites;
   }
+  // 回退：从独立 localStorage 键读取（游客收藏存在这里）
+  var key = isTestMode() ? TEST_FAVORITES_KEY : FAVORITES_KEY;
+  try {
+    var raw = localStorage.getItem(key);
+    if (raw) {
+      var favs = JSON.parse(raw);
+      if (favs.length > 0) {
+        // 如果 appState.db 中收藏为空但独立存储有数据，回填到 appState
+        if (appState.db) appState.db.favorites = favs;
+        return favs;
+      }
+    }
+  } catch(e) {}
   return [];
 }
 async function saveFavorites(arr) {
   appState.db.favorites = arr;
+  // 独立存储（游客收藏的主存储）
   localStorage.setItem(isTestMode() ? TEST_FAVORITES_KEY : FAVORITES_KEY, JSON.stringify(arr));
+  // v4.5: 同步到 STORAGE_KEY，防止 getDB() 覆盖
+  if (appState.db) {
+    try {
+      var raw = localStorage.getItem(isTestMode() ? 'yili_expert_db_test' : STORAGE_KEY);
+      if (raw) {
+        var db = JSON.parse(raw);
+        db.favorites = arr;
+        localStorage.setItem(isTestMode() ? 'yili_expert_db_test' : STORAGE_KEY, JSON.stringify(db));
+      }
+    } catch(e) {}
+  }
 }
 function isFavorited(expertId) {
   return getFavorites().includes(expertId);
@@ -2428,14 +2449,18 @@ function showUserLoginModal() {
           msgDiv.textContent = '账号不存在，正在自动注册...'; msgDiv.style.color = '#2563EB';
           try {
             var result = await signUpWithPassword(email, pwd);
-            if (result.user) {
-              msgDiv.textContent = '✅ 注册成功！已自动登录'; msgDiv.style.color = '#059669';
+            if (result.user && result.session) {
+              // 邮箱确认已关闭，注册即登录
               currentUser = result.user;
+              msgDiv.textContent = '✅ 注册成功！已自动登录'; msgDiv.style.color = '#059669';
               setTimeout(function() {
                 overlay.remove();
                 syncFavoritesAfterLogin();
                 renderFrontend();
               }, 800);
+            } else if (result.user) {
+              // 邮箱确认已开启，注册成功但需验证邮箱
+              msgDiv.textContent = '⚠️ 注册成功，但需验证邮箱后才能登录。请检查收件箱（含垃圾邮件）'; msgDiv.style.color = '#D97706';
             }
           } catch(e2) {
             msgDiv.textContent = '注册失败：' + (e2.message || '请重试');

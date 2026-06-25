@@ -3,19 +3,23 @@
 const SUPABASE_URL = 'https://owjdwwdipfsnumgoxzih.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j';
 
-// supabase 全局变量已由 CDN SDK 声明（var supabase = ...），此处不重复声明
+// 注意：不声明 supabase 变量（CDN SDK 已用 var supabase 声明全局变量，let 会导致 SyntaxError）
 try {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log('[Supabase] client initialized');
+  if (typeof window.supabase !== 'undefined') {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('Supabase client initialized');
+  } else {
+    console.warn('Supabase CDN SDK not loaded');
+  }
 } catch(e) {
-  supabase = null;
-  console.warn('[Supabase] SDK not yet loaded, will retry on boot');
+  console.warn('Supabase SDK init failed:', e.message);
 }
 
-// 以下变量由 index.html 内联脚本声明，此处不重复声明
-// var currentUser, isAdmin — 已在 index.html 中用 var 全局建立
+// ===== Auth 状态 =====
+var currentUser = null;
+var isAdmin = false;
 
-// 初始化：检查已登录状态
+// 仅在 supabase 可用时初始化 auth
 if (supabase) {
   supabase.auth.getSession().then(function(res) {
     var session = res.data && res.data.session;
@@ -23,9 +27,7 @@ if (supabase) {
       currentUser = session.user;
       checkAdminStatus();
     }
-  }).catch(function() {});
-
-  // 监听 auth 状态变化
+  });
   supabase.auth.onAuthStateChange(function(event, session) {
     if (session) {
       currentUser = session.user;
@@ -37,21 +39,17 @@ if (supabase) {
   });
 }
 
-function checkAdminStatus() {
+async function checkAdminStatus() {
   if (!currentUser) { isAdmin = false; return; }
-  if (!supabase) { isAdmin = false; return; }
-  supabase.from('profiles').select('is_admin').eq('id', currentUser.id).single().then(function(result) {
-    isAdmin = result.data && result.data.is_admin === true;
-  }).catch(function() { isAdmin = false; });
+  const { data } = await supabase.from('profiles').select('is_admin').eq('id', currentUser.id).single();
+  isAdmin = data?.is_admin === true;
 }
 
 // ===== 登录/登出 =====
-function signInWithEmail(email) {
-  if (!supabase) throw new Error('Supabase unavailable');
-  return supabase.auth.signInWithOtp({ email: email }).then(function(result) {
-    if (result.error) throw result.error;
-    return true;
-  });
+async function signInWithEmail(email) {
+  const { error } = await supabase.auth.signInWithOtp({ email });
+  if (error) throw error;
+  return true;
 }
 
 async function signOut() {
@@ -62,14 +60,40 @@ async function signOut() {
 
 // ===== 用户密码注册/登录（关闭邮件确认） =====
 async function signUpWithPassword(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
+  if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
+  const { data, error } = await supabase.auth.signUp({ 
+    email, 
+    password,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  if (error) {
+    // 常见错误翻译
+    var msg = error.message || '';
+    if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
+      throw new Error('该邮箱已注册，请直接登录');
+    }
+    if (msg === '0' || msg.includes('network') || msg.includes('fetch')) {
+      throw new Error('网络请求失败，请检查网络连接后重试');
+    }
+    throw error;
+  }
+  // 如果 Supabase 开启了邮箱确认，signUp 返回 user 但 session 为 null
+  if (!data.user && !data.session) {
+    throw new Error('注册请求已提交，请检查邮箱确认链接，或联系管理员关闭邮箱验证');
+  }
   return data;
 }
 
 async function signInWithPassword(email, password) {
+  if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
+  if (error) {
+    var msg = error.message || '';
+    if (msg === '0' || msg.includes('network') || msg.includes('fetch')) {
+      throw new Error('网络请求失败，请检查网络连接后重试');
+    }
+    throw error;
+  }
   currentUser = data.user;
   await checkAdminStatus();
   return data;
@@ -87,7 +111,7 @@ async function createExpert(expert) {
   if (!supabase) throw new Error('Supabase unavailable');
   const row = expertToRow(expert);
   delete row.id; // let DB auto-generate
-  if (!row.created_by) row.created_by = currentUser ? currentUser.email || '主管理员' : '主管理员';
+  if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
   const { data, error } = await supabase.from('experts').insert(row).select().single();
   if (error) throw error;
   return rowToExpert(data);
@@ -110,9 +134,13 @@ async function deleteExpert(id) {
 
 // ===== 项目 CRUD =====
 async function fetchProjects() {
-  if (!supabase) { console.warn('[fetchProjects] supabase client null'); return []; }
-  const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
-  console.log('[fetchProjects] result:', { count: (data||[]).length, error: error ? error.message : null });
+  if (!supabase) return [];
+  if (isAdmin) {
+    const { data, error } = await supabase.from('projects').select('*').order('year', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(rowToProject);
+  }
+  const { data, error } = await supabase.from('projects').select('*').eq('visible', true).order('year', { ascending: false });
   if (error) throw error;
   return (data || []).map(rowToProject);
 }
@@ -120,7 +148,7 @@ async function fetchProjects() {
 async function createProject(project) {
   if (!supabase) throw new Error('Supabase unavailable');
   const row = projectToRow(project);
-  if (!row.created_by) row.created_by = currentUser ? currentUser.email || '主管理员' : '主管理员';
+  if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
   const { data, error } = await supabase.from('projects').insert(row).select().single();
   if (error) throw error;
   return rowToProject(data);
@@ -153,7 +181,7 @@ async function createField(field) {
   if (!supabase) throw new Error('Supabase unavailable');
   const { data, error } = await supabase.from('fields').insert({
     name: field.name,
-    color: field.color,
+    color: field.color || '#2563EB',
     text_color: field.textColor || '#ffffff',
     hide_when_empty: field.hideWhenEmpty || false,
     sort_order: field.sortOrder || 0
@@ -163,7 +191,7 @@ async function createField(field) {
 }
 
 async function updateField(name, field) {
-  if (!supabase) throw new Error('Supabase unavailable');
+  if (!supabase) return;
   const { error } = await supabase.from('fields').update({
     color: field.color,
     text_color: field.textColor,
@@ -220,14 +248,12 @@ async function removeFavorite(expertId) {
 }
 
 async function isFavorite(expertId) {
-  if (!supabase) return false;
-  var uid = await getUserId();
-  if (!uid) return false;
-  const { data } = await supabase.from('favorites').select('expert_id').eq('user_id', uid).eq('expert_id', expertId).maybeSingle();
+  if (!supabase || !currentUser) return false;
+  const { data } = await supabase.from('favorites').select('expert_id').eq('user_id', currentUser.id).eq('expert_id', expertId).maybeSingle();
   return !!data;
 }
 
-// ===== 复合加载 =====
+// ===== 复合加载：一次性获取页面所需数据 =====
 async function loadAppData() {
   const [expertsResult, fieldsResult, projectsResult, favsResult] = await Promise.all([
     fetchExperts(),
