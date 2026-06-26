@@ -808,9 +808,25 @@ function renderFrontend() {
     className: 'search-input',
     placeholder: '搜索专家姓名或关键词（如：AI、产品、清华...）',
     value: appState.searchQuery,
+    oninput: (e) => {
+      clearTimeout(_searchDebounceTimer);
+      const q = e.target.value.trim();
+      _searchDebounceTimer = setTimeout(() => {
+        doSearchWithQuery(q);
+      }, 350);
+    },
+    onfocus: (e) => {
+      if (!e.target.value.trim()) showSearchHistoryDropdown(e.target);
+    },
+    onblur: () => {
+      setTimeout(hideSearchHistoryDropdown, 200);
+    },
     onkeydown: (e) => {
       if (e.key === 'Enter') {
+        clearTimeout(_searchDebounceTimer);
         doSearch();
+      } else if (e.key === 'Escape') {
+        hideSearchHistoryDropdown();
       }
     }
   });
@@ -1151,13 +1167,125 @@ function syncFilterUI() {
 
 // ===== v3.0: 垂直领域导航已移除，代码备份在 backup/vertical-nav-backup.js =====
 
+// ===== 搜索历史 =====
+const SEARCH_HISTORY_KEY = 'yili_search_history';
+const SEARCH_HISTORY_MAX = 5;
+
+function getSearchHistory() {
+  try { return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveSearchHistory(query) {
+  if (!query || query.length < 1) return;
+  let history = getSearchHistory().filter(q => q !== query);
+  history.unshift(query);
+  if (history.length > SEARCH_HISTORY_MAX) history = history.slice(0, SEARCH_HISTORY_MAX);
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+}
+
+function removeSearchHistory(query) {
+  const history = getSearchHistory().filter(q => q !== query);
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearSearchHistory() {
+  localStorage.removeItem(SEARCH_HISTORY_KEY);
+}
+
+function hideSearchHistoryDropdown() {
+  const existing = document.getElementById('search-history-dropdown');
+  if (existing) existing.remove();
+}
+
+function showSearchHistoryDropdown(inputEl) {
+  hideSearchHistoryDropdown();
+  const history = getSearchHistory();
+  if (history.length === 0) return;
+
+  const wrapper = inputEl.closest('.search-input-wrapper');
+  if (!wrapper) return;
+
+  const dropdown = document.createElement('div');
+  dropdown.id = 'search-history-dropdown';
+  dropdown.className = 'search-history-dropdown';
+
+  const header = document.createElement('div');
+  header.className = 'search-history-header';
+  header.innerHTML = '<span>最近搜索</span>';
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'search-history-clear-btn';
+  clearBtn.textContent = '清除记录';
+  clearBtn.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearSearchHistory();
+    hideSearchHistoryDropdown();
+  };
+  header.appendChild(clearBtn);
+  dropdown.appendChild(header);
+
+  history.forEach(q => {
+    const item = document.createElement('div');
+    item.className = 'search-history-item';
+    item.innerHTML = '<span class="history-icon">🕐</span><span style="flex:1">' + escapeHtml(q) + '</span><span class="history-del" title="删除">×</span>';
+    item.querySelector('.history-del').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeSearchHistory(q);
+      item.remove();
+      if (dropdown.querySelectorAll('.search-history-item').length === 0) {
+        hideSearchHistoryDropdown();
+      }
+    });
+    item.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('history-del')) return;
+      e.preventDefault();
+      inputEl.value = q;
+      hideSearchHistoryDropdown();
+      doSearchWithQuery(q);
+    });
+    dropdown.appendChild(item);
+  });
+
+  wrapper.style.position = 'relative';
+  wrapper.appendChild(dropdown);
+}
+
+// 防抖 timer
+let _searchDebounceTimer = null;
+
 function doSearch() {
   const input = document.querySelector('.search-input');
   if (input) {
-    appState.searchQuery = input.value.trim();
-    appState.currentPage = 1;
-    renderExpertGrid();
+    const q = input.value.trim();
+    doSearchWithQuery(q);
   }
+}
+
+function doSearchWithQuery(query) {
+  hideSearchHistoryDropdown();
+  if (query) saveSearchHistory(query);
+  appState.searchQuery = query;
+  appState.currentPage = 1;
+  renderExpertGrid();
+}
+
+// 将文本中匹配 query 的部分包裹 <mark class="search-highlight">
+function highlightText(text, query) {
+  if (!query || !text) return escapeHtml(text || '');
+  const q = query.toLowerCase();
+  const t = String(text);
+  const idx = t.toLowerCase().indexOf(q);
+  if (idx < 0) return escapeHtml(t);
+  return escapeHtml(t.slice(0, idx))
+    + '<mark class="search-highlight">' + escapeHtml(t.slice(idx, idx + q.length)) + '</mark>'
+    + escapeHtml(t.slice(idx + q.length));
+}
+
+// 将 innerHTML 设为高亮文本（安全：escapeHtml 已处理）
+function setHighlightedText(el, text, query) {
+  el.innerHTML = highlightText(text, query);
 }
 
 function getRelevanceScore(expert, query) {
@@ -1372,7 +1500,9 @@ function renderExpertGrid() {
     
     // Row 1: name + fav star + scores
     const nameRow = h('div', { className: 'card-name-row' });
-    nameRow.appendChild(h('div', { className: 'card-name' }, expert.name));
+    const nameEl = h('div', { className: 'card-name' });
+    setHighlightedText(nameEl, expert.name, appState.searchQuery);
+    nameRow.appendChild(nameEl);
     
     // v3.1: 收藏星标 ⭐ — 放在姓名右侧行内
     const favved = isFavorited(expert.id);
@@ -1411,10 +1541,12 @@ function renderExpertGrid() {
       const fieldMeta = db.fields.find(f => f.name === fName);
       const color = fieldMeta ? fieldMeta.color : '#64748b';
       const textColor = fieldMeta ? (fieldMeta.textColor || getTextColorForBg(color)) : '#ffffff';
-      fieldsRow.appendChild(h('span', {
+      const tagEl = h('span', {
         className: 'card-field-tag',
         style: { background: color, color: textColor }
-      }, fName));
+      });
+      tagEl.innerHTML = highlightText(fName, appState.searchQuery);
+      fieldsRow.appendChild(tagEl);
     });
     headerInfo.appendChild(fieldsRow);
     
@@ -1430,9 +1562,9 @@ function renderExpertGrid() {
         line.appendChild(h('span', {
           className: 'card-qual-bullet'
         }, '▸'));
-        line.appendChild(h('span', {
-          className: 'card-qual-text'
-        }, q));
+        const qualTextEl = h('span', { className: 'card-qual-text' });
+        setHighlightedText(qualTextEl, q, appState.searchQuery);
+        line.appendChild(qualTextEl);
         qualDiv.appendChild(line);
       });
       card.appendChild(qualDiv);
@@ -4397,7 +4529,8 @@ function showImportDialog() {
   content.appendChild(header);
   
   const body = h('div', { className: 'modal-body' });
-  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。系统会自动检测重复专家，由管理员确认后处理。'));
+  body.appendChild(h('p', { style: { marginBottom:'8px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。系统会自动检测重复专家，由管理员确认后处理。'));
+  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 12px' } }, '💡 建议先点击工具栏「📋 下载模板」，按字段格式填写后再导入，避免字段无法识别。'));
   
   // ===== File Import =====
   body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '文件导入'));
@@ -4892,7 +5025,8 @@ function showProjectImportDialog() {
   content.appendChild(header);
 
   const body = h('div', { className: 'modal-body' });
-  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。关联专家需填写已有专家姓名，系统自动匹配。'));
+  body.appendChild(h('p', { style: { marginBottom:'8px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。关联专家需填写已有专家姓名，系统自动匹配。'));
+  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 12px' } }, '💡 建议先点击工具栏「📋 下载模板」，按字段格式填写后再导入，避免字段无法识别。'));
 
   // File Import
   body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '文件导入'));
