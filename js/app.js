@@ -2772,9 +2772,14 @@ function renderExpertsTab(panel) {
   
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
-    onclick: () => showExportOptions()
-  }, '📥 导出'));
-  
+    onclick: () => exportExpertsToExcel()
+  }, '📥 导出专家'));
+
+  toolbar.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    onclick: () => downloadExpertExcelTemplate()
+  }, '📋 下载模板'));
+
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     onclick: () => showImportDialog()
@@ -3022,6 +3027,11 @@ function renderProjectsTab(panel) {
     className: 'btn btn-primary btn-sm',
     onclick: () => showProjectForm(null)
   }, '+ 新建项目'));
+
+  toolbar.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    onclick: () => exportProjectsToExcel()
+  }, '📥 导出项目'));
 
   panel.appendChild(toolbar);
 
@@ -4387,7 +4397,7 @@ function showImportDialog() {
   body.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     style: { marginBottom:'20px' },
-    onclick: () => downloadImportTemplate()
+    onclick: () => downloadExpertExcelTemplate()
   }, '📥 下载导入模版（Excel）'));
   
   // ===== File Import =====
@@ -4422,6 +4432,13 @@ function showImportDialog() {
             const experts = parseCSVToExperts(result);
             if (experts.length > 0) processImport(experts);
             else toast('CSV中未找到有效数据', 'error');
+          } else if (ext === 'xlsx' || ext === 'xls') {
+            // v4.14: SheetJS 解析 Excel 文件
+            const data = new Uint8Array(result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const experts = parseExcelToExperts(wb);
+            if (experts.length > 0) processImport(experts);
+            else toast('Excel中未找到有效数据，请检查格式', 'error');
           } else {
             toast('不支持的文件格式：' + ext, 'error');
           }
@@ -4431,8 +4448,10 @@ function showImportDialog() {
       };
       if (file.name.endsWith('.json') || file.name.endsWith('.csv')) {
         reader.readAsText(file, 'utf-8');
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        reader.readAsArrayBuffer(file);
       } else {
-        toast('请将Excel文件转为CSV格式后再导入，或使用JSON格式', 'error');
+        toast('不支持的文件格式，请使用 Excel(.xlsx)、CSV 或 JSON', 'error');
       }
     }
   }, '上传并导入'));
@@ -4663,6 +4682,190 @@ function showImportDialog() {
   content.appendChild(body);
   overlay.appendChild(content);
   document.body.appendChild(overlay);
+}
+
+// ===== Excel 导入导出（v4.14） =====
+
+// 导出专家数据为 Excel（.xlsx）
+function exportExpertsToExcel() {
+  const db = appState.db;
+  if (!db.experts || db.experts.length === 0) {
+    toast('暂无专家数据可导出', 'warning');
+    return;
+  }
+
+  const headers = ['姓名', '适用领域', '学历', '库内供应商', '突出优势', '卡优势概括', '卡资历概括',
+                   '资历资质', '参考案例', '联系人', '联系方式', '推荐人', '状态', '录入时间'];
+
+  const rows = [headers];
+  db.experts.forEach(e => {
+    const advText = (e.advantages || []).map(a => a.title ? '■' + a.title + '：' + a.desc : '■' + a.desc).join('\n');
+    const csvContacts = getContactsList(e);
+    const contactPersons = csvContacts.map(c => c.person || '').filter(Boolean).join(' | ');
+    const contactInfos = csvContacts.map(c => (c.type === 'email' ? '📧' : c.type === 'wechat' ? '💬' : '📞') + (c.info || '')).filter(Boolean).join(' | ');
+    rows.push([
+      e.name || '',
+      (e.fields || []).join('、'),
+      e.education || '',
+      e.isSupplier ? '是' : '否',
+      advText,
+      e.advDisplay || '',
+      e.qualDisplay || '',
+      e.qualifications || '',
+      e.courses || '',
+      contactPersons,
+      contactInfos,
+      e.referrer || '',
+      e.status || '',
+      e.createdAt ? formatDate(e.createdAt) : ''
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Set column widths
+  ws['!cols'] = [
+    {wch: 10}, {wch: 20}, {wch: 8}, {wch: 8}, {wch: 30}, {wch: 20}, {wch: 20},
+    {wch: 25}, {wch: 25}, {wch: 15}, {wch: 20}, {wch: 10}, {wch: 8}, {wch: 12}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '专家数据');
+  XLSX.writeFile(wb, '专家资源库_专家数据_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  toast('导出成功，共 ' + db.experts.length + ' 位专家', 'success');
+}
+
+// 导出合作项目数据为 Excel
+function exportProjectsToExcel() {
+  const db = appState.db;
+  if (!db.yiliProjects || db.yiliProjects.length === 0) {
+    toast('暂无项目数据可导出', 'warning');
+    return;
+  }
+
+  const headers = ['项目名称', '关联专家', '年份', '月份', '满意度', '项目描述', '前端显示', '创建者', '创建时间'];
+  const rows = [headers];
+  db.yiliProjects.forEach(p => {
+    rows.push([
+      p.title || '',
+      p.expertId ? getProjectExpertName(p.expertId) : (p.pendingExpertName || ''),
+      p.year || '',
+      p.month || '',
+      p.satisfaction && p.satisfaction.value ? formatSatisfactionDisplay(p.satisfaction) + '/10' : '',
+      p.desc || '',
+      p.visible !== false ? '是' : '否',
+      p.createdBy || '',
+      p.createdAt ? formatDate(p.createdAt) : ''
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    {wch: 20}, {wch: 12}, {wch: 8}, {wch: 6}, {wch: 10}, {wch: 30}, {wch: 8}, {wch: 12}, {wch: 12}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '合作项目');
+  XLSX.writeFile(wb, '专家资源库_合作项目_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  toast('导出成功，共 ' + db.yiliProjects.length + ' 条项目', 'success');
+}
+
+// 下载 Excel 导入模板（含填写说明）
+function downloadExpertExcelTemplate() {
+  const db = appState.db;
+  // Sheet 1: 导入模板
+  const headers = ['姓名*', '适用领域', '学历', '库内供应商', '突出优势', '卡优势概括', '卡资历概括',
+                   '资历资质', '参考案例', '联系人', '联系方式', '推荐人'];
+  const sampleRow = [
+    '张三',
+    '数字营销, 供应链',
+    '硕士',
+    '否',
+    '■行业经验：10年数字营销经验\n■专业能力：SEM/SEO优化',
+    '数字营销专家\n10年行业经验',
+    '某知名咨询公司总监',
+    '【职称/荣誉头衔】高级营销师\n【社会职务】中国广告协会会员',
+    '【核心课程】品牌营销战略\n【服务经历】为伊利等企业提供咨询服务',
+    '李四',
+    '📞13800001111',
+    '王五'
+  ];
+  const templateRows = [headers, sampleRow];
+
+  // Add field names hint row
+  if (db.fields && db.fields.length > 0) {
+    templateRows.push(['', '可用领域: ' + db.fields.map(f => f.name).join('、'), '', '', '', '', '', '', '', '', '', '']);
+  }
+
+  const ws1 = XLSX.utils.aoa_to_sheet(templateRows);
+  ws1['!cols'] = Array(12).fill(null).map(() => ({wch: 22}));
+
+  // Sheet 2: 填写说明
+  const instructions = [
+    ['列名', '必填', '填写说明与示例'],
+    ['姓名', '✅ 是', '专家姓名，不可为空。如：张三'],
+    ['适用领域', '否', '多个领域用英文逗号或中文逗号分隔，需匹配已有分类名称'],
+    ['学历', '否', '如：本科、硕士、博士'],
+    ['库内供应商', '否', '填"是"或"否"，默认为否'],
+    ['突出优势', '否', '每条一行，格式：■标题：内容。如：■行业经验：10年咨询经验'],
+    ['卡优势概括', '否', '显示在专家卡片上，1-3条，每行一条'],
+    ['卡资历概括', '否', '显示在专家卡片上，1-3条，每行一条'],
+    ['资历资质', '否', '格式：【职称/荣誉头衔】内容。支持三种子标题：职称/荣誉头衔、社会职务、履历资历'],
+    ['参考案例', '否', '格式：【核心课程】内容。包含核心课程和服务经历'],
+    ['联系人', '否', '联系人姓名'],
+    ['联系方式', '否', '电话/微信/邮箱，自动识别类型'],
+    ['推荐人', '否', '内部推荐人姓名'],
+    ['', ''],
+    ['💡 提示：导出已有专家数据可参考完整字段格式', '']
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(instructions);
+  ws2['!cols'] = [{wch: 14}, {wch: 10}, {wch: 60}];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, '专家导入模板');
+  XLSX.utils.book_append_sheet(wb, ws2, '填写说明');
+  XLSX.writeFile(wb, '专家导入模板.xlsx');
+  toast('模板已下载，请用 Excel/WPS 打开编辑后导入', 'success');
+}
+
+// 从 Excel 文件中解析专家数据
+function parseExcelToExperts(workbook) {
+  const sheetName = workbook.SheetNames[0];
+  const ws = workbook.Sheets[sheetName];
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (!data || data.length < 2) return [];
+
+  const header = data[0].map(h => String(h || '').trim());
+  const nameIdx = header.findIndex(h => h.includes('姓名'));
+  if (nameIdx < 0) return [];
+
+  const experts = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const nameVal = String(row[nameIdx] || '').trim();
+    if (!nameVal) continue; // 跳过空行
+
+    const getVal = (keywords) => {
+      const idx = header.findIndex(h => keywords.some(k => h.includes(k)));
+      return idx >= 0 ? String(row[idx] || '').trim() : '';
+    };
+
+    const expert = {
+      name: nameVal,
+      fields: getVal(['适用领域', '领域']).split(/[,，、]/).map(f => f.trim()).filter(Boolean),
+      education: getVal(['学历']),
+      isSupplier: getVal(['库内供应商', '供应商']).includes('是'),
+      advantages: getVal(['突出优势', '优势']),
+      advDisplay: getVal(['卡优势概括', '优势概括']),
+      qualDisplay: getVal(['卡资历概括', '资历概括']),
+      qualifications: getVal(['资历资质', '资质']),
+      courses: getVal(['参考案例', '案例', '课程']),
+      contactPerson: getVal(['联系人']),
+      contactInfo: getVal(['联系方式', '电话', '微信', '邮箱']),
+      referrer: getVal(['推荐人', '推荐']),
+      status: getVal(['状态'])
+    };
+
+    experts.push(expert);
+  }
+  return experts;
 }
 
 // ===== Other Admin Tabs =====
