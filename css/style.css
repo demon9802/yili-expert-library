@@ -20,6 +20,9 @@
   --radius-sm: 8px;
   --transition: 0.2s ease;
   --max-width: 1320px;
+  --grid-columns: 2;
+  --grid-gap: 16px;
+  --font-scale: 1;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -365,8 +368,8 @@ body {
   margin: 20px auto 40px;
   padding: 0 24px 56px 24px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(var(--grid-columns, 2), 1fr);
+  gap: var(--grid-gap, 16px);
 }
 .expert-count-info {
   max-width: var(--max-width);
@@ -1537,4 +1540,228 @@ input[type="color"] {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+/* ===== PC 四档适配（v4.13）—— min-width 断点向上扩展 ===== */
+
+/* ── S 档 · ≥1366px（笔记本基准） ── */
+@media (min-width: 1366px) {
+  :root {
+    --max-width: 1300px;
+    --grid-columns: 2;
+    --grid-gap: 16px;
+    --font-scale: 1;
+  }
+}
+
+/* ── M 档 · ≥1440px（常规桌面） ── */
+@media (min-width: 1440px) {
+  :root {
+    --max-width: 1400px;
+    --grid-columns: 2;
+    --grid-gap: 20px;
+    --font-scale: 1.02;
+  }
+  .expert-card {
+    padding: 22px 26px 18px 22px;
+  }
+  .card-name {
+    font-size: 18px;
+  }
+  .card-avatar {
+    width: 60px; height: 60px; min-width: 60px;
+    font-size: 22px;
+  }
+  .card-score-main {
+    font-size: 16px;
+  }
+  /* 仪表盘模态框 */
+  .dashboard-modal .modal-content {
+    max-width: 1050px;
+  }
+}
+
+/* ── L 档 · ≥1920px（大屏，3列卡片） ── */
+@media (min-width: 1920px) {
+  :root {
+    --max-width: 1580px;
+    --grid-columns: 3;
+    --grid-gap: 16px;
+    --font-scale: 1;
+  }
+  /* 卡片压缩适配3列 */
+  .expert-card {
+    padding: 16px 18px 14px 16px;
+  }
+  .card-avatar {
+    width: 48px; height: 48px; min-width: 48px;
+    font-size: 18px;
+  }
+  .card-name {
+    font-size: 16px;
+  }
+  .card-name-row {
+    gap: 6px;
+  }
+  .card-score-box {
+    gap: 4px;
+  }
+  .card-score-main {
+    font-size: 14px;
+    padding: 3px 8px;
+  }
+  .card-score-subs {
+    flex-direction: row;
+    gap: 6px;
+    font-size: 11px;
+  }
+  .card-score-sub {
+    padding: 1px 6px;
+    font-size: 11px;
+  }
+  .card-field-tag {
+    font-size: 11px;
+    padding: 1px 6px;
+  }
+  .card-fields-row {
+    gap: 4px;
+  }
+  .card-qual-text {
+    font-size: 12px;
+  }
+  .card-qual-bullet {
+    font-size: 13px;
+  }
+  .card-advantage-title-item {
+    font-size: 12px;
+  }
+  .card-adv-num {
+    width: 15px; height: 15px;
+    font-size: 10px;
+  }
+  .card-yili-project {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .card-edu {
+    font-size: 12px;
+  }
+  .card-contact {
+    font-size: 12px;
+  }
+  /* 缩放 header */
+  .header {
+    padding: 14px 0 10px;
+  }
+  .header-title {
+    font-size: 18px;
+  }
+  .header-subtitle {
+    font-size: 12px;
+  }
+  /* 筛选栏更紧凑 */
+  .filter-bar {
+    gap: 8px;
+  }
+  .filter-label {
+    font-size: 12px;
+  }
+  .field-tag, .score-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  /* 仪表盘模态框 */
+  .dashboard-modal .modal-content {
+    max-width: 1200px;
+  }
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dashboard-card.full {
+    grid-column: 1 / -1;
+  }
+  /* 管理后台 */
+  .admin-container {
+    max-width: 1540px;
+  }
+}
+
+/* ── XL 档 · ≥2560px（超大屏，3列舒适） ── */
+@media (min-width: 2560px) {
+  :root {
+    --max-width: 1900px;
+    --grid-columns: 3;
+    --grid-gap: 20px;
+    --font-scale: 1.04;
+  }
+  .expert-card {
+    padding: 20px 22px 16px 20px;
+  }
+  .card-avatar {
+    width: 56px; height: 56px; min-width: 56px;
+    font-size: 20px;
+  }
+  .card-name {
+    font-size: 18px;
+  }
+  .card-score-main {
+    font-size: 15px;
+  }
+  .card-score-subs {
+    gap: 6px;
+  }
+  .card-score-sub {
+    padding: 2px 8px;
+    font-size: 12px;
+  }
+  .card-field-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+  .card-qual-text {
+    font-size: 13px;
+  }
+  .card-advantage-title-item {
+    font-size: 13px;
+  }
+  .card-adv-num {
+    width: 18px; height: 18px;
+    font-size: 11px;
+  }
+  .card-yili-project {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .card-edu {
+    font-size: 13px;
+  }
+  .card-contact {
+    font-size: 13px;
+  }
+  .header {
+    padding: 20px 0 16px;
+  }
+  .header-title {
+    font-size: 24px;
+  }
+  .header-subtitle {
+    font-size: 14px;
+  }
+  /* 仪表盘模态框 */
+  .dashboard-modal .modal-content {
+    max-width: 1400px;
+  }
+  .dashboard-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dashboard-card.full {
+    grid-column: 1 / -1;
+  }
+  /* 管理后台 */
+  .admin-container {
+    max-width: 1860px;
+  }
+  .admin-panel {
+    padding: 32px;
+  }
 }
