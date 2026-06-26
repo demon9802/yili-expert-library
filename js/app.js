@@ -632,6 +632,35 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// v4.18: 搜索高亮 — 纯文本（先转义再标记）
+function highlightText(text, query) {
+  if (!query || !text) return escapeHtml(String(text));
+  var escaped = escapeHtml(String(text));
+  var re = new RegExp('(' + escapeRegex(query) + ')', 'gi');
+  return escaped.replace(re, '<mark>$1</mark>');
+}
+
+// v4.18: 搜索高亮 — 含HTML的富文本（只替换标签外的文本内容）
+function highlightHtml(html, query) {
+  if (!query || !html) return html;
+  var q = escapeRegex(query);
+  var re = new RegExp('(' + q + ')', 'gi');
+  // 替换标签外的文本内容：处理 >text< 之间的文本，以及开头和结尾的文本
+  // 1. 处理开头到第一个 < 之前的文本（如果有）
+  html = html.replace(/^([^<]+)/, function(match, text) {
+    return text.replace(re, '<mark>$1</mark>');
+  });
+  // 2. 处理 > 和 < 之间的文本内容
+  html = html.replace(/>([^<]+)</g, function(match, text) {
+    return '>' + text.replace(re, '<mark>$1</mark>') + '<';
+  });
+  return html;
+}
+
 function h(tag, attrs={}, ...children) {
   const el = document.createElement(tag);
   for (const [k,v] of Object.entries(attrs)) {
@@ -808,25 +837,9 @@ function renderFrontend() {
     className: 'search-input',
     placeholder: '搜索专家姓名或关键词（如：AI、产品、清华...）',
     value: appState.searchQuery,
-    oninput: (e) => {
-      clearTimeout(_searchDebounceTimer);
-      const q = e.target.value.trim();
-      _searchDebounceTimer = setTimeout(() => {
-        doSearchWithQuery(q);
-      }, 350);
-    },
-    onfocus: (e) => {
-      if (!e.target.value.trim()) showSearchHistoryDropdown(e.target);
-    },
-    onblur: () => {
-      setTimeout(hideSearchHistoryDropdown, 200);
-    },
     onkeydown: (e) => {
       if (e.key === 'Enter') {
-        clearTimeout(_searchDebounceTimer);
         doSearch();
-      } else if (e.key === 'Escape') {
-        hideSearchHistoryDropdown();
       }
     }
   });
@@ -1167,125 +1180,13 @@ function syncFilterUI() {
 
 // ===== v3.0: 垂直领域导航已移除，代码备份在 backup/vertical-nav-backup.js =====
 
-// ===== 搜索历史 =====
-const SEARCH_HISTORY_KEY = 'yili_search_history';
-const SEARCH_HISTORY_MAX = 5;
-
-function getSearchHistory() {
-  try { return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]'); }
-  catch(e) { return []; }
-}
-
-function saveSearchHistory(query) {
-  if (!query || query.length < 1) return;
-  let history = getSearchHistory().filter(q => q !== query);
-  history.unshift(query);
-  if (history.length > SEARCH_HISTORY_MAX) history = history.slice(0, SEARCH_HISTORY_MAX);
-  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
-}
-
-function removeSearchHistory(query) {
-  const history = getSearchHistory().filter(q => q !== query);
-  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
-}
-
-function clearSearchHistory() {
-  localStorage.removeItem(SEARCH_HISTORY_KEY);
-}
-
-function hideSearchHistoryDropdown() {
-  const existing = document.getElementById('search-history-dropdown');
-  if (existing) existing.remove();
-}
-
-function showSearchHistoryDropdown(inputEl) {
-  hideSearchHistoryDropdown();
-  const history = getSearchHistory();
-  if (history.length === 0) return;
-
-  const wrapper = inputEl.closest('.search-input-wrapper');
-  if (!wrapper) return;
-
-  const dropdown = document.createElement('div');
-  dropdown.id = 'search-history-dropdown';
-  dropdown.className = 'search-history-dropdown';
-
-  const header = document.createElement('div');
-  header.className = 'search-history-header';
-  header.innerHTML = '<span>最近搜索</span>';
-  const clearBtn = document.createElement('button');
-  clearBtn.className = 'search-history-clear-btn';
-  clearBtn.textContent = '清除记录';
-  clearBtn.onclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    clearSearchHistory();
-    hideSearchHistoryDropdown();
-  };
-  header.appendChild(clearBtn);
-  dropdown.appendChild(header);
-
-  history.forEach(q => {
-    const item = document.createElement('div');
-    item.className = 'search-history-item';
-    item.innerHTML = '<span class="history-icon">🕐</span><span style="flex:1">' + escapeHtml(q) + '</span><span class="history-del" title="删除">×</span>';
-    item.querySelector('.history-del').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      removeSearchHistory(q);
-      item.remove();
-      if (dropdown.querySelectorAll('.search-history-item').length === 0) {
-        hideSearchHistoryDropdown();
-      }
-    });
-    item.addEventListener('mousedown', (e) => {
-      if (e.target.classList.contains('history-del')) return;
-      e.preventDefault();
-      inputEl.value = q;
-      hideSearchHistoryDropdown();
-      doSearchWithQuery(q);
-    });
-    dropdown.appendChild(item);
-  });
-
-  wrapper.style.position = 'relative';
-  wrapper.appendChild(dropdown);
-}
-
-// 防抖 timer
-let _searchDebounceTimer = null;
-
 function doSearch() {
   const input = document.querySelector('.search-input');
   if (input) {
-    const q = input.value.trim();
-    doSearchWithQuery(q);
+    appState.searchQuery = input.value.trim();
+    appState.currentPage = 1;
+    renderExpertGrid();
   }
-}
-
-function doSearchWithQuery(query) {
-  hideSearchHistoryDropdown();
-  if (query) saveSearchHistory(query);
-  appState.searchQuery = query;
-  appState.currentPage = 1;
-  renderExpertGrid();
-}
-
-// 将文本中匹配 query 的部分包裹 <mark class="search-highlight">
-function highlightText(text, query) {
-  if (!query || !text) return escapeHtml(text || '');
-  const q = query.toLowerCase();
-  const t = String(text);
-  const idx = t.toLowerCase().indexOf(q);
-  if (idx < 0) return escapeHtml(t);
-  return escapeHtml(t.slice(0, idx))
-    + '<mark class="search-highlight">' + escapeHtml(t.slice(idx, idx + q.length)) + '</mark>'
-    + escapeHtml(t.slice(idx + q.length));
-}
-
-// 将 innerHTML 设为高亮文本（安全：escapeHtml 已处理）
-function setHighlightedText(el, text, query) {
-  el.innerHTML = highlightText(text, query);
 }
 
 function getRelevanceScore(expert, query) {
@@ -1357,7 +1258,19 @@ function getRelevanceScore(expert, query) {
     if (rl.includes(q)) score += 3;
   }
   
-  // 9. Bonus for multi-word queries: count how many words match
+  // 9. v4.18: 合作项目匹配
+  var db = appState.db;
+  if (db.yiliProjects && Array.isArray(db.yiliProjects)) {
+    var projMatches = db.yiliProjects.filter(function(p) {
+      return p.expertId === expert.id && p.visible;
+    });
+    projMatches.forEach(function(p) {
+      if (p.title && p.title.toLowerCase().includes(q)) score += 20;
+      if (p.desc && p.desc.toLowerCase().includes(q)) score += 12;
+    });
+  }
+  
+  // 10. Bonus for multi-word queries: count how many words match
   const queryWords = q.split(/\s+/).filter(w => w.length > 0);
   if (queryWords.length > 1) {
     const allFields = [
@@ -1413,21 +1326,32 @@ function getFilteredExperts() {
     });
   }
   
-  // Search - broad match across name, fields, qualifications, courses, advantages
+  // Search - broad match across ALL expert information
   if (appState.searchQuery) {
-    const q = appState.searchQuery.toLowerCase();
-    experts = experts.filter(e => {
+    var q = appState.searchQuery.toLowerCase();
+    // Build project text index once (shared across all experts)
+    var projectTextByExpert = {};
+    if (db.yiliProjects && Array.isArray(db.yiliProjects)) {
+      db.yiliProjects.forEach(function(p) {
+        if (!p.expertId) return;
+        if (!projectTextByExpert[p.expertId]) projectTextByExpert[p.expertId] = [];
+        projectTextByExpert[p.expertId].push((p.title || '') + ' ' + (p.desc || ''));
+      });
+    }
+    experts = experts.filter(function(e) {
       // Check if any field matches
-      const allContacts = getContactsList(e);
-      const allText = [
+      var allContacts = getContactsList(e);
+      var allText = [
         e.name.toLowerCase(),
-        ...e.fields.map(f => f.toLowerCase()),
-        ...(e.advantages || []).map(a => (a.title + ' ' + a.desc).toLowerCase()),
+        ...e.fields.map(function(f) { return f.toLowerCase(); }),
+        ...(e.advantages || []).map(function(a) { return (a.title + ' ' + a.desc).toLowerCase(); }),
         (e.qualifications || '').toLowerCase(),
         (e.courses || '').toLowerCase(),
         (e.education || '').toLowerCase(),
-        ...allContacts.map(c => (c.person + ' ' + c.info).toLowerCase()),
-        (e.referrer || '').toLowerCase()
+        ...allContacts.map(function(c) { return (c.person + ' ' + c.info).toLowerCase(); }),
+        (e.referrer || '').toLowerCase(),
+        // v4.18: 合作项目信息加入搜索
+        (projectTextByExpert[e.id] || []).join(' ').toLowerCase()
       ].join(' ');
       return allText.includes(q);
     });
@@ -1480,6 +1404,7 @@ function renderExpertGrid() {
     (appState.searchQuery ? ' <span class="search-results-hint">（搜索："' + escapeHtml(appState.searchQuery) + '"）</span>' : '');
 
   const db = appState.db;
+  var sq = appState.searchQuery; // v4.18: search query for highlighting
 
   paginatedExperts.forEach(expert => {
     const card = h('div', {
@@ -1498,11 +1423,9 @@ function renderExpertGrid() {
     // Right side: name row + fields row
     const headerInfo = h('div', { className: 'card-header-info' });
     
-    // Row 1: name + fav star + scores
+    // Row 1: name + fav star + scores (v4.18: name with search highlight)
     const nameRow = h('div', { className: 'card-name-row' });
-    const nameEl = h('div', { className: 'card-name' });
-    setHighlightedText(nameEl, expert.name, appState.searchQuery);
-    nameRow.appendChild(nameEl);
+    nameRow.appendChild(h('div', { className: 'card-name', innerHTML: highlightText(expert.name, sq) }));
     
     // v3.1: 收藏星标 ⭐ — 放在姓名右侧行内
     const favved = isFavorited(expert.id);
@@ -1535,25 +1458,24 @@ function renderExpertGrid() {
     }
     headerInfo.appendChild(nameRow);
     
-    // Row 2: fields
+    // Row 2: fields (v4.18: with search highlight)
     const fieldsRow = h('div', { className: 'card-fields-row' });
     expert.fields.forEach(fName => {
       const fieldMeta = db.fields.find(f => f.name === fName);
       const color = fieldMeta ? fieldMeta.color : '#64748b';
       const textColor = fieldMeta ? (fieldMeta.textColor || getTextColorForBg(color)) : '#ffffff';
-      const tagEl = h('span', {
+      fieldsRow.appendChild(h('span', {
         className: 'card-field-tag',
-        style: { background: color, color: textColor }
-      });
-      tagEl.innerHTML = highlightText(fName, appState.searchQuery);
-      fieldsRow.appendChild(tagEl);
+        style: { background: color, color: textColor },
+        innerHTML: highlightText(fName, sq)
+      }));
     });
     headerInfo.appendChild(fieldsRow);
     
     cardHeader.appendChild(headerInfo);
     card.appendChild(cardHeader);
     
-    // ===== 资历资质（简化：▸符号，每条1行，最多3条）- 统一浅色 =====
+    // ===== 资历资质（简化：▸符号，每条1行，最多3条）- 统一浅色 v4.18: with search highlight =====
     const qualItems = getQualSimpleItems(expert);
     if (qualItems.length > 0) {
       const qualDiv = h('div', { className: 'card-qual-highlights' });
@@ -1562,9 +1484,10 @@ function renderExpertGrid() {
         line.appendChild(h('span', {
           className: 'card-qual-bullet'
         }, '▸'));
-        const qualTextEl = h('span', { className: 'card-qual-text' });
-        setHighlightedText(qualTextEl, q, appState.searchQuery);
-        line.appendChild(qualTextEl);
+        line.appendChild(h('span', {
+          className: 'card-qual-text',
+          innerHTML: highlightText(q, sq)
+        }));
         qualDiv.appendChild(line);
       });
       card.appendChild(qualDiv);
@@ -1578,8 +1501,8 @@ function renderExpertGrid() {
       const projBox = h('div', { className: 'card-yili-project' });
       const latest = visibleProjects[0];
       if (visibleProjects.length === 1) {
-        // 仅1次：不显示次数，直接显示项目信息
-        projBox.appendChild(h('div', { className: 'proj-count-line' }, '📋 最近合作：' + latest.title));
+        // 仅1次：不显示次数，直接显示项目信息 (v4.18: title with highlight)
+        projBox.appendChild(h('div', { className: 'proj-count-line', innerHTML: '📋 最近合作：' + highlightText(latest.title, sq) }));
         let metaStr = latest.year + '年';
         if (latest.month) metaStr += (latest.month < 10 ? '0' : '') + latest.month + '月';
         projBox.appendChild(h('div', { className: 'proj-detail-line' }, metaStr));
@@ -1595,7 +1518,7 @@ function renderExpertGrid() {
       } else {
         // ≥2次：首行显示次数，次行显示标题，第三行显示时间，第四行显示满意度
         projBox.appendChild(h('div', { className: 'proj-count-line' }, '📋 已合作 ' + visibleProjects.length + ' 次'));
-        projBox.appendChild(h('div', { className: 'proj-detail-line', style: 'font-weight:600' }, '最近合作：' + latest.title));
+        projBox.appendChild(h('div', { className: 'proj-detail-line', style: 'font-weight:600', innerHTML: '最近合作：' + highlightText(latest.title, sq) }));
         let detailStr = latest.year + '年';
         if (latest.month) detailStr += (latest.month < 10 ? '0' : '') + latest.month + '月';
         projBox.appendChild(h('div', { className: 'proj-detail-line' }, detailStr));
@@ -1612,42 +1535,43 @@ function renderExpertGrid() {
       card.appendChild(projBox);
     }
     
-    // Advantages（突出优势 - 数字标号1、2、3，蓝色加粗内容） 
+    // Advantages（突出优势 - 数字标号1、2、3，蓝色加粗内容）v4.18: with search highlight
     const advItems = getAdvItems(expert);
     if (advItems.length > 0) {
       const advList = h('div', { className: 'card-advantages-new' });
       advItems.forEach((item, idx) => {
         const advItemDiv = h('div', { className: 'card-advantage-title-item' });
         advItemDiv.appendChild(h('span', { className: 'card-adv-num' }, String(idx + 1)));
-        // Process highlight: text before ：is blue bold
+        // Process highlight: text before ：is blue bold; v4.18: search highlight on both parts
         const colonIdx = item.indexOf('：');
         if (colonIdx > 0) {
-          advItemDiv.appendChild(h('span', { className: 'card-adv-title-bold' }, item.substring(0, colonIdx) + '：'));
-          advItemDiv.appendChild(h('span', {}, item.substring(colonIdx + 1)));
+          advItemDiv.appendChild(h('span', { className: 'card-adv-title-bold', innerHTML: highlightText(item.substring(0, colonIdx) + '：', sq) }));
+          advItemDiv.appendChild(h('span', { innerHTML: highlightText(item.substring(colonIdx + 1), sq) }));
         } else {
-          advItemDiv.appendChild(h('span', { className: 'card-adv-title-bold' }, item));
+          advItemDiv.appendChild(h('span', { className: 'card-adv-title-bold', innerHTML: highlightText(item, sq) }));
         }
         advList.appendChild(advItemDiv);
       });
       card.appendChild(advList);
     }
     
-    // Education（下移）
+    // Education（下移）v4.18: with search highlight
     if (expert.education && expert.education !== '未公开') {
-      card.appendChild(h('div', { className: 'card-edu card-edu-bottom' }, '🎓 ' + (expert.education.length > 50 ? expert.education.substring(0,50)+'...' : expert.education)));
+      var eduText = expert.education.length > 50 ? expert.education.substring(0,50)+'...' : expert.education;
+      card.appendChild(h('div', { className: 'card-edu card-edu-bottom', innerHTML: '🎓 ' + highlightText(eduText, sq) }));
     }
     
-    // Contact (v3.1: 卡片只显示第一个联系人)
+    // Contact (v3.1: 卡片只显示第一个联系人) v4.18: with search highlight
     const contacts = getContactsList(expert);
     if (contacts.length > 0 && (contacts[0].person || contacts[0].info)) {
       const contactDiv = h('div', { className: 'card-contact' });
       if (contacts[0].person) {
-        contactDiv.appendChild(h('span', {}, '👤 ' + contacts[0].person));
+        contactDiv.appendChild(h('span', { innerHTML: '👤 ' + highlightText(contacts[0].person, sq) }));
       }
       if (contacts[0].info) {
         const typeLabel = contacts[0].type === 'email' ? '📧 ' : contacts[0].type === 'wechat' ? '💬 ' : '📞 ';
         const displayInfo = contacts[0].info.length > 25 ? contacts[0].info.substring(0,25)+'...' : contacts[0].info;
-        contactDiv.appendChild(h('span', {}, typeLabel + displayInfo));
+        contactDiv.appendChild(h('span', { innerHTML: typeLabel + highlightText(displayInfo, sq) }));
       }
       // v3.2: 卡片只显示第一位联系人，不提示还有更多
       card.appendChild(contactDiv);
@@ -1813,14 +1737,15 @@ function getAdvItems(expert) {
 // ===== EXPERT DETAIL MODAL =====
 function showExpertDetail(expert) {
   const db = appState.db;
+  var sq = appState.searchQuery; // v4.18: search query for highlighting
   const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
   const content = h('div', { className: 'modal-content' });
   
   // Header
   const modalHeader = h('div', { className: 'modal-header' });
-  // Group name + fav star + supplier ribbon together
+  // Group name + fav star + supplier ribbon together (v4.18: name with search highlight)
   const nameGroup = h('span', { className: 'modal-title-group' });
-  const nameSpan = h('span', { className: 'modal-title' }, expert.name);
+  const nameSpan = h('span', { className: 'modal-title', innerHTML: highlightText(expert.name, sq) });
   nameGroup.appendChild(nameSpan);
   // v3.1: 收藏星标 — 姓名右侧，库内供应商标签左侧
   const detailFavved = isFavorited(expert.id);
@@ -1919,7 +1844,7 @@ function showExpertDetail(expert) {
   body.appendChild(scoreSection);
   }
   
-  // Fields
+  // Fields (v4.18: with search highlight)
   const fieldsSection = h('div', { className: 'detail-section' });
   fieldsSection.appendChild(h('div', { className: 'detail-section-title' }, '适用领域'));
   const fieldTags = h('div', { className: 'detail-field-tags' });
@@ -1927,20 +1852,20 @@ function showExpertDetail(expert) {
     const fMeta = db.fields.find(f => f.name === fName);
     const color = fMeta ? fMeta.color : '#64748b';
     const textColor = fMeta ? (fMeta.textColor || getTextColorForBg(color)) : '#ffffff';
-    fieldTags.appendChild(h('span', { className: 'card-field-tag', style: { background: color, color: textColor, padding:'6px 14px', fontSize:'13px' } }, fName));
+    fieldTags.appendChild(h('span', { className: 'card-field-tag', style: { background: color, color: textColor, padding:'6px 14px', fontSize:'13px' }, innerHTML: highlightText(fName, sq) }));
   });
   fieldsSection.appendChild(fieldTags);
   body.appendChild(fieldsSection);
   
-  // Education
+  // Education (v4.18: with search highlight)
   if (expert.education && expert.education !== '未公开') {
     const eduSection = h('div', { className: 'detail-section' });
     eduSection.appendChild(h('div', { className: 'detail-section-title' }, '学历'));
-    eduSection.appendChild(h('div', { className: 'detail-text' }, expert.education));
+    eduSection.appendChild(h('div', { className: 'detail-text', innerHTML: highlightText(expert.education, sq) }));
     body.appendChild(eduSection);
   }
   
-  // Advantages (as intro with ■ format, preserving original data source style)
+  // Advantages (as intro with ■ format, preserving original data source style) v4.18: with search highlight
   if (expert.advantages && expert.advantages.length > 0) {
     const advSection = h('div', { className: 'detail-section' });
     advSection.appendChild(h('div', { className: 'detail-section-title' }, '专家简介'));
@@ -1948,29 +1873,29 @@ function showExpertDetail(expert) {
     expert.advantages.forEach(adv => {
       const item = h('div', { className: 'detail-advantage-item' });
       const content = adv.title ? '■' + adv.title + '：' + adv.desc : '■' + adv.desc;
-      item.textContent = content;
+      item.innerHTML = highlightText(content, sq);
       advBox.appendChild(item);
     });
     advSection.appendChild(advBox);
     body.appendChild(advSection);
   }
   
-  // Qualifications
+  // Qualifications (v4.18: with search highlight on rich text)
   if (expert.qualifications && expert.qualifications !== '未公开') {
     const qualSection = h('div', { className: 'detail-section' });
     qualSection.appendChild(h('div', { className: 'detail-section-title' }, '资历资质'));
     const qualText = h('div', { className: 'detail-text' });
-    qualText.innerHTML = formatRichText(expert.qualifications);
+    qualText.innerHTML = highlightHtml(formatRichText(expert.qualifications), sq);
     qualSection.appendChild(qualText);
     body.appendChild(qualSection);
   }
   
-  // Reference Cases (formerly 课程/案例)
+  // Reference Cases (formerly 课程/案例) v4.18: with search highlight on rich text
   if (expert.courses) {
     const courseSection = h('div', { className: 'detail-section' });
     courseSection.appendChild(h('div', { className: 'detail-section-title' }, '参考案例'));
     const courseText = h('div', { className: 'detail-text' });
-    courseText.innerHTML = formatRichText(expert.courses);
+    courseText.innerHTML = highlightHtml(formatRichText(expert.courses), sq);
     courseSection.appendChild(courseText);
     body.appendChild(courseSection);
   }
@@ -1987,8 +1912,8 @@ function showExpertDetail(expert) {
       const projCard = h('div', {
         style: 'padding:12px 16px;margin-bottom:' + (idx < visibleProjects.length - 1 ? '8px' : '0') + ';background:linear-gradient(135deg, #f0fdf4, #dcfce7);border:1px solid #bbf7d0;border-radius:8px;font-size:14px;color:#166534'
       });
-      // 1. 项目名称
-      projCard.appendChild(h('div', { style: 'font-weight:600;margin-bottom:4px;font-size:14px' }, proj.title));
+      // 1. 项目名称 (v4.18: with search highlight)
+      projCard.appendChild(h('div', { style: 'font-weight:600;margin-bottom:4px;font-size:14px', innerHTML: highlightText(proj.title, sq) }));
       // 2. 时间（年度 + 月度精确）
       let timeStr = proj.year + '年';
       if (proj.month) timeStr += proj.month + '月';
@@ -2004,9 +1929,9 @@ function showExpertDetail(expert) {
         satLine.appendChild(h('span', { style: 'color:#166534;margin-left:6px;font-size:12px' }, numVal + '/10'));
         projCard.appendChild(satLine);
       }
-      // 4. 项目描述（为空不显示）
+      // 4. 项目描述（为空不显示）(v4.18: with search highlight)
       if (proj.desc) {
-        projCard.appendChild(h('div', { style: 'font-size:13px;color:#15803d;margin-top:4px;line-height:1.6' }, proj.desc));
+        projCard.appendChild(h('div', { style: 'font-size:13px;color:#15803d;margin-top:4px;line-height:1.6', innerHTML: highlightText(proj.desc, sq) }));
       }
       projList.appendChild(projCard);
     });
@@ -2014,7 +1939,7 @@ function showExpertDetail(expert) {
     body.appendChild(yiliSection);
   }
   
-  // Contact (v3.1: 支持多联系人依次显示)
+  // Contact (v3.1: 支持多联系人依次显示) v4.18: with search highlight
   const detailContacts = getContactsList(expert);
   if (detailContacts.length > 0 || expert.referrer) {
     const contactSection = h('div', { className: 'detail-section' });
@@ -2024,16 +1949,16 @@ function showExpertDetail(expert) {
     detailContacts.forEach((c, idx) => {
       if (c.person || c.info) {
         const label = detailContacts.length === 1 ? '联系人' : ('联系人' + (idx + 1));
-        let line = label + '：' + (c.person || '');
+        var line = label + '：' + (c.person ? highlightText(c.person, sq) : '');
         if (c.info) {
-          line += '，' + (typeMap[c.type] || '联系方式') + '：' + c.info;
+          line += '，' + (typeMap[c.type] || '联系方式') + '：' + highlightText(c.info, sq);
         }
-        contactSection.appendChild(h('div', { className: 'detail-text', style: { marginBottom: detailContacts.length > 1 ? '6px' : '0' } }, line));
+        contactSection.appendChild(h('div', { className: 'detail-text', style: { marginBottom: detailContacts.length > 1 ? '6px' : '0' }, innerHTML: line }));
       }
     });
     
     if (expert.referrer) {
-      contactSection.appendChild(h('div', { className: 'detail-text', style: { marginTop: '8px' } }, '内部推荐人：' + expert.referrer));
+      contactSection.appendChild(h('div', { className: 'detail-text', style: { marginTop: '8px' }, innerHTML: '内部推荐人：' + highlightText(expert.referrer, sq) }));
     }
     body.appendChild(contactSection);
   }
@@ -2766,7 +2691,7 @@ function getDefaultSubPermissions() {
     expertImport: true, expertExport: true, expertScore: true,
     categoryManage: true,
     ratingManage: false, dashboardManage: true, observationManage: true,
-    projectsManage: true,
+    projectsManage: true, docsManage: false,
     sortManage: false, permissionManage: false, systemSettings: false
   };
 }
@@ -2841,10 +2766,11 @@ function renderAdmin() {
     { id: 'categories', name: '分类管理', perm: 'categoryManage' },
     { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
-    { id: 'settings', name: '系统设置', perm: 'systemSettings' }
+    { id: 'settings', name: '系统设置', perm: 'systemSettings' },
+    { id: 'docs', name: '📋系统文档', perm: 'docsManage' }
   ];
   
-  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories');
+  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories' && t.id !== 'docs');
   
   visibleTabs.forEach(tab => {
     nav.appendChild(h('button', {
@@ -2873,6 +2799,7 @@ function renderAdmin() {
     case 'observation': renderObservationTab(panel); break;
     case 'permissions': renderPermissionsTab(panel); break;
     case 'settings': renderSettingsTab(panel); break;
+    case 'docs': renderDocsTab(panel); break;
   }
 }
 
@@ -2902,14 +2829,9 @@ function renderExpertsTab(panel) {
   
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
-    onclick: () => exportExpertsToExcel()
-  }, '📥 导出专家'));
-
-  toolbar.appendChild(h('button', {
-    className: 'btn btn-secondary btn-sm',
-    onclick: () => downloadExpertExcelTemplate()
-  }, '📋 下载模板'));
-
+    onclick: () => showExportOptions()
+  }, '📥 导出'));
+  
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     onclick: () => showImportDialog()
@@ -3157,21 +3079,6 @@ function renderProjectsTab(panel) {
     className: 'btn btn-primary btn-sm',
     onclick: () => showProjectForm(null)
   }, '+ 新建项目'));
-
-  toolbar.appendChild(h('button', {
-    className: 'btn btn-secondary btn-sm',
-    onclick: () => exportProjectsToExcel()
-  }, '📥 导出项目'));
-
-  toolbar.appendChild(h('button', {
-    className: 'btn btn-secondary btn-sm',
-    onclick: () => downloadProjectExcelTemplate()
-  }, '📋 下载模板'));
-
-  toolbar.appendChild(h('button', {
-    className: 'btn btn-secondary btn-sm',
-    onclick: () => showProjectImportDialog()
-  }, '📤 导入'));
 
   panel.appendChild(toolbar);
 
@@ -4529,8 +4436,16 @@ function showImportDialog() {
   content.appendChild(header);
   
   const body = h('div', { className: 'modal-body' });
-  body.appendChild(h('p', { style: { marginBottom:'8px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。系统会自动检测重复专家，由管理员确认后处理。'));
-  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 12px' } }, '💡 建议先点击工具栏「📋 下载模板」，按字段格式填写后再导入，避免字段无法识别。'));
+  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。系统会自动检测重复专家，由管理员确认后处理。'));
+  
+  // ===== Import Template Download =====
+  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '导入模版'));
+  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '下载标准模版查看格式要求，参照模版填写专家数据后导入。'));
+  body.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    style: { marginBottom:'20px' },
+    onclick: () => downloadImportTemplate()
+  }, '📥 下载导入模版（Excel）'));
   
   // ===== File Import =====
   body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '文件导入'));
@@ -4564,13 +4479,6 @@ function showImportDialog() {
             const experts = parseCSVToExperts(result);
             if (experts.length > 0) processImport(experts);
             else toast('CSV中未找到有效数据', 'error');
-          } else if (ext === 'xlsx' || ext === 'xls') {
-            // v4.14: SheetJS 解析 Excel 文件
-            const data = new Uint8Array(result);
-            const wb = XLSX.read(data, { type: 'array' });
-            const experts = parseExcelToExperts(wb);
-            if (experts.length > 0) processImport(experts);
-            else toast('Excel中未找到有效数据，请检查格式', 'error');
           } else {
             toast('不支持的文件格式：' + ext, 'error');
           }
@@ -4580,10 +4488,8 @@ function showImportDialog() {
       };
       if (file.name.endsWith('.json') || file.name.endsWith('.csv')) {
         reader.readAsText(file, 'utf-8');
-      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        reader.readAsArrayBuffer(file);
       } else {
-        toast('不支持的文件格式，请使用 Excel(.xlsx)、CSV 或 JSON', 'error');
+        toast('请将Excel文件转为CSV格式后再导入，或使用JSON格式', 'error');
       }
     }
   }, '上传并导入'));
@@ -4814,369 +4720,6 @@ function showImportDialog() {
   content.appendChild(body);
   overlay.appendChild(content);
   document.body.appendChild(overlay);
-}
-
-// ===== Excel 导入导出（v4.14） =====
-
-// 导出专家数据为 Excel（.xlsx）
-function exportExpertsToExcel() {
-  const db = appState.db;
-  if (!db.experts || db.experts.length === 0) {
-    toast('暂无专家数据可导出', 'warning');
-    return;
-  }
-
-  const headers = ['姓名', '适用领域', '学历', '库内供应商', '突出优势', '卡优势概括', '卡资历概括',
-                   '资历资质', '参考案例', '联系人', '联系方式', '推荐人', '状态', '录入时间'];
-
-  const rows = [headers];
-  db.experts.forEach(e => {
-    const advText = (e.advantages || []).map(a => a.title ? '■' + a.title + '：' + a.desc : '■' + a.desc).join('\n');
-    const csvContacts = getContactsList(e);
-    const contactPersons = csvContacts.map(c => c.person || '').filter(Boolean).join(' | ');
-    const contactInfos = csvContacts.map(c => (c.type === 'email' ? '📧' : c.type === 'wechat' ? '💬' : '📞') + (c.info || '')).filter(Boolean).join(' | ');
-    rows.push([
-      e.name || '',
-      (e.fields || []).join('、'),
-      e.education || '',
-      e.isSupplier ? '是' : '否',
-      advText,
-      e.advDisplay || '',
-      e.qualDisplay || '',
-      e.qualifications || '',
-      e.courses || '',
-      contactPersons,
-      contactInfos,
-      e.referrer || '',
-      e.status || '',
-      e.createdAt ? formatDate(e.createdAt) : ''
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  // Set column widths
-  ws['!cols'] = [
-    {wch: 10}, {wch: 20}, {wch: 8}, {wch: 8}, {wch: 30}, {wch: 20}, {wch: 20},
-    {wch: 25}, {wch: 25}, {wch: 15}, {wch: 20}, {wch: 10}, {wch: 8}, {wch: 12}
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '专家数据');
-  XLSX.writeFile(wb, '专家资源库_专家数据_' + new Date().toISOString().slice(0,10) + '.xlsx');
-  toast('导出成功，共 ' + db.experts.length + ' 位专家', 'success');
-}
-
-// 导出合作项目数据为 Excel
-function exportProjectsToExcel() {
-  const db = appState.db;
-  if (!db.yiliProjects || db.yiliProjects.length === 0) {
-    toast('暂无项目数据可导出', 'warning');
-    return;
-  }
-
-  const headers = ['项目名称', '关联专家', '年份', '月份', '满意度', '项目描述', '前端显示', '创建者', '创建时间'];
-  const rows = [headers];
-  db.yiliProjects.forEach(p => {
-    rows.push([
-      p.title || '',
-      p.expertId ? getProjectExpertName(p.expertId) : (p.pendingExpertName || ''),
-      p.year || '',
-      p.month || '',
-      p.satisfaction && p.satisfaction.value ? formatSatisfactionDisplay(p.satisfaction) + '/10' : '',
-      p.desc || '',
-      p.visible !== false ? '是' : '否',
-      p.createdBy || '',
-      p.createdAt ? formatDate(p.createdAt) : ''
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [
-    {wch: 20}, {wch: 12}, {wch: 8}, {wch: 6}, {wch: 10}, {wch: 30}, {wch: 8}, {wch: 12}, {wch: 12}
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '合作项目');
-  XLSX.writeFile(wb, '专家资源库_合作项目_' + new Date().toISOString().slice(0,10) + '.xlsx');
-  toast('导出成功，共 ' + db.yiliProjects.length + ' 条项目', 'success');
-}
-
-// ===== 合作项目 Excel 导入（v4.15） =====
-
-// 下载项目导入模板
-function downloadProjectExcelTemplate() {
-  const db = appState.db;
-  const headers = ['项目名称*', '关联专家*', '年份*', '月份', '满意度（满分10分）', '项目描述', '前端显示'];
-  const sampleRow = [
-    '品牌营销咨询项目',
-    '张三',
-    '2026',
-    '6',
-    '8.5',
-    '为伊利品牌营销策略提供专业咨询服务',
-    '是'
-  ];
-  const templateRows = [headers, sampleRow];
-
-  if (db.experts && db.experts.length > 0) {
-    const expertNames = db.experts.slice(0, 10).map(e => e.name).join('、');
-    templateRows.push(['', '已有专家: ' + expertNames + (db.experts.length > 10 ? ' ...' : ''), '', '', '', '', '']);
-  }
-
-  const ws1 = XLSX.utils.aoa_to_sheet(templateRows);
-  ws1['!cols'] = [
-    {wch: 25}, {wch: 15}, {wch: 8}, {wch: 6}, {wch: 14}, {wch: 35}, {wch: 10}
-  ];
-
-  const instructions = [
-    ['列名', '必填', '填写说明与示例'],
-    ['项目名称', '✅ 是', '合作项目名称，不可为空'],
-    ['关联专家', '✅ 是', '专家姓名，需与已有专家姓名完全一致。如不确定可导出专家表查看'],
-    ['年份', '✅ 是', '项目所在年份，如 2026'],
-    ['月份', '否', '1-12，填数字'],
-    ['满意度', '否', '填数字（10分制），如 8.5'],
-    ['项目描述', '否', '项目的简要描述和合作内容'],
-    ['前端显示', '否', '填"是"或"否"，默认为是。设为否则不对外展示'],
-    ['', ''],
-    ['💡 提示：导出已有项目数据可参考完整字段格式', '']
-  ];
-  const ws2 = XLSX.utils.aoa_to_sheet(instructions);
-  ws2['!cols'] = [{wch: 14}, {wch: 10}, {wch: 55}];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws1, '项目导入模板');
-  XLSX.utils.book_append_sheet(wb, ws2, '填写说明');
-  XLSX.writeFile(wb, '项目导入模板.xlsx');
-  toast('项目模板已下载，请用 Excel/WPS 打开编辑后导入', 'success');
-}
-
-// 从 Excel 文件中解析项目数据
-function parseExcelToProjects(workbook, db) {
-  const sheetName = workbook.SheetNames[0];
-  const ws = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  if (!data || data.length < 2) return [];
-
-  const header = data[0].map(h => String(h || '').trim());
-  const titleIdx = header.findIndex(h => h.includes('项目名称') || h.includes('title'));
-  if (titleIdx < 0) return [];
-
-  const projects = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const title = String(row[titleIdx] || '').trim();
-    if (!title) continue;
-
-    const getVal = (keywords) => {
-      const idx = header.findIndex(h => keywords.some(k => h.includes(k)));
-      return idx >= 0 ? String(row[idx] || '').trim() : '';
-    };
-
-    const expertName = getVal(['关联专家', '专家', 'expert']);
-    const yearStr = getVal(['年份', 'year']);
-    const monthStr = getVal(['月份', 'month']);
-    const satisStr = getVal(['满意度', 'satisfaction']);
-    const desc = getVal(['项目描述', '描述', 'desc']);
-    const visibleStr = getVal(['前端显示', '显示', 'visible']);
-
-    // Find expert by name
-    let expertId = null;
-    let pendingExpertName = null;
-    if (expertName && db.experts) {
-      const match = db.experts.find(e => e.name === expertName);
-      if (match) {
-        expertId = match.id;
-      } else {
-        pendingExpertName = expertName;
-      }
-    }
-
-    const project = {
-      title: title,
-      expertId: expertId,
-      pendingExpertName: pendingExpertName,
-      year: yearStr ? parseInt(yearStr, 10) || null : null,
-      month: monthStr ? parseInt(monthStr, 10) || null : null,
-      desc: desc || '',
-      visible: visibleStr ? visibleStr !== '否' : true,
-      createdBy: appState.currentUser?.email || 'system',
-      createdAt: new Date().toISOString()
-    };
-
-    if (satisStr) {
-      const sVal = parseFloat(satisStr);
-      if (!isNaN(sVal)) {
-        project.satisfaction = { value: sVal, scale: 10 };
-      }
-    }
-
-    projects.push(project);
-  }
-  return projects;
-}
-
-// 项目导入弹窗
-function showProjectImportDialog() {
-  const db = appState.db;
-  const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
-  const content = h('div', { className: 'modal-content', style: { maxWidth: '600px' } });
-
-  const header = h('div', { className: 'modal-header' });
-  header.appendChild(h('div', { className: 'modal-title' }, '批量导入合作项目'));
-  header.appendChild(h('button', { className: 'modal-close', onclick: () => overlay.remove() }, '✕'));
-  content.appendChild(header);
-
-  const body = h('div', { className: 'modal-body' });
-  body.appendChild(h('p', { style: { marginBottom:'8px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。关联专家需填写已有专家姓名，系统自动匹配。'));
-  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 12px' } }, '💡 建议先点击工具栏「📋 下载模板」，按字段格式填写后再导入，避免字段无法识别。'));
-
-  // File Import
-  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '文件导入'));
-  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '支持格式：Excel (.xlsx/.xls)'));
-  
-  const fileInput = h('input', { type: 'file', accept: '.xlsx,.xls', id: 'project-import-file', style: { marginBottom:'12px' } });
-  body.appendChild(fileInput);
-
-  body.appendChild(h('button', {
-    className: 'btn btn-primary btn-sm',
-    style: { marginBottom:'20px' },
-    onclick: () => {
-      const file = document.getElementById('project-import-file').files[0];
-      if (!file) { toast('请选择文件', 'error'); return; }
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const wb = XLSX.read(data, { type: 'array' });
-          const projects = parseExcelToProjects(wb, db);
-          if (projects.length === 0) { toast('Excel中未找到有效项目数据', 'error'); return; }
-
-          // Preview and confirm
-          let msg = '即将导入 ' + projects.length + ' 条项目数据：\n';
-          projects.forEach((p, i) => {
-            msg += '\n#' + (i+1) + ' ' + p.title + ' | ' + (p.expertId ? getProjectExpertName(p.expertId) : ('⚠️待关联: ' + (p.pendingExpertName || '未知'))) + ' | ' + (p.year || '');
-          });
-          msg += '\n\n确认导入？';
-
-          if (confirm(msg)) {
-            if (!db.yiliProjects) db.yiliProjects = [];
-            projects.forEach(p => { db.yiliProjects.push(p); });
-            db.updateTime = new Date().toISOString();
-            saveDB(db);
-            renderProjectsTab(document.getElementById('admin-panel'));
-            overlay.remove();
-            toast('成功导入 ' + projects.length + ' 条项目', 'success');
-          }
-        } catch(err) {
-          toast('文件解析失败：' + err.message, 'error');
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-  }, '上传并导入'));
-
-  content.appendChild(body);
-  overlay.appendChild(content);
-  document.body.appendChild(overlay);
-}
-
-// 下载 Excel 导入模板（含填写说明）
-function downloadExpertExcelTemplate() {
-  const db = appState.db;
-  // Sheet 1: 导入模板
-  const headers = ['姓名*', '适用领域', '学历', '库内供应商', '突出优势', '卡优势概括', '卡资历概括',
-                   '资历资质', '参考案例', '联系人', '联系方式', '推荐人'];
-  const sampleRow = [
-    '张三',
-    '数字营销, 供应链',
-    '硕士',
-    '否',
-    '■行业经验：10年数字营销经验\n■专业能力：SEM/SEO优化',
-    '数字营销专家\n10年行业经验',
-    '某知名咨询公司总监',
-    '【职称/荣誉头衔】高级营销师\n【社会职务】中国广告协会会员\n【履职资历】曾参与某大型企业数字化转型项目',
-    '【核心课程】品牌营销战略\n【服务经历】为伊利等企业提供咨询服务',
-    '李四',
-    '📞13800001111',
-    '王五'
-  ];
-  const templateRows = [headers, sampleRow];
-
-  // Add field names hint row
-  if (db.fields && db.fields.length > 0) {
-    templateRows.push(['', '可用领域: ' + db.fields.map(f => f.name).join('、'), '', '', '', '', '', '', '', '', '', '']);
-  }
-
-  const ws1 = XLSX.utils.aoa_to_sheet(templateRows);
-  ws1['!cols'] = Array(12).fill(null).map(() => ({wch: 22}));
-
-  // Sheet 2: 填写说明
-  const instructions = [
-    ['列名', '必填', '填写说明与示例'],
-    ['姓名', '✅ 是', '专家姓名，不可为空。如：张三'],
-    ['适用领域', '否', '多个领域用英文逗号或中文逗号分隔，需匹配已有分类名称'],
-    ['学历', '否', '如：本科、硕士、博士'],
-    ['库内供应商', '否', '填"是"或"否"，默认为否'],
-    ['突出优势', '否', '每条一行，格式：■标题：内容。如：■行业经验：10年咨询经验'],
-    ['卡优势概括', '否', '显示在专家卡片上，1-3条，每行一条'],
-    ['卡资历概括', '否', '显示在专家卡片上，1-3条，每行一条'],
-    ['资历资质', '否', '格式：【职称/荣誉头衔】内容。支持四种子标题：职称/荣誉头衔、社会职务、履历资历、履职资历'],
-    ['参考案例', '否', '格式：【核心课程】内容。包含核心课程和服务经历'],
-    ['联系人', '否', '联系人姓名'],
-    ['联系方式', '否', '电话/微信/邮箱，自动识别类型'],
-    ['推荐人', '否', '内部推荐人姓名（公司内部）'],
-    ['', ''],
-    ['💡 提示：导出已有专家数据可参考完整字段格式', '']
-  ];
-  const ws2 = XLSX.utils.aoa_to_sheet(instructions);
-  ws2['!cols'] = [{wch: 14}, {wch: 10}, {wch: 60}];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws1, '专家导入模板');
-  XLSX.utils.book_append_sheet(wb, ws2, '填写说明');
-  XLSX.writeFile(wb, '专家导入模板.xlsx');
-  toast('模板已下载，请用 Excel/WPS 打开编辑后导入', 'success');
-}
-
-// 从 Excel 文件中解析专家数据
-function parseExcelToExperts(workbook) {
-  const sheetName = workbook.SheetNames[0];
-  const ws = workbook.Sheets[sheetName];
-  const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  if (!data || data.length < 2) return [];
-
-  const header = data[0].map(h => String(h || '').trim());
-  const nameIdx = header.findIndex(h => h.includes('姓名'));
-  if (nameIdx < 0) return [];
-
-  const experts = [];
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const nameVal = String(row[nameIdx] || '').trim();
-    if (!nameVal) continue; // 跳过空行
-
-    const getVal = (keywords) => {
-      const idx = header.findIndex(h => keywords.some(k => h.includes(k)));
-      return idx >= 0 ? String(row[idx] || '').trim() : '';
-    };
-
-    const expert = {
-      name: nameVal,
-      fields: getVal(['适用领域', '领域']).split(/[,，、]/).map(f => f.trim()).filter(Boolean),
-      education: getVal(['学历']),
-      isSupplier: getVal(['库内供应商', '供应商']).includes('是'),
-      advantages: getVal(['突出优势', '优势']),
-      advDisplay: getVal(['卡优势概括', '优势概括']),
-      qualDisplay: getVal(['卡资历概括', '资历概括']),
-      qualifications: getVal(['资历资质', '资质']),
-      courses: getVal(['参考案例', '案例', '课程']),
-      contactPerson: getVal(['联系人']),
-      contactInfo: getVal(['联系方式', '电话', '微信', '邮箱']),
-      referrer: getVal(['推荐人', '推荐']),
-      status: getVal(['状态'])
-    };
-
-    experts.push(expert);
-  }
-  return experts;
 }
 
 // ===== Other Admin Tabs =====
@@ -6038,81 +5581,17 @@ function renderSettingsTab(panel) {
     }
   }, '保存链接'));
 
-  // ===== 关联文档 =====
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 10px', fontSize:'14px' } }, '📁 关联文档'));
-  panel.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'12px' } }, '以下链接仅供查看源数据。如需同步数据，请在腾讯文档中导出为CSV，粘贴到下方"手动同步数据"区域进行更新。'));
+  // ===== Current data source link display (read-only, shows latest link) =====
+  const currentLinkRow = h('div', { style:{ background:'var(--primary-light)', padding:'12px 16px', borderRadius:'8px', marginBottom:'16px', border:'1px solid #93c5fd' } });
+  currentLinkRow.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', color:'var(--primary)', marginBottom:'6px' } }, '📎 当前数据源链接'));
+  currentLinkRow.appendChild(h('a', {
+    href: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2',
+    target: '_blank',
+    style: { fontSize:'12px', color:'var(--primary)', wordBreak:'break-all', lineHeight:'1.6', textDecoration:'underline' }
+  }, 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2'));
+  currentLinkRow.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' } }, '主管理员最新更新的线上文档链接，点击可在新窗口打开'));
+  panel.appendChild(currentLinkRow);
   
-  const docs = [
-    {
-      icon: '📊',
-      title: '版本更新进度管理表',
-      desc: '所有功能需求的优先级、排期、完成状态追踪',
-      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h&_fid=DTVJIWmh2ZXdBUE14',
-      label: '打开进度表'
-    },
-    {
-      icon: '📁',
-      title: '初始化源数据表',
-      desc: '专家资源库初始数据来源（腾讯文档），仅供查看，不自动同步',
-      url: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou&_fid=DTUROVmZod2FxSGFO',
-      label: '打开源数据表'
-    }
-  ];
-
-  docs.forEach(function(doc) {
-    var card = h('div', {
-      style: {
-        background: '#fff',
-        borderRadius: '10px',
-        padding: '14px 18px',
-        marginBottom: '10px',
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-        border: '1px solid #f0f0f0',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px'
-      }
-    });
-
-    var icon = h('div', {
-      style: {
-        fontSize: '24px',
-        width: '42px',
-        height: '42px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#f0f7ff',
-        borderRadius: '10px',
-        flexShrink: 0
-      }
-    }, doc.icon);
-
-    var body = h('div', { style: { flex: 1 } },
-      h('div', { style: { fontSize: '14px', fontWeight: 600, marginBottom: '3px', color: '#1e293b' } }, doc.title),
-      h('div', { style: { fontSize: '12px', color: '#94a3b8', marginBottom: '6px' } }, doc.desc),
-      h('a', {
-        href: doc.url,
-        target: '_blank',
-        rel: 'noopener',
-        style: {
-          fontSize: '12px',
-          color: 'var(--primary)',
-          fontWeight: 600,
-          textDecoration: 'none',
-          padding: '4px 12px',
-          background: '#f0f7ff',
-          borderRadius: '6px',
-          display: 'inline-block'
-        }
-      }, doc.label)
-    );
-
-    card.appendChild(icon);
-    card.appendChild(body);
-    panel.appendChild(card);
-  });
-
   // Manual data update via CSV paste
   panel.appendChild(h('h5', { style:{ margin:'16px 0 6px', fontSize:'13px' } }, '手动同步数据'));
   panel.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '从腾讯文档导出为CSV，粘贴到下方进行更新。更新不覆盖已有数据，自动检测重复并提示。'));
@@ -6383,6 +5862,102 @@ function renderSettingsTab(panel) {
     h('div', {}, '3. 通过局域网文件共享访问 index.html')
   ));
 }
+// ===== 系统文档 (v4.11 — 主管理员可见) =====
+function renderDocsTab(panel) {
+  panel.innerHTML = '';
+  panel.appendChild(h('h3', {}, '📋 系统文档'));
+
+  const docs = [
+    {
+      icon: '📊',
+      title: '版本更新进度管理表',
+      desc: '所有功能需求的优先级、排期、完成状态追踪',
+      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+      label: '打开进度表'
+    },
+    {
+      icon: '📁',
+      title: '初始化源数据表',
+      desc: '专家资源库初始数据来源（腾讯文档）',
+      url: '#',
+      label: '敬请期待（联系管理员补充链接）',
+      disabled: true
+    }
+  ];
+
+  docs.forEach(function(doc) {
+    var card = h('div', {
+      style: {
+        background: '#fff',
+        borderRadius: '10px',
+        padding: '20px 24px',
+        marginBottom: '12px',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        border: '1px solid #f0f0f0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px'
+      }
+    });
+
+    var icon = h('div', {
+      style: {
+        fontSize: '28px',
+        width: '48px',
+        height: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0f7ff',
+        borderRadius: '10px',
+        flexShrink: 0
+      }
+    }, doc.icon);
+
+    var body = h('div', { style: { flex: 1 } },
+      h('div', { style: { fontSize: '15px', fontWeight: 600, marginBottom: '4px', color: '#1e293b' } }, doc.title),
+      h('div', { style: { fontSize: '13px', color: '#94a3b8', marginBottom: '8px' } }, doc.desc),
+      h('a', {
+        href: doc.url,
+        target: '_blank',
+        rel: 'noopener',
+        style: {
+          display: 'inline-block',
+          fontSize: '13px',
+          color: doc.disabled ? '#cbd5e1' : '#2563EB',
+          textDecoration: 'none',
+          cursor: doc.disabled ? 'not-allowed' : 'pointer',
+          padding: '4px 12px',
+          border: '1px solid ' + (doc.disabled ? '#e2e8f0' : '#2563EB'),
+          borderRadius: '6px'
+        },
+        onclick: doc.disabled ? function(e) { e.preventDefault(); } : null
+      }, doc.label)
+    );
+
+    card.appendChild(icon);
+    card.appendChild(body);
+    panel.appendChild(card);
+  });
+
+  // 底部提示
+  panel.appendChild(h('p', {
+    style: {
+      fontSize: '12px',
+      color: '#94a3b8',
+      marginTop: '20px',
+      padding: '12px 16px',
+      background: '#f8fafc',
+      borderRadius: '8px',
+      border: '1px dashed #e2e8f0',
+      lineHeight: 1.8
+    }
+  },
+    h('span', { style: { fontWeight: 600, color: '#64748b' } }, '💡 提示：'),
+    ' 此面板仅主管理员可见。如需补充源数据链接，请联系系统负责人更新。未来可扩展添加部署SOP、功能说明文档等。'
+  ));
+}
+
 // ===== INIT (v4.0 — async Supabase load with timeout) =====
 async function boot() {
   var app = document.getElementById('app');
