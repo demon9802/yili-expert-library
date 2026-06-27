@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.12 | 2026-06-25 | 筛选UI高亮修复 + syncFilterUI */
+/* Version 4.19 | 2026-06-27 | 实时防抖搜索 + 历史下拉 + X清除 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.12] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.19] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -12,6 +12,41 @@ if (typeof isAdmin === 'undefined') var isAdmin = false;
 const STORAGE_KEY = 'yili_expert_db';
 const ADMIN_KEY = 'yili_admin_config';
 const FAVORITES_KEY = 'yili_expert_favorites';
+
+// ===== v4.19: 搜索历史 =====
+const SEARCH_HISTORY_KEY = 'yili_search_history';
+const MAX_SEARCH_HISTORY = 5;
+
+function getSearchHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSearchHistory(query) {
+  if (!query || !query.trim()) return;
+  var q = query.trim();
+  var history = getSearchHistory();
+  // Remove duplicate if exists
+  history = history.filter(function(h) { return h.toLowerCase() !== q.toLowerCase(); });
+  // Add to front
+  history.unshift(q);
+  // Keep max
+  if (history.length > MAX_SEARCH_HISTORY) history = history.slice(0, MAX_SEARCH_HISTORY);
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+}
+
+function removeSearchHistoryItem(query) {
+  var history = getSearchHistory();
+  history = history.filter(function(h) { return h !== query; });
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+}
+
+function clearSearchHistory() {
+  localStorage.removeItem(SEARCH_HISTORY_KEY);
+}
 
 // ===== v4.1 测试模式 =====
 const TEST_MODE_KEY = 'yili_test_mode';
@@ -830,26 +865,80 @@ function renderFrontend() {
   app.appendChild(statsBar);
   
   // Search bar
-  const searchBar = h('div', { className: 'search-bar' });
-  const searchWrapper = h('div', { className: 'search-input-wrapper' });
-  searchWrapper.appendChild(h('span', { className: 'search-icon' }, '🔍'));
-  const searchInput = h('input', {
+  var searchBar = h('div', { className: 'search-bar' });
+  var searchWrapper = h('div', { className: 'search-input-wrapper' });
+  searchWrapper.appendChild(h('span', { className: 'search-icon' }, '\uD83D\uDD0D'));
+  var searchInput = h('input', {
     className: 'search-input',
     placeholder: '搜索专家姓名或关键词（如：AI、产品、清华...）',
-    value: appState.searchQuery,
-    onkeydown: (e) => {
-      if (e.key === 'Enter') {
-        doSearch();
-      }
-    }
+    value: appState.searchQuery
   });
+  
+  // v4.19: 实时防抖搜索 + 搜索历史下拉 + X清除按钮
+  var searchDebounceTimer = null;
+  searchInput.oninput = function(e) {
+    var val = e.target.value;
+    appState.searchQuery = val;
+    // Show/hide inline clear button
+    var inlineClear = document.querySelector('.search-inline-clear');
+    if (inlineClear) {
+      inlineClear.style.display = val ? 'flex' : 'none';
+    }
+    // Show search history dropdown when typing/focusing
+    if (document.activeElement === searchInput) {
+      showSearchHistoryDropdown(searchInput);
+    }
+    // Debounce search
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(function() {
+      doSearch();
+      searchDebounceTimer = null;
+    }, 350);
+  };
+  
+  searchInput.onfocus = function() {
+    // On focus, show inline clear if has content
+    var inlineClear = document.querySelector('.search-inline-clear');
+    if (inlineClear) {
+      inlineClear.style.display = appState.searchQuery ? 'flex' : 'none';
+    }
+    showSearchHistoryDropdown(searchInput);
+  };
+  
+  searchInput.onblur = function() {
+    // Delay hide to allow click on dropdown items
+    setTimeout(function() {
+      var dd = document.querySelector('.search-history-dropdown');
+      if (dd) dd.remove();
+    }, 200);
+  };
+  
+  // Inline X clear button inside wrapper
+  var inlineClear = h('span', {
+    className: 'search-inline-clear',
+    style: 'display:' + (appState.searchQuery ? 'flex' : 'none'),
+    onclick: function(e) {
+      e.stopPropagation();
+      appState.searchQuery = '';
+      searchInput.value = '';
+      inlineClear.style.display = 'none';
+      appState.currentPage = 1;
+      syncFilterUI();
+      renderExpertGrid();
+      var dd = document.querySelector('.search-history-dropdown');
+      if (dd) dd.remove();
+    }
+  }, '\u2715');
+  
   searchWrapper.appendChild(searchInput);
+  searchWrapper.appendChild(inlineClear);
   searchBar.appendChild(searchWrapper);
   
+  // 搜索按钮（保留作为显式触发入口）
   searchBar.appendChild(h('button', {
     className: 'search-btn',
-    onclick: () => doSearch()
-  }, '搜索'));
+    onclick: function() { doSearch(); saveSearchHistory(appState.searchQuery); }
+  }, '\u641C\u7D22'));
   
   if (appState.searchQuery) {
     searchBar.appendChild(h('button', {
@@ -1181,12 +1270,92 @@ function syncFilterUI() {
 // ===== v3.0: 垂直领域导航已移除，代码备份在 backup/vertical-nav-backup.js =====
 
 function doSearch() {
-  const input = document.querySelector('.search-input');
+  var input = document.querySelector('.search-input');
   if (input) {
-    appState.searchQuery = input.value.trim();
+    var val = input.value.trim();
+    appState.searchQuery = val;
     appState.currentPage = 1;
+    // v4.19: 保存到搜索历史（非空时）
+    if (val) saveSearchHistory(val);
     renderExpertGrid();
   }
+}
+
+// v4.19: 搜索历史下拉
+function showSearchHistoryDropdown(inputEl) {
+  // Remove existing dropdown
+  var existing = document.querySelector('.search-history-dropdown');
+  if (existing) existing.remove();
+  
+  var history = getSearchHistory();
+  var currentVal = (inputEl && inputEl.value && inputEl.value.trim()) || '';
+  
+  // Filter: show matching history items if typing, otherwise show all
+  var filtered = currentVal
+    ? history.filter(function(h) { return h.toLowerCase().indexOf(currentVal.toLowerCase()) !== -1; })
+    : history.slice();
+  
+  // Don't show if no history or all items filtered out
+  if (filtered.length === 0 && !currentVal) return;
+  
+  var wrapper = inputEl.parentElement;
+  var dropdown = document.createElement('div');
+  dropdown.className = 'search-history-dropdown';
+  
+  // Header
+  var header = document.createElement('div');
+  header.className = 'search-history-header';
+  header.innerHTML = '<span>搜索历史</span>';
+  var clearAll = document.createElement('span');
+  clearAll.className = 'search-history-clear-all';
+  clearAll.textContent = '清空';
+  clearAll.onclick = function(e) {
+    e.stopPropagation();
+    clearSearchHistory();
+    dropdown.remove();
+  };
+  header.appendChild(clearAll);
+  dropdown.appendChild(header);
+  
+  // Items
+  if (filtered.length > 0) {
+    filtered.forEach(function(item) {
+      var row = document.createElement('div');
+      row.className = 'search-history-item';
+      
+      var text = document.createElement('span');
+      text.className = 'search-history-text';
+      text.textContent = item;
+      text.title = item;
+      text.onclick = function() {
+        inputEl.value = item;
+        appState.searchQuery = item;
+        saveSearchHistory(item);
+        appState.currentPage = 1;
+        doSearch();
+        dropdown.remove();
+      };
+      row.appendChild(text);
+      
+      var delBtn = document.createElement('span');
+      delBtn.className = 'search-history-delete';
+      delBtn.textContent = '\u2715';
+      delBtn.title = '删除此条';
+      delBtn.onclick = function(e) {
+        e.stopPropagation();
+        removeSearchHistoryItem(item);
+        dropdown.remove();
+        // Re-show updated dropdown
+        showSearchHistoryDropdown(inputEl);
+      };
+      row.appendChild(delBtn);
+      
+      dropdown.appendChild(row);
+    });
+  }
+  
+  // Position: below the wrapper
+  wrapper.appendChild(dropdown);
 }
 
 function getRelevanceScore(expert, query) {
