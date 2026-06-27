@@ -100,6 +100,151 @@ async function reauthenticate(password) {
   return true;
 }
 
+// ===== v4.21: 密保问题 + 用户管理 =====
+
+// 保存密保问题（答案经客户端SHA-256哈希后存储）
+async function saveSecurityQuestions(questions) {
+  if (!supabase || !currentUser) throw new Error('未登录');
+  if (!Array.isArray(questions) || questions.length !== 3) throw new Error('密保问题需填写 3 道');
+  var hashed = questions.map(function(a) {
+    return sha256(a.trim());
+  });
+  var { error } = await supabase.from('profiles').update({
+    security_questions: hashed,
+    security_attempts: 0,
+    security_lock_until: null
+  }).eq('id', currentUser.id);
+  if (error) throw error;
+  return true;
+}
+
+// 获取某用户的密保问题文本
+async function getSecurityQuestionTexts(userId) {
+  if (!supabase) return null;
+  var { data } = await supabase.from('profiles').select('security_questions, security_lock_until, security_attempts').eq('id', userId).single();
+  if (!data || !data.security_questions) return null;
+  return {
+    locked: data.security_lock_until && new Date(data.security_lock_until) > new Date(),
+    lockUntil: data.security_lock_until,
+    attemptsRemaining: Math.max(0, 3 - (data.security_attempts || 0)),
+    questions: data.security_questions
+  };
+}
+
+// 服务端验证密保答案（通过 RPC 调用 PostgreSQL 函数）
+async function verifySecurityAnswers(userId, answers) {
+  if (!supabase) throw new Error('Supabase 未加载');
+  if (!Array.isArray(answers) || answers.length !== 3) throw new Error('需要回答 3 道密保题');
+  var hashed = answers.map(function(a) { return sha256(a.trim()); });
+  var { data, error } = await supabase.rpc('verify_security_answers', {
+    p_user_id: userId,
+    p_answers: hashed
+  });
+  if (error) {
+    // RPC 尚未部署 → 客户端本地验证作为降级方案
+    console.warn('verify_security_answers RPC not available, using client fallback');
+    return verifySecurityAnswersClient(userId, answers);
+  }
+  return data;
+}
+
+// 客户端本地密保验证（RPC 不可用时的降级方案）
+async function verifySecurityAnswersClient(userId, answers) {
+  var info = await getSecurityQuestionTexts(userId);
+  if (!info || !info.questions) return { success: false, error: '未设置密保问题' };
+  if (info.locked) return { success: false, error: '密保已锁定，请稍后重试' };
+  
+  var allMatch = true;
+  for (var i = 0; i < 3; i++) {
+    if (sha256(String(answers[i] || '').trim()) !== info.questions[i]) {
+      allMatch = false;
+      break;
+    }
+  }
+  
+  if (allMatch) {
+    await supabase.from('profiles').update({ security_attempts: 0, security_lock_until: null }).eq('id', userId);
+    return { success: true };
+  } else {
+    var newAttempts = (info.attemptsRemaining > 0 ? (3 - info.attemptsRemaining) : 0) + 1;
+    if (newAttempts >= 3) {
+      await supabase.from('profiles').update({ security_attempts: newAttempts, security_lock_until: new Date(Date.now() + 5 * 60 * 1000).toISOString() }).eq('id', userId);
+      return { success: false, error: '答错次数过多，密保已锁定 5 分钟' };
+    } else {
+      await supabase.from('profiles').update({ security_attempts: newAttempts }).eq('id', userId);
+      return { success: false, error: '密保答案错误，还剩 ' + (3 - newAttempts) + ' 次机会' };
+    }
+  }
+}
+
+// 密保验证通过后修改密码
+async function changePasswordAfterSecurityVerification(userId, newPassword) {
+  if (!supabase) throw new Error('Supabase 未加载');
+  if (!newPassword || newPassword.length < 6) throw new Error('新密码至少 6 位');
+  var { error } = await supabase.rpc('admin_reset_password_by_id', {
+    p_user_id: userId,
+    p_password: newPassword
+  });
+  if (error) {
+    console.warn('admin_reset_password_by_id RPC failed:', error.message);
+    throw new Error('密码修改失败，请确认 SQL 迁移已执行（supabase-migration-v4.21.sql）');
+  }
+  return true;
+}
+
+// 管理员获取用户列表
+async function fetchUserList() {
+  if (!supabase) return [];
+  var { data, error } = await supabase.rpc('get_user_list');
+  if (error) {
+    console.warn('get_user_list RPC failed, fallback:', error.message);
+    var { data: d2, error: e2 } = await supabase.from('profiles').select('id, is_admin, security_questions, force_password_change');
+    if (e2) return [];
+    return (d2 || []).map(function(p) {
+      return {
+        id: p.id,
+        email: '',
+        is_admin: p.is_admin,
+        has_security_questions: !!p.security_questions,
+        force_password_change: p.force_password_change,
+        created_at: null
+      };
+    });
+  }
+  return data || [];
+}
+
+// 管理员重置用户密码
+async function adminResetUserPassword(userId, tempPassword) {
+  if (!supabase) throw new Error('Supabase 未加载');
+  var { error } = await supabase.rpc('admin_reset_password_by_id', {
+    p_user_id: userId,
+    p_password: tempPassword
+  });
+  if (error) {
+    console.warn('admin_reset_password_by_id RPC failed:', error.message);
+    throw new Error('重置失败，请确认 SQL 迁移已执行');
+  }
+  var { error: e2 } = await supabase.from('profiles').update({
+    force_password_change: true
+  }).eq('id', userId);
+  if (e2) console.warn('标记强制改密失败:', e2.message);
+  return true;
+}
+
+// 检查是否需要强制改密
+async function checkForcePasswordChange() {
+  if (!supabase || !currentUser) return false;
+  var { data } = await supabase.from('profiles').select('force_password_change').eq('id', currentUser.id).single();
+  return data?.force_password_change === true;
+}
+
+// 清除强制改密标记
+async function clearForcePasswordChange() {
+  if (!supabase || !currentUser) return;
+  await supabase.from('profiles').update({ force_password_change: false }).eq('id', currentUser.id);
+}
+
 // ===== 用户密码注册/登录（关闭邮件确认） =====
 // 注意事项：
 // 1. Supabase Dashboard → Authentication → Settings → "Confirm email" 须关闭
@@ -472,4 +617,69 @@ async function fetchPermissions() {
   const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'permissions').maybeSingle();
   if (error || !data) return null;
   return data.value;
+}
+
+// ===== v4.21: SHA-256 纯客户端实现（不依赖外部库）=====
+function sha256(str) {
+  function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+  function ch(x, y, z) { return (x & y) ^ (~x & z); }
+  function maj(x, y, z) { return (x & y) ^ (x & z) ^ (y & z); }
+  function bsig0(x) { return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22); }
+  function bsig1(x) { return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25); }
+  function ssig0(x) { return rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3); }
+  function ssig1(x) { return rotr(x, 17) ^ rotr(x, 19) ^ (x >>> 10); }
+
+  var K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];
+
+  var bytes = [];
+  for (var i = 0; i < str.length; i++) {
+    var code = str.charCodeAt(i);
+    if (code < 0x80) bytes.push(code);
+    else if (code < 0x800) { bytes.push(0xc0 | (code >>> 6)); bytes.push(0x80 | (code & 0x3f)); }
+    else if (code < 0xd800 || code >= 0xe000) {
+      bytes.push(0xe0 | (code >>> 12)); bytes.push(0x80 | ((code >>> 6) & 0x3f)); bytes.push(0x80 | (code & 0x3f));
+    } else {
+      i++; code = 0x10000 + (((code & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+      bytes.push(0xf0 | (code >>> 18)); bytes.push(0x80 | ((code >>> 12) & 0x3f));
+      bytes.push(0x80 | ((code >>> 6) & 0x3f)); bytes.push(0x80 | (code & 0x3f));
+    }
+  }
+
+  var bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while ((bytes.length % 64) !== 56) bytes.push(0);
+  for (var j = 7; j >= 0; j--) bytes.push(Math.floor(bitLen / Math.pow(2, j * 8)) & 0xff);
+
+  var H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  for (var b = 0; b < bytes.length; b += 64) {
+    var W = new Array(64);
+    var t;
+    for (t = 0; t < 16; t++)
+      W[t] = bytes[b + t * 4] << 24 | bytes[b + t * 4 + 1] << 16 | bytes[b + t * 4 + 2] << 8 | bytes[b + t * 4 + 3];
+    for (t = 16; t < 64; t++) W[t] = (ssig1(W[t - 2]) + W[t - 7] + ssig0(W[t - 15]) + W[t - 16]) >>> 0;
+    var a = H[0], bv = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (t = 0; t < 64; t++) {
+      var T1 = (h + bsig1(e) + ch(e, f, g) + K[t] + W[t]) >>> 0;
+      var T2 = (bsig0(a) + maj(a, bv, c)) >>> 0;
+      h = g; g = f; f = e; e = (d + T1) >>> 0; d = c; c = bv; bv = a; a = (T1 + T2) >>> 0;
+    }
+    H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + bv) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
+    H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+  }
+  var hex = '';
+  for (var k = 0; k < 8; k++) {
+    var val = H[k];
+    hex += ((val >>> 24) & 0xff).toString(16).padStart(2, '0');
+    hex += ((val >>> 16) & 0xff).toString(16).padStart(2, '0');
+    hex += ((val >>> 8) & 0xff).toString(16).padStart(2, '0');
+    hex += (val & 0xff).toString(16).padStart(2, '0');
+  }
+  return hex;
 }

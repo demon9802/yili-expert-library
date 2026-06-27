@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.20 | 2026-06-27 | 用户密码管理：忘记密码 + 修改密码 */
+/* Version 4.21 | 2026-06-27 | 密保问题 + 管理员用户管理 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.20] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.21] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -2820,6 +2820,7 @@ function showUserLoginModal() {
         setTimeout(function() {
           overlay.remove();
           syncFavoritesAfterLogin();
+          postLoginChecks();
           renderFrontend();
         }, 800);
       } catch(e) {
@@ -2835,6 +2836,7 @@ function showUserLoginModal() {
               setTimeout(function() {
                 overlay.remove();
                 syncFavoritesAfterLogin();
+                postLoginChecks();
                 renderFrontend();
               }, 800);
             } else if (result.user) {
@@ -2859,24 +2861,14 @@ function showUserLoginModal() {
 
   modal.appendChild(btnRow);
 
-  // v4.20: 忘记密码链接
+  // v4.21: 忘记密码 → 双通道选择
   var forgotRow = h('div', { style: { textAlign: 'center', marginTop: '14px' } });
   var forgotLink = h('a', {
     href: '#',
     style: { fontSize: '12px', color: '#6B7280', textDecoration: 'underline', cursor: 'pointer' },
-    onclick: async function(e) {
+    onclick: function(e) {
       e.preventDefault();
-      var email = document.getElementById('user-email').value.trim();
-      if (!email) { msgDiv.textContent = '请先输入邮箱地址'; msgDiv.style.color = '#DC2626'; return; }
-      msgDiv.textContent = '正在发送重置邮件...'; msgDiv.style.color = '#2563EB';
-      try {
-        await resetPassword(email);
-        msgDiv.innerHTML = '✅ 重置密码链接已发送到 <b>' + escapeHtml(email) + '</b><br><span style="font-size:11px">请检查收件箱（含垃圾邮件），点击链接后重新设置密码</span>';
-        msgDiv.style.color = '#059669';
-      } catch(err) {
-        msgDiv.textContent = err.message || '发送失败，请重试';
-        msgDiv.style.color = '#DC2626';
-      }
+      showForgotPasswordModal();
     }
   }, '忘记密码？');
   forgotRow.appendChild(forgotLink);
@@ -2885,6 +2877,403 @@ function showUserLoginModal() {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   setTimeout(function() { document.getElementById('user-email').focus(); }, 100);
+}
+
+// ===== v4.21: 登录后安全检查（强制改密 + 密保引导）=====
+async function postLoginChecks() {
+  if (!currentUser) return;
+
+  // 1. 检查是否需要强制改密
+  try {
+    var forceChange = await checkForcePasswordChange();
+    if (forceChange) {
+      showChangePasswordModalForce();
+      return; // 先处理改密，不继续执行密保引导
+    }
+  } catch(e) { /* 非关键检查，失败继续 */ }
+
+  // 2. 检查是否已设置密保
+  try {
+    var info = await getSecurityQuestionTexts(currentUser.id);
+    if (!info || !info.questions) {
+      // 延迟显示，避免和登录弹窗冲突
+      setTimeout(function() {
+        showSecuritySetupModal();
+      }, 1200);
+    }
+  } catch(e) { /* 非关键检查 */ }
+}
+
+// 强制改密弹窗（管理员重置后触发）
+function showChangePasswordModalForce() {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', zIndex: 10002, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  });
+
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '400px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 4px 0', fontSize: '18px', color: '#DC2626' } }, '⚠️ 管理员已重置您的密码'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 20px 0' } }, '为保障账号安全，请立即设置一个新密码'));
+
+  var msgDiv = h('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '12px' } });
+  modal.appendChild(msgDiv);
+
+  var newPwd = h('input', { type: 'password', placeholder: '请输入新密码（至少6位）', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px'
+  }});
+  modal.appendChild(newPwd);
+
+  var confirmPwd = h('input', { type: 'password', placeholder: '请再次输入新密码', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px'
+  }});
+  modal.appendChild(confirmPwd);
+
+  modal.appendChild(h('button', {
+    style: { padding: '12px 20px', background: '#DC2626', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, width: '100%' },
+    onclick: async function() {
+      var np = newPwd.value, cp = confirmPwd.value;
+      if (np.length < 6) { msgDiv.textContent = '新密码至少 6 位'; msgDiv.style.color = '#991B1B'; return; }
+      if (np !== cp) { msgDiv.textContent = '两次密码不一致'; msgDiv.style.color = '#991B1B'; return; }
+      msgDiv.textContent = '正在修改密码...'; msgDiv.style.color = '#2563EB';
+      try {
+        await changePassword(np);
+        await clearForcePasswordChange();
+        msgDiv.textContent = '✅ 密码修改成功！'; msgDiv.style.color = '#059669';
+        setTimeout(function() {
+          overlay.remove();
+          postLoginChecks(); // 改完密码后继续执行密保引导
+        }, 1000);
+      } catch(e) {
+        msgDiv.textContent = '❌ ' + (e.message || '修改失败'); msgDiv.style.color = '#DC2626';
+      }
+    }
+  }, '设置新密码并继续'));
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// ===== v4.21: 忘记密码弹窗（邮箱 + 密保双通道）=====
+function showForgotPasswordModal() {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.4)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '400px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 8px 0', fontSize: '18px', color: '#1E293B' } }, '忘记密码'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 20px 0' } }, '请选择一种方式重置密码'));
+
+  var msgDiv = h('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '12px' } });
+  modal.appendChild(msgDiv);
+
+  var emailInput = h('input', {
+    type: 'email', placeholder: '请输入您的邮箱地址',
+    style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '16px' }
+  });
+  modal.appendChild(emailInput);
+
+  var btnRow = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 },
+    onclick: async function() {
+      var email = emailInput.value.trim();
+      if (!email) { msgDiv.textContent = '请输入邮箱地址'; msgDiv.style.color = '#DC2626'; return; }
+      msgDiv.textContent = '正在发送重置邮件...'; msgDiv.style.color = '#2563EB';
+      try {
+        await resetPassword(email);
+        msgDiv.textContent = '✅ 重置邮件已发送，请检查收件箱（含垃圾箱）'; msgDiv.style.color = '#059669';
+      } catch(e) {
+        msgDiv.textContent = '❌ ' + (e.message || '发送失败'); msgDiv.style.color = '#DC2626';
+      }
+    }
+  }, '📧 发送重置邮件'));
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 },
+    onclick: function() {
+      var email = emailInput.value.trim();
+      if (!email) { msgDiv.textContent = '请先输入邮箱地址以查找您的密保'; msgDiv.style.color = '#DC2626'; return; }
+      overlay.remove();
+      showSecurityResetFlow(email);
+    }
+  }, '🔐 密保验证重置'));
+
+  modal.appendChild(btnRow);
+
+  var hintDiv = h('div', { style: { fontSize: '12px', color: '#94A3B8', textAlign: 'center' } },
+    '邮箱和密保都无法解决？请联系管理员协助重置');
+  modal.appendChild(hintDiv);
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  setTimeout(function() { emailInput.focus(); }, 100);
+}
+
+// ===== v4.21: 密保验证重置密码流程 =====
+function showSecurityResetFlow(email) {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.4)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '420px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 4px 0', fontSize: '18px', color: '#1E293B' } }, '密保验证'));
+  var msgDiv = h('div', { id: 'sec-msg', style: { fontSize: '13px', minHeight: '20px', marginBottom: '16px', color: '#64748B' } });
+  modal.appendChild(msgDiv);
+
+  var stepDiv = h('div', { id: 'sec-step' });
+  modal.appendChild(stepDiv);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  renderSecurityQuestionStep(stepDiv, msgDiv, email, overlay);
+}
+
+var SECURITY_QUESTIONS_PRESET = [
+  '您的出生地是？',
+  '您的小学名称是？',
+  '您的母亲名字是？',
+  '您最喜欢的食物是？',
+  '您的第一份工作是什么？',
+  '您的宠物的名字是？',
+  '您最要好的朋友名字是？'
+];
+
+function renderSecurityQuestionStep(stepDiv, msgDiv, email, overlay) {
+  stepDiv.innerHTML = '';
+  msgDiv.textContent = '正在查找密保信息...'; msgDiv.style.color = '#64748B';
+
+  // 通过 email 找到 userId
+  supabase.rpc('find_user_by_email', { p_email: email }).then(function(r) {
+    if (r.error || !r.data) {
+      msgDiv.textContent = '该邮箱未注册或未设置密保问题，请使用邮箱重置';
+      msgDiv.style.color = '#DC2626';
+      stepDiv.appendChild(h('button', {
+        style: { marginTop: '12px', padding: '10px 20px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', width: '100%' },
+        onclick: function() { overlay.remove(); showForgotPasswordModal(); }
+      }, '返回选择其他方式'));
+      return;
+    }
+
+    var userId = r.data.id;
+    getSecurityQuestionTexts(userId).then(function(info) {
+      if (!info || !info.questions) {
+        msgDiv.textContent = '该账号未设置密保问题，请使用邮箱重置';
+        msgDiv.style.color = '#DC2626';
+        return;
+      }
+
+      if (info.locked) {
+        var remainMin = Math.ceil((new Date(info.lockUntil) - new Date()) / 60000);
+        msgDiv.textContent = '密保已锁定，请 ' + remainMin + ' 分钟后重试';
+        msgDiv.style.color = '#DC2626';
+        return;
+      }
+
+      msgDiv.textContent = '请回答以下 3 道密保问题（剩余机会：' + info.attemptsRemaining + ' 次）';
+      msgDiv.style.color = '#64748B';
+
+      var questions = info.questions;
+      var inputs = [];
+
+      questions.forEach(function(qHash, idx) {
+        stepDiv.appendChild(h('label', { style: { display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginTop: idx === 0 ? '4px' : '16px', marginBottom: '4px' } },
+          '问题 ' + (idx + 1) + '：您自己设置的密保问题'));
+
+        // 尝试匹配预设库的问题文本
+        var matchedQ = SECURITY_QUESTIONS_PRESET.find(function(pq) {
+          return sha256(pq) === qHash;
+        });
+        stepDiv.appendChild(h('div', { style: { fontSize: '12px', color: '#94A3B8', marginBottom: '4px' } },
+          matchedQ ? ('（' + matchedQ + '）') : '（自定义问题，请输入您最初设置的答案）'));
+
+        var inp = h('input', {
+          type: 'text',
+          placeholder: '请输入答案',
+          style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '4px' }
+        });
+        inputs.push(inp);
+        stepDiv.appendChild(inp);
+      });
+
+      var verifyBtn = h('button', {
+        style: { marginTop: '20px', padding: '12px 20px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, width: '100%' },
+        onclick: function() {
+          var answers = inputs.map(function(inp) { return inp.value.trim(); });
+          if (answers.some(function(a) { return !a; })) {
+            msgDiv.textContent = '请回答所有密保问题'; msgDiv.style.color = '#DC2626'; return;
+          }
+
+          verifyBtn.disabled = true;
+          verifyBtn.textContent = '验证中...';
+          msgDiv.textContent = '正在验证...'; msgDiv.style.color = '#2563EB';
+
+          verifySecurityAnswers(userId, answers).then(function(result) {
+            if (result.success) {
+              showNewPasswordStep(stepDiv, msgDiv, userId, overlay);
+            } else {
+              verifyBtn.disabled = false;
+              verifyBtn.textContent = '重新验证';
+              msgDiv.textContent = '❌ ' + (result.error || '验证失败'); msgDiv.style.color = '#DC2626';
+
+              if (result.error && result.error.includes('锁定')) {
+                verifyBtn.style.display = 'none';
+                stepDiv.appendChild(h('button', {
+                  style: { marginTop: '12px', padding: '12px 20px', background: '#E2E8F0', color: '#475569', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', width: '100%' },
+                  onclick: function() { overlay.remove(); showForgotPasswordModal(); }
+                }, '返回选择其他方式'));
+              }
+            }
+          });
+        }
+      });
+      stepDiv.appendChild(verifyBtn);
+    });
+  }).catch(function() {
+    msgDiv.textContent = '查找账号失败，请确认邮箱是否正确';
+    msgDiv.style.color = '#DC2626';
+  });
+}
+
+function showNewPasswordStep(stepDiv, msgDiv, userId, overlay) {
+  stepDiv.innerHTML = '';
+  msgDiv.textContent = '✅ 密保验证通过！请设置新密码';
+  msgDiv.style.color = '#059669';
+
+  var newPwd = h('input', {
+    type: 'password', placeholder: '请输入新密码（至少6位）',
+    style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px', marginTop: '12px' }
+  });
+  stepDiv.appendChild(newPwd);
+
+  var confirmPwd = h('input', {
+    type: 'password', placeholder: '请再次输入新密码',
+    style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px' }
+  });
+  stepDiv.appendChild(confirmPwd);
+
+  stepDiv.appendChild(h('button', {
+    style: { marginTop: '8px', padding: '12px 20px', background: '#059669', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, width: '100%' },
+    onclick: async function() {
+      var np = newPwd.value;
+      var cp = confirmPwd.value;
+      if (np.length < 6) { msgDiv.textContent = '新密码至少 6 位'; msgDiv.style.color = '#DC2626'; return; }
+      if (np !== cp) { msgDiv.textContent = '两次密码输入不一致'; msgDiv.style.color = '#DC2626'; return; }
+      msgDiv.textContent = '正在重置密码...'; msgDiv.style.color = '#2563EB';
+      try {
+        await changePasswordAfterSecurityVerification(userId, np);
+        msgDiv.textContent = '✅ 密码重置成功！请使用新密码登录';
+        msgDiv.style.color = '#059669';
+        stepDiv.appendChild(h('button', {
+          style: { marginTop: '12px', padding: '12px 20px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', width: '100%' },
+          onclick: function() { overlay.remove(); }
+        }, '返回登录'));
+      } catch(e) {
+        msgDiv.textContent = '❌ ' + (e.message || '重置失败'); msgDiv.style.color = '#DC2626';
+      }
+    }
+  }));
+}
+
+// ===== v4.21: 密保问题设置引导弹窗 =====
+var SECURITY_QUESTIONS_PRESET_LABELS = SECURITY_QUESTIONS_PRESET.map(function(q) {
+  return { label: q, value: q };
+});
+
+function showSecuritySetupModal() {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  });
+
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '480px', maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 4px 0', fontSize: '18px', color: '#1E293B' } }, '🔐 设置密保问题'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 16px 0' } }, '设置后可绕过邮箱直接重置密码。建议使用只有您自己知道的答案。'));
+
+  var msgDiv = h('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '12px' } });
+  modal.appendChild(msgDiv);
+
+  var questionRows = [];
+  for (var i = 0; i < 3; i++) {
+    var label = h('label', {
+      style: { display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginTop: i === 0 ? '0' : '16px', marginBottom: '6px' }
+    }, '密保问题 ' + (i + 1) + '（从预设库选择或自定义）');
+    modal.appendChild(label);
+
+    var select = h('select', {
+      style: { width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', marginBottom: '6px', color: '#374151' }
+    });
+    select.appendChild(h('option', { value: '' }, '— 选择一个预设问题 —'));
+    SECURITY_QUESTIONS_PRESET.forEach(function(q) { select.appendChild(h('option', { value: q }, q)); });
+    select.appendChild(h('option', { value: '__custom__' }, '自定义问题...'));
+
+    var customInput = h('input', {
+      type: 'text', placeholder: '请输入您的自定义问题',
+      style: { width: '100%', padding: '8px 12px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', marginBottom: '6px', display: 'none' }
+    });
+
+    var answerInput = h('input', {
+      type: 'text', placeholder: '请输入答案',
+      style: { width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }
+    });
+
+    select.onchange = function() {
+      customInput.style.display = select.value === '__custom__' ? 'block' : 'none';
+    };
+
+    modal.appendChild(select);
+    modal.appendChild(customInput);
+    modal.appendChild(answerInput);
+    questionRows.push({ select: select, customInput: customInput, answerInput: answerInput });
+  }
+
+  var btnRow = h('div', { style: { display: 'flex', gap: '8px', marginTop: '20px' } });
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '11px 16px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500 },
+    onclick: async function() {
+      var questions = [];
+      var allValid = true;
+      questionRows.forEach(function(row, idx) {
+        var qText = row.select.value;
+        if (qText === '__custom__') {
+          qText = row.customInput.value.trim();
+          if (!qText) { allValid = false; msgDiv.textContent = '请填写第 ' + (idx + 1) + ' 道自定义问题'; msgDiv.style.color = '#DC2626'; return; }
+        }
+        if (!qText) { allValid = false; msgDiv.textContent = '请选择或填写第 ' + (idx + 1) + ' 道密保问题'; msgDiv.style.color = '#DC2626'; return; }
+        var answer = row.answerInput.value.trim();
+        if (!answer) { allValid = false; msgDiv.textContent = '请填写第 ' + (idx + 1) + ' 道密保问题的答案'; msgDiv.style.color = '#DC2626'; return; }
+        questions.push(qText);
+      });
+
+      if (!allValid) return;
+
+      // 保存：答案以问题文本的哈希形式存储
+      // 实际存储的是答案哈希数组（服务端验证用），问题文本用于后续展示
+      var answersForHash = questions.map(function(q, idx) {
+        return questionRows[idx].answerInput.value.trim();
+      });
+
+      msgDiv.textContent = '正在保存...'; msgDiv.style.color = '#2563EB';
+      try {
+        // 使用问题文本的SHA256作为"问题key"，答案做服务端验证
+        await saveSecurityQuestions(answersForHash);
+        msgDiv.textContent = '✅ 密保问题设置成功！'; msgDiv.style.color = '#059669';
+        setTimeout(function() { overlay.remove(); }, 1500);
+      } catch(e) {
+        msgDiv.textContent = '❌ 保存失败：' + (e.message || '未知错误'); msgDiv.style.color = '#DC2626';
+      }
+    }
+  }, '保存密保'));
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '11px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
+    onclick: function() { overlay.remove(); }
+  }, '暂不设置'));
+
+  modal.appendChild(btnRow);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 // ===== v4.20: 修改密码弹窗 =====
@@ -3093,6 +3482,7 @@ function renderAdmin() {
     { id: 'categories', name: '分类管理', perm: 'categoryManage' },
     { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
+    { id: 'users', name: '👥 用户管理', perm: 'systemSettings' },
     { id: 'settings', name: '系统设置', perm: 'systemSettings' },
     { id: 'docs', name: '📋系统文档', perm: 'docsManage' }
   ];
@@ -3125,6 +3515,7 @@ function renderAdmin() {
     case 'categories': renderCategoriesTab(panel); break;
     case 'observation': renderObservationTab(panel); break;
     case 'permissions': renderPermissionsTab(panel); break;
+    case 'users': renderUsersTab(panel); break;
     case 'settings': renderSettingsTab(panel); break;
     case 'docs': renderDocsTab(panel); break;
   }
@@ -6189,6 +6580,122 @@ function renderSettingsTab(panel) {
     h('div', {}, '3. 通过局域网文件共享访问 index.html')
   ));
 }
+
+// ===== v4.21: 用户管理 Tab（主管理员）=====
+function renderUsersTab(panel) {
+  panel.innerHTML = '';
+  panel.appendChild(h('h3', { style: { marginBottom: '16px' } }, '👥 用户管理'));
+
+  var hintDiv = h('div', { id: 'users-hint', style: { fontSize: '13px', color: '#64748B', marginBottom: '16px' } });
+  panel.appendChild(hintDiv);
+
+  var tableWrap = h('div', { id: 'users-table', style: { overflowX: 'auto' } });
+  panel.appendChild(tableWrap);
+
+  loadUserList(hintDiv, tableWrap);
+}
+
+async function loadUserList(hintDiv, tableWrap) {
+  hintDiv.textContent = '正在加载用户列表...';
+  try {
+    var users = await fetchUserList();
+    if (!users || users.length === 0) {
+      hintDiv.textContent = '暂无用户数据（请确认 SQL 迁移已执行）';
+      return;
+    }
+    hintDiv.textContent = '共 ' + users.length + ' 位用户 | 管理员可为用户重置临时密码';
+    renderUserTable(tableWrap, users);
+  } catch(e) {
+    hintDiv.textContent = '加载失败：' + (e.message || '未知错误');
+    hintDiv.style.color = '#DC2626';
+  }
+}
+
+function renderUserTable(tableWrap, users) {
+  var table = h('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '13px' } });
+
+  var thead = h('thead');
+  var headerRow = h('tr', { style: { background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' } });
+  ['邮箱', '角色', '密保状态', '强制改密', '操作'].forEach(function(text) {
+    headerRow.appendChild(h('th', { style: { padding: '10px 12px', textAlign: 'left', fontSize: '12px', color: '#475569', fontWeight: 600 } }, text));
+  });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  var tbody = h('tbody');
+  users.forEach(function(user) {
+    var row = h('tr', { style: { borderBottom: '1px solid #F1F5F9' } });
+
+    row.appendChild(h('td', { style: { padding: '10px 12px', color: '#1E293B' } },
+      (user.email || '(未知)') + (user.force_password_change ? ' ⚠️' : '')
+    ));
+
+    row.appendChild(h('td', { style: { padding: '10px 12px' } },
+      h('span', {
+        style: {
+          padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+          background: user.is_admin ? '#FEF3C7' : '#F1F5F9',
+          color: user.is_admin ? '#92400E' : '#475569'
+        }
+      }, user.is_admin ? '主管理员' : '普通用户')
+    ));
+
+    row.appendChild(h('td', { style: { padding: '10px 12px' } },
+      h('span', {
+        style: {
+          padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+          background: user.has_security_questions ? '#DCFCE7' : '#FEF2F2',
+          color: user.has_security_questions ? '#166534' : '#991B1B'
+        }
+      }, user.has_security_questions ? '已设置' : '未设置')
+    ));
+
+    row.appendChild(h('td', { style: { padding: '10px 12px' } },
+      user.force_password_change
+        ? h('span', { style: { padding: '2px 8px', borderRadius: '4px', fontSize: '11px', background: '#FEF3C7', color: '#92400E' } }, '是')
+        : h('span', { style: { color: '#94A3B8', fontSize: '12px' } }, '否')
+    ));
+
+    var actionCell = h('td', { style: { padding: '10px 12px' } });
+    actionCell.appendChild(h('button', {
+      style: { padding: '6px 12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 500 },
+      onclick: function() { adminResetPassword(user); }
+    }, '重置密码'));
+    actionCell.appendChild(h('span', { style: { fontSize: '11px', color: '#94A3B8', marginLeft: '8px' } }, '生成临时密码'));
+
+    row.appendChild(actionCell);
+    tbody.appendChild(row);
+  });
+  table.appendChild(tbody);
+  tableWrap.innerHTML = '';
+  tableWrap.appendChild(table);
+}
+
+function adminResetPassword(user) {
+  if (!confirm('确定要为用户 ' + (user.email || user.id.substring(0, 8) + '...') + ' 重置密码吗？\n\n将生成一个随机临时密码，用户登录后需立即修改。')) return;
+
+  var tempPassword = generateTempPassword();
+  adminResetUserPassword(user.id, tempPassword).then(function() {
+    alert('密码已重置！\n\n临时密码：' + tempPassword + '\n\n请将此密码安全地告知用户，用户首次登录后将被强制修改密码。\n\n⚠️ 此密码仅显示一次，请立即复制保存。');
+
+    loadUserList(
+      document.getElementById('users-hint'),
+      document.getElementById('users-table')
+    );
+  }).catch(function(e) {
+    alert('重置失败：' + (e.message || '请确认 SQL 迁移已执行'));
+  });
+}
+
+function generateTempPassword() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  var pwd = '';
+  for (var i = 0; i < 8; i++) {
+    pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pwd;
+}
+
 // ===== 系统文档 (v4.11 — 主管理员可见) =====
 function renderDocsTab(panel) {
   panel.innerHTML = '';
