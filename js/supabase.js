@@ -58,6 +58,48 @@ async function signOut() {
   isAdmin = false;
 }
 
+// ===== v4.20: 密码管理 =====
+async function resetPassword(email) {
+  if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  if (error) {
+    var msg = String(error.message || '');
+    if (msg.includes('rate') || msg.includes('limit')) throw new Error('请求过于频繁，请稍后再试');
+    throw new Error(msg || '发送重置邮件失败');
+  }
+  return true;
+}
+
+async function changePassword(newPassword) {
+  if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
+  if (!currentUser) throw new Error('未登录，请先登录');
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    var msg = String(error.message || '');
+    if (msg.includes('same as old')) throw new Error('新密码不能与旧密码相同');
+    throw new Error(msg || '修改密码失败');
+  }
+  return true;
+}
+
+// v4.20: 重新认证（修改密码前验旧密码）
+async function reauthenticate(password) {
+  if (!supabase) throw new Error('Supabase SDK 未加载，请刷新页面重试');
+  if (!currentUser) throw new Error('未登录，请先登录');
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: currentUser.email,
+    password: password
+  });
+  if (error) {
+    var msg = String(error.message || '');
+    if (msg.includes('Invalid login') || msg.includes('invalid')) throw new Error('旧密码错误');
+    throw new Error(msg || '验证失败');
+  }
+  return true;
+}
+
 // ===== 用户密码注册/登录（关闭邮件确认） =====
 // 注意事项：
 // 1. Supabase Dashboard → Authentication → Settings → "Confirm email" 须关闭

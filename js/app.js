@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.19 | 2026-06-27 | 实时防抖搜索 + 历史下拉 + X清除 */
+/* Version 4.20 | 2026-06-27 | 用户密码管理：忘记密码 + 修改密码 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.19] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v4.20] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -807,6 +807,60 @@ function renderFrontend() {
   const headerActions = h('div', { className: 'header-actions' });
   headerActions.appendChild(h('div', { className: 'header-update' }, '数据更新：' + formatDate(db.updateTime)));
   
+  // v4.20: 用户信息 + 下拉菜单
+  if (currentUser && appState.mode !== 'admin') {
+    // 登录用户的头像 + 邮箱
+    var userMenuWrap = h('div', { className: 'user-menu-wrap', style: { position: 'relative' } });
+    var userBtn = h('button', {
+      className: 'btn btn-sm user-menu-btn',
+      style: { background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: '12px', border: '1px solid rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' },
+      onclick: function(e) {
+        e.stopPropagation();
+        var dropdown = document.getElementById('user-dropdown');
+        if (dropdown) {
+          dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        }
+      }
+    });
+    userBtn.appendChild(h('span', {}, '👤'));
+    userBtn.appendChild(h('span', { style: { maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, currentUser.email));
+    userBtn.appendChild(h('span', { style: { fontSize: '10px' } }, '▾'));
+    userMenuWrap.appendChild(userBtn);
+    
+    // 下拉菜单
+    var dropdown = h('div', {
+      id: 'user-dropdown',
+      style: { display: 'none', position: 'absolute', top: '100%', right: 0, marginTop: '4px', background: '#fff', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,0.12)', zIndex: 1000, minWidth: '160px', overflow: 'hidden' }
+    });
+    var menuItem = function(text, icon, onclick) {
+      return h('div', {
+        style: { padding: '10px 14px', fontSize: '13px', color: '#374151', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #F3F4F6' },
+        onmouseenter: function() { this.style.background = '#F9FAFB'; },
+        onmouseleave: function() { this.style.background = ''; },
+        onclick: function() { dropdown.style.display = 'none'; onclick(); }
+      }, h('span', {}, icon), h('span', {}, text));
+    };
+    dropdown.appendChild(menuItem('修改密码', '🔑', function() { showChangePasswordModal(); }));
+    dropdown.appendChild(menuItem('退出登录', '🚪', async function() {
+      await signOut();
+      appState.currentUser = null;
+      renderFrontend();
+    }));
+    userMenuWrap.appendChild(dropdown);
+    headerActions.appendChild(userMenuWrap);
+    
+    // 点击外部关闭下拉
+    setTimeout(function() {
+      document.addEventListener('click', function closeDropdown(e) {
+        var d = document.getElementById('user-dropdown');
+        if (d && !d.contains(e.target) && !userBtn.contains(e.target)) {
+          d.style.display = 'none';
+        }
+      });
+    }, 0);
+  }
+  
+  // 管理员入口按钮
   headerActions.appendChild(h('button', {
     className: 'btn btn-sm',
     style: { background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: '12px', border: '1px solid rgba(255,255,255,0.2)' },
@@ -822,7 +876,7 @@ function renderFrontend() {
         showAdminLogin();
       }
     }
-  }, isAdmin ? '退出后台' : (currentUser ? '管理员入口' : '管理员入口')));
+  }, isAdmin ? '退出后台' : '管理员入口'));
   headerInner.appendChild(headerActions);
   
   header.appendChild(headerInner);
@@ -2804,9 +2858,113 @@ function showUserLoginModal() {
   }, '取消'));
 
   modal.appendChild(btnRow);
+
+  // v4.20: 忘记密码链接
+  var forgotRow = h('div', { style: { textAlign: 'center', marginTop: '14px' } });
+  var forgotLink = h('a', {
+    href: '#',
+    style: { fontSize: '12px', color: '#6B7280', textDecoration: 'underline', cursor: 'pointer' },
+    onclick: async function(e) {
+      e.preventDefault();
+      var email = document.getElementById('user-email').value.trim();
+      if (!email) { msgDiv.textContent = '请先输入邮箱地址'; msgDiv.style.color = '#DC2626'; return; }
+      msgDiv.textContent = '正在发送重置邮件...'; msgDiv.style.color = '#2563EB';
+      try {
+        await resetPassword(email);
+        msgDiv.innerHTML = '✅ 重置密码链接已发送到 <b>' + escapeHtml(email) + '</b><br><span style="font-size:11px">请检查收件箱（含垃圾邮件），点击链接后重新设置密码</span>';
+        msgDiv.style.color = '#059669';
+      } catch(err) {
+        msgDiv.textContent = err.message || '发送失败，请重试';
+        msgDiv.style.color = '#DC2626';
+      }
+    }
+  }, '忘记密码？');
+  forgotRow.appendChild(forgotLink);
+  modal.appendChild(forgotRow);
+
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   setTimeout(function() { document.getElementById('user-email').focus(); }, 100);
+}
+
+// ===== v4.20: 修改密码弹窗 =====
+function showChangePasswordModal() {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.4)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '28px 24px', width: '380px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', position: 'relative' } });
+  
+  modal.appendChild(h('button', {
+    style: { position: 'absolute', top: '12px', right: '14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#94A3B8', lineHeight: 1, padding: '4px' },
+    onclick: function() { overlay.remove(); }
+  }, '✕'));
+
+  modal.appendChild(h('h3', { style: { margin: '0 0 4px 0', fontSize: '18px', color: '#1E293B' } }, '修改密码'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', margin: '0 0 20px 0' } },
+    '当前账号：' + (currentUser ? currentUser.email : '未登录')
+  ));
+
+  var oldPwdInput = h('input', { type: 'password', placeholder: '请输入旧密码', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px'
+  }});
+  modal.appendChild(oldPwdInput);
+
+  var newPwdInput = h('input', { type: 'password', placeholder: '请输入新密码（至少6位）', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px'
+  }});
+  modal.appendChild(newPwdInput);
+
+  var confirmPwdInput = h('input', { type: 'password', placeholder: '请再次输入新密码', style: {
+    width: '100%', padding: '10px 14px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '8px'
+  }});
+  modal.appendChild(confirmPwdInput);
+
+  var msgDiv = h('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '8px' } });
+  modal.appendChild(msgDiv);
+
+  var btnRow = h('div', { style: { display: 'flex', gap: '8px', marginTop: '4px' } });
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#4F46E5', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 },
+    onclick: async function() {
+      var oldPwd = oldPwdInput.value;
+      var newPwd = newPwdInput.value;
+      var confirmPwd = confirmPwdInput.value;
+      if (!oldPwd) { msgDiv.textContent = '请输入旧密码'; msgDiv.style.color = '#DC2626'; return; }
+      if (newPwd.length < 6) { msgDiv.textContent = '新密码至少6位'; msgDiv.style.color = '#DC2626'; return; }
+      if (newPwd !== confirmPwd) { msgDiv.textContent = '两次输入的密码不一致'; msgDiv.style.color = '#DC2626'; return; }
+      if (oldPwd === newPwd) { msgDiv.textContent = '新密码不能与旧密码相同'; msgDiv.style.color = '#DC2626'; return; }
+      
+      msgDiv.textContent = '正在验证身份...'; msgDiv.style.color = '#2563EB';
+      try {
+        await reauthenticate(oldPwd);
+        msgDiv.textContent = '正在修改密码...'; msgDiv.style.color = '#2563EB';
+        await changePassword(newPwd);
+        msgDiv.textContent = '✅ 密码修改成功！请重新登录'; msgDiv.style.color = '#059669';
+        setTimeout(async function() {
+          await signOut();
+          appState.currentUser = null;
+          overlay.remove();
+          renderFrontend();
+          showUserLoginModal();
+        }, 1500);
+      } catch(err) {
+        msgDiv.textContent = err.message || '修改失败，请重试';
+        msgDiv.style.color = '#DC2626';
+      }
+    }
+  }, '确认修改'));
+
+  btnRow.appendChild(h('button', {
+    style: { flex: 1, padding: '10px', background: '#F1F5F9', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
+    onclick: function() { overlay.remove(); }
+  }, '取消'));
+
+  modal.appendChild(btnRow);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  setTimeout(function() { oldPwdInput.focus(); }, 100);
 }
 
 // v4.4: 登录后收藏双向同步 — Supabase ↔ localStorage 合并
