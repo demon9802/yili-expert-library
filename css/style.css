@@ -38,7 +38,8 @@ body {
   color: white;
   padding: 18px 0 14px;
   position: relative;
-  overflow: hidden;
+  /* v4.20 fix: 改为 visible，否则用户下拉菜单会被裁切 */
+  overflow: visible;
 }
 .header::before {
   content: '';
@@ -49,6 +50,8 @@ body {
   height: 400px;
   background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
   border-radius: 50%;
+  /* v4.20 fix: 装饰圆不溢出 header */
+  overflow: hidden;
 }
 .header-inner {
   max-width: var(--max-width);
@@ -86,6 +89,38 @@ body {
   font-size: 12px;
   color: rgba(255,255,255,0.6);
   white-space: nowrap;
+}
+
+/* ===== v4.20 用户下拉菜单 ===== */
+.user-menu-wrap {
+  position: relative;
+}
+.user-menu-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px !important;
+  transition: background 0.2s;
+}
+.user-menu-btn:hover {
+  background: rgba(255,255,255,0.25) !important;
+}
+#user-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 9999;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ===== STATS BAR ===== */
