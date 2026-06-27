@@ -24,12 +24,16 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+html {
+  overflow-x: hidden;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* ===== HEADER ===== */
@@ -38,20 +42,19 @@ body {
   color: white;
   padding: 18px 0 14px;
   position: relative;
-  /* v4.20 fix: 改为 visible，否则用户下拉菜单会被裁切 */
-  overflow: visible;
+  /* v4.21 fix: x轴hidden防止装饰圆溢出横向滚动条，y轴visible保留下拉菜单 */
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 .header::before {
   content: '';
   position: absolute;
   top: -50%;
-  right: -20%;
-  width: 400px;
-  height: 400px;
+  right: -10%;
+  width: 300px;
+  height: 300px;
   background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
   border-radius: 50%;
-  /* v4.20 fix: 装饰圆不溢出 header */
-  overflow: hidden;
 }
 .header-inner {
   max-width: var(--max-width);
@@ -1252,7 +1255,27 @@ input[type="color"] {
 .export-option .icon { font-size: 28px; margin-bottom: 8px; }
 .export-option .label { font-size: 13px; font-weight: 600; }
 
-/* ===== v3.0 桌面端自适应 ===== */
+/* ===== v4.13/v4.21 PC端四档自适应 ===== */
+/* S档 ≥1366px: 2列 基准 */
+@media (min-width: 1366px) {
+  :root { --max-width: 1300px; }
+}
+/* M档 ≥1600px: 2列 + 宽度扩展 */
+@media (min-width: 1600px) {
+  :root { --max-width: 1500px; }
+}
+/* L档 ≥1920px: 3列 */
+@media (min-width: 1920px) {
+  :root { --max-width: 1800px; }
+  .expert-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+/* XL档 ≥2560px: 3列 舒适尺寸 */
+@media (min-width: 2560px) {
+  :root { --max-width: 2200px; }
+}
+/* ===== 小屏降级 ===== */
 @media (max-width: 1280px) {
   .expert-grid { padding: 0 16px 56px 16px; gap: 12px; }
   .expert-card { padding: 16px 18px 14px 16px; }
