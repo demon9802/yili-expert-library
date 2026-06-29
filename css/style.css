@@ -42,9 +42,9 @@ body {
   color: white;
   padding: 18px 0 14px;
   position: relative;
-  /* v4.21 fix: x轴hidden防止装饰圆溢出横向滚动条，y轴visible保留下拉菜单 */
-  overflow-x: hidden;
-  overflow-y: visible;
+  /* v4.22 fix: overflow 不设任何值（visible），下拉菜单不被裁切；
+     装饰圆改用 clip-path 裁剪防溢出产生横向滚动条 */
+  overflow: visible;
 }
 .header::before {
   content: '';
@@ -55,6 +55,8 @@ body {
   height: 300px;
   background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
   border-radius: 50%;
+  /* 把装饰圆限定在 header 边界内，不产生滚动条 */
+  clip-path: inset(0);
 }
 .header-inner {
   max-width: var(--max-width);
