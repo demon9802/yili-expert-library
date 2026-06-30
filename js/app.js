@@ -495,25 +495,20 @@ function debounceSyncToSupabase(db) {
 
 async function syncToSupabase(db) {
   console.log('[Supabase] Syncing experts, projects, fields...');
-  // Sync experts
+  // Sync experts — 使用 upsert，避免 update 静默失败导致新数据丢失
   if (db.experts) {
     for (const expert of db.experts) {
       try {
-        await updateExpert(expert.id, expert);
-      } catch(e) {
-        // Expert might not exist yet → create
-        try { await createExpert(expert); } catch(e2) { console.warn('Expert sync error:', expert.name, e2.message); }
-      }
+        await upsertExpert(expert);
+      } catch(e) { console.warn('Expert sync error:', expert.name, e.message); }
     }
   }
-  // Sync projects
+  // Sync projects — 使用 upsert，避免新增项目无法写入 Supabase
   if (db.yiliProjects && db.yiliProjects.length > 0) {
     for (const proj of db.yiliProjects) {
       try {
-        await updateProject(proj.id, proj);
-      } catch(e) {
-        try { await createProject(proj); } catch(e2) { console.warn('Project sync error:', proj.title, e2.message); }
-      }
+        await upsertProject(proj);
+      } catch(e) { console.warn('Project sync error:', proj.title, e.message); }
     }
   }
   // Sync fields
@@ -4239,6 +4234,10 @@ function showProjectForm(project) {
         project.desc = desc;
         project.visible = visible;
         project.updatedAt = new Date().toISOString();
+        // v4.24 fix: 编辑时立即同步到 Supabase
+        if (currentUser && isAdmin) {
+          upsertProject(project).catch(e => console.warn('[Supabase] Project update failed:', e.message));
+        }
       } else {
         const newProj = {
           id: 'proj_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6),
@@ -4256,6 +4255,10 @@ function showProjectForm(project) {
         };
         if (!db.yiliProjects || !Array.isArray(db.yiliProjects)) db.yiliProjects = [];
         db.yiliProjects.push(newProj);
+        // v4.24 fix: 新增项目立即直写 Supabase，避免 debounce sync 静默失败导致数据丢失
+        if (currentUser && isAdmin) {
+          upsertProject(newProj).catch(e => console.warn('[Supabase] Project create failed:', e.message));
+        }
       }
 
       saveDB(db);
@@ -4806,6 +4809,10 @@ function showExpertForm(expert) {
       if (isEdit) {
         const idx = db.experts.findIndex(e => e.id === expert.id);
         db.experts[idx] = newExpert;
+        // v4.24 fix: 编辑专家立即同步到 Supabase
+        if (currentUser && isAdmin) {
+          upsertExpert(newExpert).catch(e => console.warn('[Supabase] Expert update failed:', e.message));
+        }
       } else {
         db.experts.push(newExpert);
         // v3.5: 更新新增专家时前置创建的合作项目（临时ID → 正式ID，设为可见）
@@ -4817,6 +4824,10 @@ function showExpertForm(expert) {
               p.pendingExpertName = '';
             }
           });
+        }
+        // v4.24 fix: 新增专家立即直写 Supabase，避免 debounce sync 静默失败导致数据丢失
+        if (currentUser && isAdmin) {
+          upsertExpert(newExpert).catch(e => console.warn('[Supabase] Expert create failed:', e.message));
         }
       }
       

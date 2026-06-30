@@ -359,6 +359,17 @@ async function updateExpert(id, expert) {
   return rowToExpert(data);
 }
 
+// upsert = insert if not exists, update if exists (on conflict: id)
+async function upsertExpert(expert) {
+  if (!supabase) throw new Error('Supabase unavailable');
+  const row = expertToRow(expert);
+  if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
+  row.updated_at = new Date().toISOString();
+  const { data, error } = await supabase.from('experts').upsert(row, { onConflict: 'id' }).select().single();
+  if (error) throw error;
+  return rowToExpert(data);
+}
+
 async function deleteExpert(id) {
   if (!supabase) throw new Error('Supabase unavailable');
   const { error } = await supabase.from('experts').delete().eq('id', id);
@@ -392,6 +403,17 @@ async function updateProject(id, project) {
   const row = projectToRow(project);
   row.updated_at = new Date().toISOString();
   const { data, error } = await supabase.from('projects').update(row).eq('id', id).select().single();
+  if (error) throw error;
+  return rowToProject(data);
+}
+
+// upsert = insert if not exists, update if exists (on conflict: id)
+async function upsertProject(project) {
+  if (!supabase) throw new Error('Supabase unavailable');
+  const row = projectToRow(project);
+  if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
+  row.updated_at = new Date().toISOString();
+  const { data, error } = await supabase.from('projects').upsert(row, { onConflict: 'id' }).select().single();
   if (error) throw error;
   return rowToProject(data);
 }
