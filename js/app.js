@@ -4170,22 +4170,29 @@ function showProjectForm(project) {
   const satGroup = h('div', { className: 'form-group' });
   satGroup.appendChild(h('label', {}, '项目满意度（可选）'));
   const satRow = h('div', { style: 'display:flex;gap:8px;align-items:center' });
+  const currentScale = (project && project.satisfaction && project.satisfaction.scale) || 10;
   const satInput = h('input', {
     type: 'number',
     id: 'proj-form-sat-value',
-    placeholder: '如 8.5',
-    step: '0.1',
+    placeholder: currentScale === 5 ? '如 4.5' : '如 8.5',
+    step: '0.01',
     min: '0',
-    max: '10',
+    max: String(currentScale),
     value: project && project.satisfaction && project.satisfaction.value
-      ? (project.satisfaction.scale === 5 ? project.satisfaction.value * 2 : project.satisfaction.value)
+      ? project.satisfaction.value  // v4.26 fix: 存储的就是原始值，直接回显
       : '',
     style: 'width:100px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px'
   });
   satRow.appendChild(satInput);
   const satScaleSel = h('select', {
     id: 'proj-form-sat-scale',
-    style: 'width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px'
+    style: 'width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px',
+    // v4.26: 切换量程时同步更新 max 和 placeholder
+    onchange: function() {
+      const scale = parseInt(this.value);
+      satInput.max = String(scale);
+      satInput.placeholder = scale === 5 ? '如 4.5' : '如 8.5';
+    }
   });
   ['10分制','5分制'].forEach(s => {
     const v = s === '5分制' ? '5' : '10';
@@ -4239,10 +4246,11 @@ function showProjectForm(project) {
   body.appendChild(visGroup);
 
   // Save
-  body.appendChild(h('button', {
+  const saveBtnEl = h('button', {
+    id: 'proj-save-btn',
     className: 'btn btn-primary',
     style: 'width:100%;margin-top:12px',
-    onclick: () => {
+    onclick: async () => {
       const titleVal = (document.getElementById('proj-form-title') || {}).value || '';
       const title = titleVal.trim();
       if (!title) { toast('请输入项目名称', 'error'); return; }
@@ -4269,14 +4277,20 @@ function showProjectForm(project) {
 
       const satVal = parseFloat(document.getElementById('proj-form-sat-value').value);
       const satScale = parseInt(document.getElementById('proj-form-sat-scale').value);
+      // v4.26 fix: 存储原始值+量程，不做/2换算；显示时统一由 formatSatisfactionDisplay 换算为10分制
       const satisfaction = (!isNaN(satVal) && satVal > 0)
-        ? { value: satScale === 5 ? satVal / 2 : satVal, scale: satScale }
+        ? { value: satVal, scale: satScale }
         : null;
 
       const desc = (document.getElementById('proj-form-desc') || {}).value || '';
       const visible = (document.getElementById('proj-form-visible') || {}).value === 'true';
 
-      if (isEdit) {
+    // v4.26: 改为 async onclick 以便 await Supabase 写入结果
+    const saveBtn = document.getElementById('proj-save-btn') || this;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中...';
+
+    if (isEdit) {
         project.title = title;
         project.expertId = selectedExpertId;
         project.pendingExpertName = selectedExpertId ? '' : pendingNameValue.trim();
@@ -4286,9 +4300,14 @@ function showProjectForm(project) {
         project.desc = desc;
         project.visible = visible;
         project.updatedAt = new Date().toISOString();
-        // v4.24 fix: 编辑时立即同步到 Supabase
-        if (currentUser && isAdmin) {
-          upsertProject(project).catch(e => console.warn('[Supabase] Project update failed:', e.message));
+        // v4.26: await 写入，失败时给用户提示；使用 appState.currentUser（本地登录状态）而非 supabase.js currentUser
+        if (appState.currentUser && isAdmin) {
+          try {
+            await upsertProject(project);
+          } catch(e) {
+            console.error('[Supabase] Project update failed:', e);
+            toast('云端写入失败：' + e.message + '（已保存到本地）', 'warning');
+          }
         }
       } else {
         const newProj = {
@@ -4301,15 +4320,21 @@ function showProjectForm(project) {
           satisfaction: satisfaction,
           desc: desc,
           visible: selectedExpertId ? visible : false,
-          createdBy: '主管理员',
+          createdBy: currentUser?.email || '主管理员',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
         if (!db.yiliProjects || !Array.isArray(db.yiliProjects)) db.yiliProjects = [];
         db.yiliProjects.push(newProj);
-        // v4.24 fix: 新增项目立即直写 Supabase，避免 debounce sync 静默失败导致数据丢失
-        if (currentUser && isAdmin) {
-          upsertProject(newProj).catch(e => console.warn('[Supabase] Project create failed:', e.message));
+        // v4.26: await 写入并明确反馈结果；使用 appState.currentUser（本地登录状态）
+        if (appState.currentUser && isAdmin) {
+          try {
+            const saved = await upsertProject(newProj);
+            console.log('[Supabase] Project saved:', saved?.id);
+          } catch(e) {
+            console.error('[Supabase] Project create failed:', e);
+            toast('云端写入失败：' + e.message + '（已保存到本地）', 'warning');
+          }
         }
       }
 
@@ -4325,6 +4350,7 @@ function showProjectForm(project) {
       toast(isEdit ? '项目已更新' : '项目已添加', 'success');
     }
   }, isEdit ? '保存修改' : '添加项目'));
+  body.appendChild(saveBtnEl);
 
   content.appendChild(body);
   overlay.appendChild(content);
@@ -4861,8 +4887,8 @@ function showExpertForm(expert) {
       if (isEdit) {
         const idx = db.experts.findIndex(e => e.id === expert.id);
         db.experts[idx] = newExpert;
-        // v4.24 fix: 编辑专家立即同步到 Supabase
-        if (currentUser && isAdmin) {
+        // v4.26 fix: 使用 appState.currentUser（本地登录状态），await 写入
+        if (appState.currentUser && isAdmin) {
           upsertExpert(newExpert).catch(e => console.warn('[Supabase] Expert update failed:', e.message));
         }
       } else {
@@ -4877,8 +4903,8 @@ function showExpertForm(expert) {
             }
           });
         }
-        // v4.24 fix: 新增专家立即直写 Supabase，避免 debounce sync 静默失败导致数据丢失
-        if (currentUser && isAdmin) {
+        // v4.26 fix: 使用 appState.currentUser（本地登录状态），await 写入
+        if (appState.currentUser && isAdmin) {
           upsertExpert(newExpert).catch(e => console.warn('[Supabase] Expert create failed:', e.message));
         }
       }
