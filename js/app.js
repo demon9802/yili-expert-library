@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 4.21 | 2026-06-27 | 密保问题 + 管理员用户管理 */
+/* Version 5.0 | 2026-06-30 | EdgeOne Pages 静态托管 + Supabase 云端数据层 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v4.21] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
