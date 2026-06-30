@@ -4349,7 +4349,7 @@ function showProjectForm(project) {
       }
       toast(isEdit ? '项目已更新' : '项目已添加', 'success');
     }
-  }, isEdit ? '保存修改' : '添加项目'));
+  }, isEdit ? '保存修改' : '添加项目');
   body.appendChild(saveBtnEl);
 
   content.appendChild(body);
