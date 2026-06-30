@@ -4011,12 +4011,52 @@ function showProjectForm(project) {
     }
   }
 
+  // v4.25 fix: track last input value for auto-match on blur
+  let lastInputValue = expInput.value || '';
+
   expInput.oninput = function() {
-    selectedExpertId = null;
+    lastInputValue = this.value;
+    // Only clear selection if user actually changed the text (not from dropdown click)
+    if (selectedExpertId) {
+      const matchedExpert = db.experts.find(e => e.id === selectedExpertId);
+      if (!matchedExpert || this.value !== matchedExpert.name) {
+        selectedExpertId = null;
+      }
+    }
     rebuildDropdown(this.value);
   };
   expInput.onfocus = function() { rebuildDropdown(this.value); };
-  expInput.onblur = function() { setTimeout(() => { dropdown.style.display = 'none'; }, 200); };
+  // v4.25 fix: onblur auto-match by exact name
+  expInput.onblur = function() {
+    const val = (this.value || '').trim();
+    // Auto-select expert if name exactly matches
+    if (!selectedExpertId && val) {
+      const exactMatch = db.experts.find(e => e.name === val);
+      if (exactMatch) {
+        selectedExpertId = exactMatch.id;
+      }
+    }
+    setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+  };
+  // v4.25: Enter key selects first match
+  expInput.onkeydown = function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const firstItem = dropdown.querySelector('div[style*="cursor:pointer"]');
+      if (firstItem && firstItem.onclick) {
+        firstItem.click();
+      } else if (this.value.trim()) {
+        // Fallback: try to find exact match
+        const match = db.experts.find(e => e.name === this.value.trim());
+        if (match) {
+          selectedExpertId = match.id;
+          this.value = match.name;
+          dropdown.style.display = 'none';
+          pendingNameInput.style.display = 'none';
+        }
+      }
+    }
+  };
 
   expSearchWrap.appendChild(expInput);
   expSearchWrap.appendChild(dropdown);
@@ -4207,8 +4247,20 @@ function showProjectForm(project) {
       const title = titleVal.trim();
       if (!title) { toast('请输入项目名称', 'error'); return; }
 
+      // v4.25 fix: 兜底匹配——用户输入了名称但未点下拉项时，按名称查找
       if (!selectedExpertId && !pendingNameValue.trim()) {
-        toast('请选择关联讲师', 'error'); return;
+        const expInputVal = (expInput.value || '').trim();
+        if (expInputVal) {
+          const nameMatch = db.experts.find(e => e.name === expInputVal);
+          if (nameMatch) {
+            selectedExpertId = nameMatch.id;
+          } else {
+            toast('请选择关联讲师（从下拉列表中选择或使用"待关联讲师"）', 'error');
+            return;
+          }
+        } else {
+          toast('请选择关联讲师', 'error'); return;
+        }
       }
 
       const year = parseInt(document.getElementById('proj-form-year').value) || currentYear;
