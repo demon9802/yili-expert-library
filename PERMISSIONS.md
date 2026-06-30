@@ -82,12 +82,12 @@ if (!f.color) f.color = src.color;  // ✅ 有守卫
 
 | 链接类型 | 用途 | 示例 |
 |---------|------|------|
-| **永久分享链接** | 对外分享、管理员访问 | `https://xxx.app.codebuddy.work` |
-| 沙盒直连 URL | 临时验证（仅供开发者） | `https://xxx.e2b.ap-beijing.sandbox.cloudstudio.club/` |
+| **永久分享链接** | 对外分享、管理员访问 | `https://yili-expert-library.zh-cn.edgeone.cool` |
+| GitHub Pages | （国内已废弃，DNS 阻断） | `https://demon9802.github.io/yili-expert-library/` |
+| CloudStudio | （已废弃，沙盒不稳定） | `https://xxx.app.codebuddy.work` |
 
-- **仅使用 `app.codebuddy.work` 链接与用户沟通**
-- 沙盒直连仅用于部署后自行验证，不提供用户
-- 分享链接是固定域名，不会因重新部署而改变
+- **仅使用 EdgeOne 链接与用户沟通**（国内 CDN 加速，永久稳定）
+- EdgeOne 随 GitHub push 自动部署，1-2 分钟全网生效
 
 ---
 
