@@ -1,5 +1,5 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.0 | 2026-06-30 | EdgeOne Pages 静态托管 + Supabase 云端数据层 */
+/* Version 5.0.1 | 2026-07-01 | 合并系统文档→系统设置 + 初始源数据链接修复 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
 console.log('%c[专家资源库 v5.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
@@ -3478,11 +3478,10 @@ function renderAdmin() {
     { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
     { id: 'users', name: '👥 用户管理', perm: 'systemSettings' },
-    { id: 'settings', name: '系统设置', perm: 'systemSettings' },
-    { id: 'docs', name: '📋系统文档', perm: 'docsManage' }
+    { id: 'settings', name: '系统设置', perm: 'systemSettings' }
   ];
   
-  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories' && t.id !== 'docs');
+  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories');
   
   visibleTabs.forEach(tab => {
     nav.appendChild(h('button', {
@@ -3512,7 +3511,6 @@ function renderAdmin() {
     case 'permissions': renderPermissionsTab(panel); break;
     case 'users': renderUsersTab(panel); break;
     case 'settings': renderSettingsTab(panel); break;
-    case 'docs': renderDocsTab(panel); break;
   }
 }
 
@@ -6646,7 +6644,42 @@ function renderSettingsTab(panel) {
     toast('更新时间已刷新', 'success');
   } }, '刷新'));
   panel.appendChild(timeDiv);
-  
+
+  // ===== 系统文档（合并自原系统文档Tab）=====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '📋 系统文档'));
+  var docsList = [
+    {
+      icon: '📊',
+      title: '版本更新进度管理表',
+      desc: '所有功能需求的优先级、排期、完成状态追踪',
+      url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+      label: '打开进度表'
+    },
+    {
+      icon: '📁',
+      title: '初始源数据表',
+      desc: '专家资源库初始数据来源（腾讯文档）',
+      url: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou',
+      label: '打开源数据表'
+    }
+  ];
+  docsList.forEach(function(doc) {
+    var card = h('div', {
+      style: {
+        background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px 20px',
+        marginBottom:'10px', border:'1px solid var(--border)',
+        display:'flex', alignItems:'center', gap:'14px'
+      }
+    });
+    card.appendChild(h('div', { style:{ fontSize:'24px', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--primary-light)', borderRadius:'8px', flexShrink:0 } }, doc.icon));
+    card.appendChild(h('div', { style:{ flex:1 } },
+      h('div', { style:{ fontSize:'14px', fontWeight:600, marginBottom:'2px', color:'var(--text)' } }, doc.title),
+      h('div', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'6px' } }, doc.desc),
+      h('a', { href:doc.url, target:'_blank', rel:'noopener', style:{ fontSize:'12px', color:'var(--primary)', textDecoration:'none', padding:'4px 10px', border:'1px solid var(--primary)', borderRadius:'6px', display:'inline-block' } }, doc.label)
+    ));
+    panel.appendChild(card);
+  });
+
   // ===== Dangerous operations =====
   panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px', color:'var(--danger)' } }, '危险操作'));
   panel.appendChild(h('button', { className:'btn btn-danger', onclick: () => {
