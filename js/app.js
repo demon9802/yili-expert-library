@@ -6019,7 +6019,8 @@ function renderRatingsTab(panel) {
   }
 
   // ===== ④ Expert Score Adjustment Table（所有管理员）=====
-  const scoreIdx = isMaster ? '④' : '②';\n  panel.appendChild(h('h4', { style: { margin:'16px 0 8px', fontSize:'15px', color:'var(--primary)' } }, scoreIdx + ' 专家评分调整'));
+  const scoreIdx = isMaster ? '④' : '②';
+  panel.appendChild(h('h4', { style: { margin:'16px 0 8px', fontSize:'15px', color:'var(--primary)' } }, scoreIdx + ' 专家评分调整'));
 
   const quickRow = h('div', { style: { display:'flex', gap:'8px', marginBottom:'12px' } });
   quickRow.appendChild(h('input', { placeholder:'搜索专家姓名...', style:{ padding:'6px 12px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1, maxWidth:'200px' }, id:'rating-search', oninput: () => renderRatingTable() }));
@@ -6118,7 +6119,8 @@ function renderRatingsTab(panel) {
   const summaryRow = h('div', { style: { display:'flex', gap:'12px', marginBottom:'12px', flexWrap:'wrap' } });
   summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: lowExperts.length > 0 ? '#fffbeb' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (lowExperts.length > 0 ? '#fde68a' : '#bbf7d0'), fontSize:'13px' } }, '综合 < 7分: ' + lowExperts.length + ' 位'));
   summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: obsExperts.length > 0 ? '#eff6ff' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (obsExperts.length > 0 ? '#bfdbfe' : '#bbf7d0'), fontSize:'13px' } }, '观察库: ' + obsExperts.length + ' 位'));
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', flex:'1' } }, '规则：综合 < 7 自动列入观察库；≥ 7 自动移出。淘汰状态仅手动管理。'));\n  panel.appendChild(summaryRow);
+  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', flex:'1' } }, '规则：综合 < 7 自动列入观察库；≥ 7 自动移出。淘汰状态仅手动管理。'));
+  panel.appendChild(summaryRow);
 
   if (lowExperts.length === 0) {
     const ok = h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0' } });
