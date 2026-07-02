@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.1 | 2026-07-02 | 系统设置重构：六区分区 + 数据源/文档合并 + 系统更新时间重命名 */
+/* Version 5.6 | 2026-07-02 | 评分管理重构：合并评分细则+体系配置 + criteria可编辑 + 级联锁定 + 预警区整合 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -233,18 +233,18 @@ const DEFAULT_RATING_CONFIG = {
       id: 'professional', name: '专业度', weight: 0.5, 
       desc: '评估专家的学历背景、行业资质及专业成果',
       subDimensions: [
-        { name: '学历与学术背景', weight: 0.35, maxScore: 10 },
-        { name: '行业资质与认证', weight: 0.30, maxScore: 10 },
-        { name: '专业成果与经验', weight: 0.35, maxScore: 10 }
+        { name: '学历与学术背景', weight: 0.35, maxScore: 10, criteria: '9分：博士/博士后/教授 | 8分：硕士/研究生/MBA | 7分：本科/学士 | 6分：专科及以下 | 5分：信息缺失' },
+        { name: '行业资质与认证', weight: 0.30, maxScore: 10, criteria: '9分：权威认证(CPA/CFA/PMP/律师等) | 8分：行业资质证书 | 7分：培训进修经历 | 5分：信息缺失' },
+        { name: '专业成果与经验', weight: 0.35, maxScore: 10, criteria: '9分：著作/论文/专利/公开演讲 | 8分：企业授课/主持项目 | 7分：企业服务经验 | 5分：信息缺失' }
       ]
     },
     { 
       id: 'influence', name: '影响力', weight: 0.5, 
       desc: '评估专家的社会荣誉、专业头衔及行业地位',
       subDimensions: [
-        { name: '社会荣誉与奖项', weight: 0.35, maxScore: 10 },
-        { name: '职称与专业头衔', weight: 0.25, maxScore: 10 },
-        { name: '管理履历与行业地位', weight: 0.40, maxScore: 10 }
+        { name: '社会荣誉与奖项', weight: 0.35, maxScore: 10, criteria: '9分：省部级以上奖项/荣誉称号/十大百强 | 8分：协会/学会任职 | 7分：行业认可/媒体报道 | 5分：信息缺失' },
+        { name: '职称与专业头衔', weight: 0.25, maxScore: 10, criteria: '9分：教授/研究员/院士/首席 | 8分：总监/VP/合伙人/副教授 | 7分：经理/高级工程师 | 5分：信息缺失' },
+        { name: '管理履历与行业地位', weight: 0.40, maxScore: 10, criteria: '9分：CEO/总裁/创始人/董事长 | 8分：总监/副总裁 | 7分：经理/主管 | 5分：信息缺失' }
       ]
     }
   ],
@@ -296,13 +296,20 @@ function migrateRatingConfig(cfg) {
     cfg.dimensions = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG.dimensions));
     return cfg;
   }
-  // Ensure each dimension has subDimensions
+  // Ensure each dimension has subDimensions + criteria
   cfg.dimensions.forEach((dim, idx) => {
+    const defaultDim = DEFAULT_RATING_CONFIG.dimensions.find(d => d.id === dim.id) || DEFAULT_RATING_CONFIG.dimensions[0];
     if (!dim.subDimensions || dim.subDimensions.length === 0) {
-      const defaultDim = DEFAULT_RATING_CONFIG.dimensions[idx];
       if (defaultDim && defaultDim.subDimensions) {
         dim.subDimensions = JSON.parse(JSON.stringify(defaultDim.subDimensions));
       }
+    } else {
+      dim.subDimensions.forEach(sd => {
+        if (!sd.criteria) {
+          const defaultSD = defaultDim && defaultDim.subDimensions ? defaultDim.subDimensions.find(ds => ds.name === sd.name) : null;
+          sd.criteria = defaultSD ? defaultSD.criteria : ('6-9分：按资质等级评定 | 5分：信息缺失（默认中值）');
+        }
+      });
     }
   });
   // Ensure both dimensions exist
@@ -3401,7 +3408,7 @@ function getDefaultSubPermissions() {
     expertView: true, expertAdd: true, expertEdit: true, expertDelete: false,
     expertImport: true, expertExport: true, expertScore: true,
     categoryManage: true,
-    ratingManage: false, dashboardManage: true, observationManage: true,
+    ratingManage: true, dashboardManage: true, observationManage: true,
     projectsManage: true, docsManage: false,
     sortManage: false, permissionManage: false, systemSettings: false
   };
@@ -3472,10 +3479,10 @@ function renderAdmin() {
     { id: 'experts', name: '专家管理', perm: 'expertView' },
     { id: 'projects', name: '合作项目管理', perm: 'projectsManage' },
     { id: 'ratings', name: '评分管理', perm: 'ratingManage' },
+    { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'sort', name: '排序标签', perm: 'sortManage' },
     { id: 'dashboard', name: '仪表盘', perm: 'dashboardManage' },
     { id: 'categories', name: '分类管理', perm: 'categoryManage' },
-    { id: 'observation', name: '观察库', perm: 'observationManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
     { id: 'users', name: '👥 用户管理', perm: 'systemSettings' },
     { id: 'settings', name: '系统设置', perm: 'systemSettings' }
@@ -5757,19 +5764,22 @@ function showImportDialog() {
   document.body.appendChild(overlay);
 }
 
-// ===== Other Admin Tabs =====
+// ===== V5.6 评分管理重构：合并评分细则+体系配置 + 级联锁定 + 预警区整合 =====
+// 5768-6169: 完整重写
 function renderRatingsTab(panel) {
   const db = appState.db;
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '评分管理'));
   const cfg = db.ratingConfig;
   const isMaster = isMasterAdmin();
+  const showScores = cfg.showScores !== false;
 
   panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } },
     isMaster ? '管理评分的维度配置、子维度权重及所有专家的各项分值。调整后自动重新计算综合评分。'
              : '查看评分细则、调整各专家分值。维度配置和权重调整仅主管理员可操作。'
   ));
 
+  // ===== 辅助函数 =====
   function recalcAllExperts() {
     db.experts.forEach(e => {
       if (!e.subScores) { e.subScores = null; aiScoreExpert(e); }
@@ -5778,13 +5788,13 @@ function renderRatingsTab(panel) {
     saveDB(db);
   }
 
-  // ===== ① Frontend Score Display Toggle（主管理员）=====
+  // ===== ① 前端展示控制（主管理员）=====
   if (isMaster) {
     const toggleSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
     toggleSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, '① 前端展示控制'));
     const toggleRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center' } });
     toggleRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '在前端展示评分信息（专家卡片 & 详情页）：'));
-    toggleRow.appendChild(h('input', { type:'checkbox', checked: cfg.showScores !== false, onchange: (e) => {
+    toggleRow.appendChild(h('input', { type:'checkbox', checked: showScores, onchange: (e) => {
       cfg.showScores = e.target.checked;
       saveDB(db);
       renderRatingsTab(panel);
@@ -5795,247 +5805,273 @@ function renderRatingsTab(panel) {
     panel.appendChild(toggleSec);
   }
 
-  // ===== ② Rating Rules Reference（所有管理员可见）=====
-  const rulesIdx = isMaster ? '②' : '①';
-  const rulesSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-  rulesSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px', color:'var(--primary)' } }, rulesIdx + ' 评分细则'));
-
-  // Build scoring criteria reference for each sub-dimension
-  function getCriteriaForSubDim(sdName) {
-    if (/(学历|学术|学位)/i.test(sdName)) return '9分：博士/博士后/教授 | 8分：硕士/研究生/MBA | 7分：本科/学士 | 6分：专科及以下 | 5分：信息缺失';
-    if (/(资质|认证|证书)/i.test(sdName)) return '9分：权威认证(CPA/CFA/PMP/律师等) | 8分：行业资质证书 | 7分：培训进修经历 | 5分：信息缺失';
-    if (/(成果|经验|著作|项目)/i.test(sdName)) return '9分：著作/论文/专利/公开演讲 | 8分：企业授课/主持项目 | 7分：企业服务经验 | 5分：信息缺失';
-    if (/(荣誉|奖项|获奖)/i.test(sdName)) return '9分：省部级以上奖项/荣誉称号/十大百强 | 8分：协会/学会任职 | 7分：行业认可/媒体报道 | 5分：信息缺失';
-    if (/(职称|头衔|教授|研究员)/i.test(sdName)) return '9分：教授/研究员/院士/首席 | 8分：总监/VP/合伙人/副教授 | 7分：经理/高级工程师 | 5分：信息缺失';
-    if (/(管理|履历|地位|CEO|总裁)/i.test(sdName)) return '9分：CEO/总裁/创始人/董事长 | 8分：总监/副总裁 | 7分：经理/主管 | 5分：信息缺失';
-    return '6-9分：按资质等级评定 | 5分：信息缺失（默认中值）';
+  // ===== 子管理员：showScores=false 时的锁定提示 =====
+  if (!isMaster && !showScores) {
+    const lockSec = h('div', { style: { background:'#fef2f2', padding:'20px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #fecaca', textAlign:'center' } });
+    lockSec.appendChild(h('div', { style:{ fontSize:'32px', marginBottom:'8px' } }, '🔒'));
+    lockSec.appendChild(h('div', { style:{ fontSize:'15px', fontWeight:'600', color:'#dc2626', marginBottom:'4px' } }, '主管理员已关闭评分显示'));
+    lockSec.appendChild(h('div', { style:{ fontSize:'13px', color:'#92400e' } }, '功能尚在调试中，当前无法使用评分管理'));
+    panel.appendChild(lockSec);
+    return;
   }
 
+  // ===== ② 评分体系配置（合并评分细则 + 赋分标准可编辑）=====
+  // 主管理员：完整编辑界面 | 子管理员：只读细则说明
+  const configSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
+  const configTitle = isMaster ? '② 评分体系配置（维度 & 赋分标准）' : '① 评分细则说明';
+  configSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, configTitle));
+
+  if (!isMaster) {
+    configSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'12px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px' } },
+      '评分细则仅主管理员可编辑。以下为当前生效的评分标准，子管理员可据此为专家调整分值。'
+    ));
+  }
+
+  // 评分说明提示
+  configSec.appendChild(h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
+    '💡 信息缺失（该维度完全无信息）统一默认5分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。AI评分仅供参考，管理员可手动调整每个子维度的分值。'
+  ));
+
+  // 遍历每个主维度
   cfg.dimensions.forEach((dim, dimIdx) => {
-    const dimCard = h('div', { style: { background:'var(--bg)', padding:'14px', borderRadius:'8px', marginBottom:'10px', border:'2px solid ' + (dimIdx === 0 ? '#dbeafe' : '#fef3c7') } });
-    const dimHeader = h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'4px' } });
-    dimHeader.appendChild(h('div', { style: { fontWeight:'700', fontSize:'14px', color: dimIdx === 0 ? '#1e40af' : '#92400e' } }, dim.name + '（权重 ' + Math.round(dim.weight * 100) + '%）'));
+    const dimCard = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'10px', marginBottom:'12px', border:'2px solid ' + (dimIdx === 0 ? '#bfdbfe' : '#fde68a') } });
+    const dimColor = dimIdx === 0 ? '#1e40af' : '#92400e';
+    const dimBgColor = dimIdx === 0 ? '#dbeafe' : '#fef3c7';
+
+    // --- 主维度头部：名称 + 权重 ---
+    const dimHeader = h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px', marginBottom:'8px' } });
+    const dimNameCol = h('div', { style:{ flex:1, minWidth:'200px' } });
+
+    if (isMaster) {
+      // 可编辑的主维度名称
+      const nameInp = h('input', {
+        type: 'text', value: dim.name,
+        style: { width:'160px', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'14px', fontWeight:'700', color: dimColor },
+        onchange: (e) => {
+          const v = e.target.value.trim();
+          if (!v) { toast('名称不能为空', 'error'); e.target.value = dim.name; return; }
+          dim.name = v; saveDB(db); renderRatingsTab(panel);
+          toast('主维度名称已更新', 'success');
+        }
+      });
+      dimNameCol.appendChild(nameInp);
+
+      // 可编辑的主维度描述
+      const descInp = h('input', {
+        type: 'text', value: dim.desc || '',
+        placeholder: '点击添加维度描述...',
+        style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' },
+        onchange: (e) => { dim.desc = e.target.value.trim(); saveDB(db); renderRatingsTab(panel); toast('维度描述已更新', 'success'); }
+      });
+      dimNameCol.appendChild(descInp);
+    } else {
+      dimNameCol.appendChild(h('div', { style:{ fontWeight:'700', fontSize:'14px', color: dimColor } }, dim.name));
+      if (dim.desc) dimNameCol.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px' } }, dim.desc));
+    }
+    dimHeader.appendChild(dimNameCol);
+
+    // 权重控制
+    if (isMaster) {
+      const weightCtrl = h('div', { style: { display:'flex', gap:'6px', alignItems:'center' } });
+      weightCtrl.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '权重：'));
+      const weightInput = h('input', {
+        type: 'number', value: String(Math.round(dim.weight * 100)), min: 10, max: 90, step: 5,
+        style: { width:'60px', padding:'4px 6px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'13px', textAlign:'center' },
+        onchange: (e) => {
+          const newW = parseInt(e.target.value) / 100;
+          if (isNaN(newW) || newW < 0.1 || newW > 0.9) { toast('权重需在10%-90%之间', 'error'); return; }
+          dim.weight = newW;
+          cfg.dimensions[1 - dimIdx].weight = 1 - newW;
+          recalcAllExperts();
+          saveDB(db);
+          renderRatingsTab(panel);
+          toast('权重已更新并重算所有专家评分', 'success');
+        }
+      });
+      weightCtrl.appendChild(weightInput);
+      weightCtrl.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '%'));
+      dimHeader.appendChild(weightCtrl);
+    } else {
+      dimHeader.appendChild(h('span', { style:{ fontSize:'13px', color: dimColor, fontWeight:'600', background: dimBgColor, padding:'3px 10px', borderRadius:'12px' } }, '权重 ' + Math.round(dim.weight * 100) + '%'));
+    }
     dimCard.appendChild(dimHeader);
-    if (dim.desc) dimCard.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginBottom:'8px' } }, dim.desc));
+
+    // --- 子维度表格：名称 + 权重 + 赋分标准 ---
+    if (!dim.subDimensions) dim.subDimensions = [];
     const subTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px' } });
     const subThead = h('thead');
     const sr = h('tr', { style:{ borderBottom:'1px solid var(--border)' } });
     ['子维度', '权重', '赋分标准'].forEach((hdr, hi) => {
-      sr.appendChild(h('th', { style:{ padding:'4px 8px', textAlign: hi === 1 ? 'center' : 'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600', width: hi === 1 ? '60px' : hi === 2 ? '55%' : 'auto' } }, hdr));
+      sr.appendChild(h('th', { style:{ padding:'6px 8px', textAlign: hi === 1 ? 'center' : 'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600', width: hi === 1 ? '60px' : hi === 2 ? '60%' : 'auto' } }, hdr));
     });
     subThead.appendChild(sr); subTable.appendChild(subThead);
     const subTbody = h('tbody');
-    (dim.subDimensions || []).forEach((sd) => {
-      const row = h('tr', { style:{ borderBottom:'1px solid #f3f4f6' } });
-      row.appendChild(h('td', { style:{ padding:'4px 8px', fontWeight:'500' } }, sd.name));
-      row.appendChild(h('td', { style:{ padding:'4px 8px', textAlign:'center', color:'var(--text-secondary)' } }, Math.round(sd.weight * 100) + '%'));
-      row.appendChild(h('td', { style:{ padding:'4px 8px', fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.6' } }, getCriteriaForSubDim(sd.name)));
-      subTbody.appendChild(row);
-    });
-    subTable.appendChild(subTbody);
-    dimCard.appendChild(subTable);
-    rulesSec.appendChild(dimCard);
-  });
-  rulesSec.appendChild(h('div', { style:{ marginTop:'10px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
-    '信息缺失（该维度完全无信息）统一默认5分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。AI评分仅供参考，管理员可手动调整每个子维度的分值。'
-  ));
-  panel.appendChild(rulesSec);
 
-  // ===== ③ Dimension Configuration（仅主管理员）=====
-  if (isMaster) {
-    panel.appendChild(h('h4', { style: { margin:'16px 0 8px', fontSize:'15px', color:'var(--primary)' } }, '③ 评分体系配置（维度管理）'));
-  
-  cfg.dimensions.forEach((dim, dimIdx) => {
-    const dimCard = h('div', { style: { background:'var(--bg)', padding:'18px', borderRadius:'var(--radius-sm)', marginBottom:'14px', border:'2px solid ' + (dimIdx === 0 ? '#dbeafe' : '#fef3c7') } });
-    
-    const dimHeader = h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' } });
-    dimHeader.appendChild(h('div', { style: { fontWeight:'700', fontSize:'15px', color: dimIdx === 0 ? '#1e40af' : '#92400e' } }, dim.name));
-    
-    const weightCtrl = h('div', { style: { display:'flex', gap:'8px', alignItems:'center' } });
-    weightCtrl.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text-muted)' } }, '权重：'));
-    const weightInput = h('input', {
-      type: 'number', value: String(Math.round(dim.weight * 100)), min: 10, max: 90, step: 5,
-      style: { width:'70px', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'13px', textAlign:'center' },
-      onchange: (e) => {
-        const newW = parseInt(e.target.value) / 100;
-        if (isNaN(newW) || newW < 0.1 || newW > 0.9) { toast('权重需在10%-90%之间', 'error'); return; }
-        dim.weight = newW;
-        cfg.dimensions[1 - dimIdx].weight = 1 - newW;
-        recalcAllExperts();
-        saveDB(db);
-        renderRatingsTab(panel);
-        toast('权重已更新并重算所有专家评分', 'success');
-      }
-    });
-    weightCtrl.appendChild(weightInput);
-    weightCtrl.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text-muted)' } }, '%'));
-    dimHeader.appendChild(weightCtrl);
-    dimCard.appendChild(dimHeader);
-    dimCard.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginBottom:'12px' } }, dim.desc));
-    
-    // Sub-dimensions with editable names, add/delete, no maxScore column
-    if (!dim.subDimensions) dim.subDimensions = [];
-    const subTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13px' } });
-    const subThead = h('thead');
-    const sr = h('tr', { style:{ borderBottom:'1px solid var(--border)' } });
-    ['子维度名称', '权重 (%)', ''].forEach((hdr, hi) => {
-      sr.appendChild(h('th', { style:{ padding:'6px 10px', textAlign: hi === 2 ? 'center' : 'left', fontSize:'12px', color:'var(--text-muted)', fontWeight:'600', width: hi === 1 ? '80px' : hi === 2 ? '40px' : 'auto' } }, hdr));
-    });
-    subThead.appendChild(sr); subTable.appendChild(subThead);
-    
-    const subTbody = h('tbody');
-    function renderSubRow(sd, sdIdx) {
-      const row = h('tr');
-      // Editable name
-      const nameTd = h('td', { style:{ padding:'4px 10px' } });
-      const nameInp = h('input', {
-        type: 'text', value: sd.name,
-        style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px' },
-        placeholder: '输入子维度名称...',
-        onchange: (ev) => {
-          const newName = ev.target.value.trim();
-          if (!newName) { toast('名称不能为空', 'error'); ev.target.value = sd.name; return; }
-          const oldName = sd.name;
-          sd.name = newName;
-          // Rename sub-score keys for all experts
-          db.experts.forEach(e => {
-            if (e.subScores && e.subScores[dim.id] && e.subScores[dim.id][oldName] !== undefined) {
-              e.subScores[dim.id][newName] = e.subScores[dim.id][oldName];
-              delete e.subScores[dim.id][oldName];
-            }
-          });
-          recalcAllExperts();
-          saveDB(db);
-          renderRatingsTab(panel);
-          toast('子维度名称已更新，专家分数已同步', 'success');
-        }
-      });
-      nameTd.appendChild(nameInp); row.appendChild(nameTd);
-      
-      // Weight
-      const wTd = h('td', { style:{ padding:'4px 10px' } });
-      const wInp = h('input', {
-        type: 'number', value: String(Math.round(sd.weight * 100)), min: 5, max: 80, step: 5,
-        style: { width:'55px', padding:'3px 6px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px', textAlign:'center' },
-        onchange: (ev) => {
-          const newSW = parseInt(ev.target.value) / 100;
-          if (isNaN(newSW) || newSW < 0.05 || newSW > 0.8) { toast('子维度权重需在5%-80%之间', 'error'); return; }
-          sd.weight = newSW;
-          const total = dim.subDimensions.reduce((s, d) => s + d.weight, 0);
-          if (Math.abs(total - 1) > 0.001) {
-            const others = dim.subDimensions.filter((_, i) => i !== sdIdx);
-            const rem = others.reduce((s, d) => s + d.weight, 0);
-            if (rem > 0) others.forEach(d => { d.weight = Math.round(d.weight / rem * (1 - newSW) * 100) / 100; });
-            dim.subDimensions[dim.subDimensions.length - 1].weight += parseFloat((1 - dim.subDimensions.reduce((s, d) => s + d.weight, 0)).toFixed(2));
+    dim.subDimensions.forEach((sd, sdIdx) => {
+      const row = h('tr', { style:{ borderBottom:'1px solid #f3f4f6' } });
+
+      // 子维度名称
+      const nameTd = h('td', { style:{ padding:'6px 8px' } });
+      if (isMaster) {
+        const nameInp = h('input', {
+          type: 'text', value: sd.name,
+          style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px' },
+          placeholder: '子维度名称...',
+          onchange: (ev) => {
+            const newName = ev.target.value.trim();
+            if (!newName) { toast('名称不能为空', 'error'); ev.target.value = sd.name; return; }
+            const oldName = sd.name;
+            sd.name = newName;
+            db.experts.forEach(e => {
+              if (e.subScores && e.subScores[dim.id] && e.subScores[dim.id][oldName] !== undefined) {
+                e.subScores[dim.id][newName] = e.subScores[dim.id][oldName];
+                delete e.subScores[dim.id][oldName];
+              }
+            });
+            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
+            toast('子维度名称已更新', 'success');
           }
-          recalcAllExperts();
-          saveDB(db);
-          renderRatingsTab(panel);
-          toast('子维度权重已更新', 'success');
-        }
-      });
-      wTd.appendChild(wInp); row.appendChild(wTd);
-      
-      // Delete button
-      const delTd = h('td', { style:{ padding:'4px 10px', textAlign:'center' } });
-      if (dim.subDimensions.length > 1) {
+        });
+        nameTd.appendChild(nameInp);
+      } else {
+        nameTd.appendChild(h('span', { style:{ fontWeight:'500' } }, sd.name));
+      }
+      row.appendChild(nameTd);
+
+      // 权重
+      const wTd = h('td', { style:{ padding:'6px 8px', textAlign:'center' } });
+      if (isMaster) {
+        const wInp = h('input', {
+          type: 'number', value: String(Math.round(sd.weight * 100)), min: 5, max: 80, step: 5,
+          style: { width:'50px', padding:'3px 5px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px', textAlign:'center' },
+          onchange: (ev) => {
+            const newSW = parseInt(ev.target.value) / 100;
+            if (isNaN(newSW) || newSW < 0.05 || newSW > 0.8) { toast('子维度权重需在5%-80%之间', 'error'); return; }
+            sd.weight = newSW;
+            const total = dim.subDimensions.reduce((s, d) => s + d.weight, 0);
+            if (Math.abs(total - 1) > 0.001) {
+              const others = dim.subDimensions.filter((_, i) => i !== sdIdx);
+              const rem = others.reduce((s, d) => s + d.weight, 0);
+              if (rem > 0) others.forEach(d => { d.weight = Math.round(d.weight / rem * (1 - newSW) * 100) / 100; });
+              dim.subDimensions[dim.subDimensions.length - 1].weight += parseFloat((1 - dim.subDimensions.reduce((s, d) => s + d.weight, 0)).toFixed(2));
+            }
+            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
+            toast('子维度权重已更新', 'success');
+          }
+        });
+        wTd.appendChild(wInp);
+        wTd.appendChild(h('span', { style:{ fontSize:'11px', color:'var(--text-muted)' } }, '%'));
+      } else {
+        wTd.appendChild(h('span', { style:{ color:'var(--text-secondary)' } }, Math.round(sd.weight * 100) + '%'));
+      }
+      row.appendChild(wTd);
+
+      // 赋分标准
+      const critTd = h('td', { style:{ padding:'6px 8px' } });
+      if (isMaster) {
+        const critInp = h('textarea', {
+          value: sd.criteria || '',
+          placeholder: '输入赋分标准（如：9分：... | 8分：... | 5分：信息缺失）',
+          style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', lineHeight:'1.5', resize:'vertical', minHeight:'36px' },
+          onchange: (ev) => {
+            sd.criteria = ev.target.value.trim();
+            saveDB(db);
+            toast('赋分标准已保存', 'success');
+          }
+        });
+        critTd.appendChild(critInp);
+      } else {
+        critTd.appendChild(h('span', { style:{ fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5', whiteSpace:'pre-wrap' } }, sd.criteria || '暂无赋分标准'));
+      }
+      row.appendChild(critTd);
+
+      // 删除按钮（仅主管理）
+      if (isMaster && dim.subDimensions.length > 1) {
+        const delTd = h('td', { style:{ padding:'6px 8px', textAlign:'center' } });
         const delBtn = h('button', {
-          style: { background:'none', border:'1px solid #fca5a5', color:'#dc2626', borderRadius:'4px', cursor:'pointer', fontSize:'16px', padding:'2px 8px', lineHeight:'1' },
+          style: { background:'none', border:'1px solid #fca5a5', color:'#dc2626', borderRadius:'4px', cursor:'pointer', fontSize:'14px', padding:'2px 7px', lineHeight:'1' },
           title: '删除此子维度',
           onclick: () => {
             const sdName = sd.name;
             dim.subDimensions.splice(sdIdx, 1);
-            // Normalize remaining weights
             const rem = dim.subDimensions.reduce((s, d) => s + d.weight, 0);
             if (rem > 0) dim.subDimensions.forEach(d => { d.weight = Math.round(d.weight / rem * 100) / 100; });
-            // Remove sub-score keys for all experts
             db.experts.forEach(e => {
               if (e.subScores && e.subScores[dim.id] && e.subScores[dim.id][sdName] !== undefined) {
                 delete e.subScores[dim.id][sdName];
               }
             });
-            recalcAllExperts();
-            saveDB(db);
-            renderRatingsTab(panel);
+            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
             toast('已删除子维度「' + sdName + '」', 'success');
           }
         }, '×');
         delTd.appendChild(delBtn);
+        row.appendChild(delTd);
+      } else if (isMaster) {
+        row.appendChild(h('td', { style:{ padding:'6px 8px' } }));
       }
-      row.appendChild(delTd);
       subTbody.appendChild(row);
-    }
-    
-    dim.subDimensions.forEach((sd, sdIdx) => { renderSubRow(sd, sdIdx); });
+    });
     subTable.appendChild(subTbody);
-    
-    // Add sub-dimension button
-    if (dim.subDimensions.length < 3) {
+
+    // 添加子维度按钮（仅主管理）
+    if (isMaster && dim.subDimensions.length < 4) {
       const addRow = h('tr');
-      const addTd = h('td', { colspan: 3, style:{ padding:'6px 10px' } });
+      const addTd = h('td', { colspan: 4, style:{ padding:'6px 8px' } });
       const addBtn = h('button', {
         style: { background:'none', border:'1px dashed var(--border)', color:'var(--primary)', borderRadius:'6px', cursor:'pointer', fontSize:'12px', padding:'4px 14px' },
         onclick: () => {
-          const newSD = { name: '新子维度', weight: 0.33, maxScore: 10 };
+          const newSD = { name: '新子维度', weight: Math.round((1 / (dim.subDimensions.length + 1)) * 100) / 100, maxScore: 10, criteria: '6-9分：按资质等级评定 | 5分：信息缺失' };
           dim.subDimensions.push(newSD);
-          // Evenly distribute weights
           const eq = Math.round(100 / dim.subDimensions.length) / 100;
           dim.subDimensions.forEach(d => { d.weight = eq; });
           dim.subDimensions[dim.subDimensions.length - 1].weight += parseFloat((1 - eq * dim.subDimensions.length).toFixed(2));
-          saveDB(db);
-          renderRatingsTab(panel);
-          toast('已添加新子维度（最多3条）', 'success');
+          saveDB(db); renderRatingsTab(panel);
+          toast('已添加新子维度', 'success');
         }
-      }, '+ 添加子维度');
-      addTd.appendChild(addBtn);
-      addRow.appendChild(addTd);
-      subTable.appendChild(addRow);
-    } else {
-      const hintRow = h('tr');
-      const hintTd = h('td', { colspan: 3, style:{ padding:'4px 10px', fontSize:'11px', color:'#9ca3af' } }, '已到达上限（最多3条子维度）');
-      hintRow.appendChild(hintTd);
-      subTable.appendChild(hintRow);
+      }, '+ 添加子维度（最多4条）');
+      addTd.appendChild(addBtn); addRow.appendChild(addTd); subTable.appendChild(addRow);
     }
-    
     dimCard.appendChild(subTable);
-    panel.appendChild(dimCard);
+    configSec.appendChild(dimCard);
   });
-  
-  // AI Scoring
-  const aiSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-  aiSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, 'AI 自主评分'));
-  const aiRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center' } });
-  aiRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '启用AI自动评分：'));
-  aiRow.appendChild(h('input', { type:'checkbox', checked: cfg.aiScoringEnabled, onchange: (e) => {
-    cfg.aiScoringEnabled = e.target.checked;
-    if (e.target.checked) { db.experts.forEach(ex => { ex.subScores = null; aiScoreExpert(ex); }); recalcAllExperts(); }
-    saveDB(db);
-    renderRatingsTab(panel);
-    toast(e.target.checked ? 'AI评分已启用' : 'AI评分已关闭', 'success');
-  }}));
-  aiSec.appendChild(aiRow);
-  aiSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, 'AI根据专家学历、资历、履历等信息自动生成子维度评分。关闭后可手动调整每位专家的评分。'));
-  panel.appendChild(aiSec);
+  panel.appendChild(configSec);
+
+  // ===== AI 评分开关（仅主管理）=====
+  if (isMaster) {
+    const aiSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
+    aiSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, 'AI 自主评分'));
+    const aiRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center' } });
+    aiRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '启用AI自动评分：'));
+    aiRow.appendChild(h('input', { type:'checkbox', checked: cfg.aiScoringEnabled, onchange: (e) => {
+      cfg.aiScoringEnabled = e.target.checked;
+      if (e.target.checked) { db.experts.forEach(ex => { ex.subScores = null; aiScoreExpert(ex); }); recalcAllExperts(); }
+      saveDB(db); renderRatingsTab(panel);
+      toast(e.target.checked ? 'AI评分已启用' : 'AI评分已关闭', 'success');
+    }}));
+    aiSec.appendChild(aiRow);
+    aiSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, 'AI根据专家学历、资历、履历等信息自动生成子维度评分。关闭后可手动调整每位专家的评分。'));
+    panel.appendChild(aiSec);
   }
 
-  // ===== ④ Expert Score Adjustment Table（所有管理员）=====
-  const scoreIdx = isMaster ? '④' : '②';
+  // ===== 专家评分调整（所有管理员）=====
+  const scoreIdx = isMaster ? '③' : '②';
   panel.appendChild(h('h4', { style: { margin:'16px 0 8px', fontSize:'15px', color:'var(--primary)' } }, scoreIdx + ' 专家评分调整'));
 
   const quickRow = h('div', { style: { display:'flex', gap:'8px', marginBottom:'12px' } });
   quickRow.appendChild(h('input', { placeholder:'搜索专家姓名...', style:{ padding:'6px 12px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1, maxWidth:'200px' }, id:'rating-search', oninput: () => renderRatingTable() }));
   panel.appendChild(quickRow);
-  
+
   const tableDiv = h('div', { id:'rating-table', style:{ overflow:'auto', maxHeight:'45vh', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)' } });
   panel.appendChild(tableDiv);
-  
+
   function renderRatingTable() {
     const q = (document.getElementById('rating-search')?.value || '').toLowerCase();
     let experts = db.experts.filter(e => e.status !== 'eliminated');
     if (q) experts = experts.filter(e => e.name.toLowerCase().includes(q));
     const profDim = cfg.dimensions.find(d => d.id === 'professional');
     const inflDim = cfg.dimensions.find(d => d.id === 'influence');
-    
+
     tableDiv.innerHTML = '';
     const table = h('table', { className: 'data-table', style: { minWidth:'700px' } });
     const thead = h('thead'); const hr = h('tr');
@@ -6044,7 +6080,7 @@ function renderRatingsTab(panel) {
     (inflDim?.subDimensions || []).forEach(sd => { hr.appendChild(h('th', { style:{ whiteSpace:'nowrap', fontSize:'11px', color:'#F59E0B' } }, sd.name)); });
     hr.appendChild(h('th', { style:{ whiteSpace:'nowrap' } }, '操作'));
     thead.appendChild(hr); table.appendChild(thead);
-    
+
     const tbody = h('tbody');
     experts.forEach(e => {
       const row = h('tr');
@@ -6052,7 +6088,7 @@ function renderRatingsTab(panel) {
       row.appendChild(h('td', { style:{ color:'#3B82F6', fontWeight:'600' } }, String(e.scores.professional)));
       row.appendChild(h('td', { style:{ color:'#F59E0B', fontWeight:'600' } }, String(e.scores.influence)));
       row.appendChild(h('td', { style:{ fontWeight:'bold', color: e.scores.overall >= 8 ? '#059669' : '#d97706' } }, e.scores.overall.toFixed(1)));
-      
+
       const allSubs = [
         ...(profDim?.subDimensions || []).map(sd => ({ dim:'professional', ...sd })),
         ...(inflDim?.subDimensions || []).map(sd => ({ dim:'influence', ...sd }))
@@ -6077,7 +6113,7 @@ function renderRatingsTab(panel) {
         });
         td.appendChild(inp); row.appendChild(td);
       });
-      
+
       const act = h('td', {});
       act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); saveDB(db);
@@ -6089,12 +6125,11 @@ function renderRatingsTab(panel) {
     table.appendChild(tbody); tableDiv.appendChild(table);
   }
   setTimeout(() => renderRatingTable(), 50);
-  
-  // ===== ⑤ Warning Zone & Observation Linkage（所有管理员）=====
-  const warnIdx = isMaster ? '⑤' : '③';
-  panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警区 & 观察库'));
 
-  // Auto-sync: low-scoring experts → observation library
+  // ===== 评分预警区（所有管理员，已整合观察库）=====
+  const warnIdx = isMaster ? '④' : '③';
+  panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警'));
+
   const obsThreshold = 7;
   function autoSyncObservation() {
     let changed = false;
@@ -6112,19 +6147,21 @@ function renderRatingsTab(panel) {
   }
   autoSyncObservation();
 
-  const lowExperts = db.experts.filter(e => e.status !== 'eliminated' && e.scores.overall < obsThreshold);
-  const obsExperts = db.experts.filter(e => e.status === 'observation' || e.observationStatus);
+  const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
+  const obsExperts = db.experts.filter(ex => ex.status === 'observation' || ex.observationStatus);
 
-  // Summary
+  // 统计摘要
   const summaryRow = h('div', { style: { display:'flex', gap:'12px', marginBottom:'12px', flexWrap:'wrap' } });
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: lowExperts.length > 0 ? '#fffbeb' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (lowExperts.length > 0 ? '#fde68a' : '#bbf7d0'), fontSize:'13px' } }, '综合 < 7分: ' + lowExperts.length + ' 位'));
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: obsExperts.length > 0 ? '#eff6ff' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (obsExperts.length > 0 ? '#bfdbfe' : '#bbf7d0'), fontSize:'13px' } }, '观察库: ' + obsExperts.length + ' 位'));
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', flex:'1' } }, '规则：综合 < 7 自动列入观察库；≥ 7 自动移出。淘汰状态仅手动管理。'));
+  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: lowExperts.length > 0 ? '#fffbeb' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (lowExperts.length > 0 ? '#fde68a' : '#bbf7d0'), fontSize:'13px' } }, '⚠️ 综合 < 7分: ' + lowExperts.length + ' 位'));
+  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: obsExperts.length > 0 ? '#eff6ff' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (obsExperts.length > 0 ? '#bfdbfe' : '#bbf7d0'), fontSize:'13px' } }, '🔍 观察库: ' + obsExperts.length + ' 位'));
+  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', flex:'1', cursor:'pointer' }, onclick: () => { appState.adminTab = 'observation'; renderAdmin(); } },
+    '📋 观察库管理 → 跳转至观察库Tab处理（规则：综合 < 7 自动入库；≥ 7 自动移出）'
+  ));
   panel.appendChild(summaryRow);
 
   if (lowExperts.length === 0) {
     const ok = h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0' } });
-    ok.appendChild(h('div', { style:{ fontSize:'14px', fontWeight:'600', color:'#059669' } }, '无预警 · 所有专家评分正常（≥ 7分）'));
+    ok.appendChild(h('div', { style:{ fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
     panel.appendChild(ok);
   } else {
     lowExperts.forEach(e => {
@@ -6133,18 +6170,24 @@ function renderRatingsTab(panel) {
         h('strong', {}, e.name + '  综合：' + e.scores.overall.toFixed(1) + ' | ' + (e.status === 'observation' ? '🔍 已列入观察库' : '⚠️ 待处理')),
         h('div', { style:{ display:'flex', gap:'6px' } },
           h('button', { className:'btn btn-sm', style:{ background:'#059669', color:'white', fontSize:'11px' }, onclick: () => {
-            e.scores.professional = Math.max(e.scores.professional, 7);
-            e.scores.overall = 7.0;
             if (!e.subScores) { e.subScores = null; aiScoreExpert(e); }
+            // 将所有子维度调整至7分及以上
+            if (e.subScores) {
+              Object.keys(e.subScores).forEach(dimId => {
+                Object.keys(e.subScores[dimId]).forEach(sdName => {
+                  e.subScores[dimId][sdName] = Math.max(e.subScores[dimId][sdName], 7);
+                });
+              });
+            }
             recalcExpertFromSubscores(e);
             if (e.status === 'observation' && e.observationStatus !== 'eliminated') { e.status = 'active'; e.observationStatus = ''; }
             saveDB(db); renderRatingsTab(panel);
             toast(e.name + ' 已调整至7分', 'success');
           } }, '调整至7分'),
           h('button', { className:'btn btn-sm', style:{ background:'#d97706', color:'white', fontSize:'11px' }, onclick: () => {
-            e.status = 'observation'; e.observationStatus = 'evaluating'; e.observationDate = new Date().toISOString();
-            saveDB(db); renderRatingsTab(panel); toast(e.name + ' 已移入观察库', 'success');
-          } }, '移入观察库')
+            appState.adminTab = 'observation'; renderAdmin();
+            toast('已切换至观察库Tab，请手动处理 ' + e.name, 'info');
+          } }, '前往观察库')
         )
       ));
       item.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'6px' } }, '专业度：' + e.scores.professional + ' | 影响力：' + e.scores.influence));
