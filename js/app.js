@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.0.1 | 2026-07-01 | 合并系统文档→系统设置 + 初始源数据链接修复 */
+/* Version 5.1 | 2026-07-02 | 系统设置重构：六区分区 + 数据源/文档合并 + 系统更新时间重命名 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -6356,200 +6356,8 @@ function renderSettingsTab(panel) {
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '系统设置'));
   const db = appState.db;
-  
-  // ===== Data Sync from Tencent Docs =====
-  panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '数据源管理'));
-  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'12px' } }, '从腾讯文档源数据更新专家库。更新不会覆盖已有数据，重复项将由管理员确认处理。'));
-  
-  // Tencent Docs link input
-  const linkRow = h('div', { style:{ display:'flex', gap:'8px', alignItems:'center', marginBottom:'12px' } });
-  const linkInput = h('input', {
-    type: 'text',
-    placeholder: '粘贴腾讯文档分享链接...',
-    value: db.sourceDocLink || '',
-    style: { flex:1, padding:'8px 12px', border:'1px solid var(--border)', borderRadius:'8px', fontSize:'13px' },
-    id: 'settings-source-link'
-  });
-  linkRow.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text-secondary)', whiteSpace:'nowrap' } }, '源文档链接：'));
-  linkRow.appendChild(linkInput);
-  panel.appendChild(linkRow);
-
-  // Save link button
-  panel.appendChild(h('button', {
-    className: 'btn btn-secondary btn-sm',
-    style: { marginBottom:'12px' },
-    onclick: () => {
-      const link = document.getElementById('settings-source-link').value.trim();
-      db.sourceDocLink = link;
-      saveDB(db);
-      toast('源文档链接已保存', 'success');
-    }
-  }, '保存链接'));
-
-  // ===== Current data source link display (read-only, shows latest link) =====
-  const currentLinkRow = h('div', { style:{ background:'var(--primary-light)', padding:'12px 16px', borderRadius:'8px', marginBottom:'16px', border:'1px solid #93c5fd' } });
-  currentLinkRow.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', color:'var(--primary)', marginBottom:'6px' } }, '📎 当前数据源链接'));
-  currentLinkRow.appendChild(h('a', {
-    href: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2',
-    target: '_blank',
-    style: { fontSize:'12px', color:'var(--primary)', wordBreak:'break-all', lineHeight:'1.6', textDecoration:'underline' }
-  }, 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2'));
-  currentLinkRow.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' } }, '主管理员最新更新的线上文档链接，点击可在新窗口打开'));
-  panel.appendChild(currentLinkRow);
-  
-  // Manual data update via CSV paste
-  panel.appendChild(h('h5', { style:{ margin:'16px 0 6px', fontSize:'13px' } }, '手动同步数据'));
-  panel.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '从腾讯文档导出为CSV，粘贴到下方进行更新。更新不覆盖已有数据，自动检测重复并提示。'));
-  
-  const syncTextarea = h('textarea', {
-    placeholder: '粘贴腾讯文档导出的CSV数据...\n\n格式要求：第一行为列名（姓名、适用领域、学历、资历资质、课程/案例、联系人、联系方式、内部推荐人），后续每行为一条专家数据。',
-    style: { width:'100%', minHeight:'120px', padding:'10px', border:'1px solid var(--border)', borderRadius:'8px', fontSize:'12px', fontFamily:'monospace' },
-    id: 'settings-sync-csv'
-  });
-  panel.appendChild(syncTextarea);
-  
-  const syncBtns = h('div', { style:{ display:'flex', gap:'8px', marginTop:'8px' } });
-  syncBtns.appendChild(h('button', {
-    className: 'btn btn-primary btn-sm',
-    onclick: () => {
-      const csv = document.getElementById('settings-sync-csv').value.trim();
-      if (!csv) { toast('请粘贴CSV数据', 'error'); return; }
-      const newExperts = parseCSVToExperts(csv);
-      if (newExperts.length === 0) { toast('未解析到有效数据', 'error'); return; }
-      
-      // Check for duplicates
-      const duplicates = [];
-      const newOnes = [];
-      newExperts.forEach(ne => {
-        const match = db.experts.find(ee => ee.name.toLowerCase() === (ne.name || '').toLowerCase());
-        if (match) duplicates.push({ existing: match, incoming: ne });
-        else newOnes.push(ne);
-      });
-      
-      if (duplicates.length > 0) {
-        // Confirm with admin
-        let dupMsg = '发现 ' + duplicates.length + ' 条重复数据：\n';
-        duplicates.forEach((d, i) => {
-          dupMsg += '\n#' + (i+1) + ' ' + d.incoming.name + '（已有记录）';
-        });
-        dupMsg += '\n\n新数据 ' + newOnes.length + ' 条将直接导入。\n重复项处理方式：\n• 输入 "yes" = 覆盖所有重复项\n• 输入 "no" = 跳过所有重复项\n• 直接取消 = 不执行任何操作';
-        
-        const action = prompt(dupMsg, 'no');
-        if (action === null) { toast('已取消同步', ''); return; }
-        if (action.toLowerCase() === 'yes') {
-          duplicates.forEach(d => {
-            const idx = db.experts.findIndex(e => e.id === d.existing.id);
-            if (idx >= 0) {
-              const updated = { ...d.incoming, id: d.existing.id, createdAt: d.existing.createdAt, createdBy: d.existing.createdBy };
-              db.experts[idx] = updated;
-            }
-          });
-        }
-        // Add new ones
-        addNewExpertsSimple(newOnes, db);
-        db.updateTime = new Date().toISOString();
-        saveDB(db);
-        renderSettingsTab(panel);
-        toast('同步完成：新增 ' + newOnes.length + ' 位' + (action.toLowerCase() === 'yes' ? '，覆盖 ' + duplicates.length + ' 位' : ''), 'success');
-      } else {
-        addNewExpertsSimple(newOnes, db);
-        db.updateTime = new Date().toISOString();
-        saveDB(db);
-        renderSettingsTab(panel);
-        toast('同步完成：新增 ' + newOnes.length + ' 位专家', 'success');
-      }
-    }
-  }, '同步数据（不覆盖已有）'));
-  
-  syncBtns.appendChild(h('button', {
-    className: 'btn btn-sm',
-    style: { background:'#fef3c7', color:'#92400e', border:'1px solid #fbbf24' },
-    onclick: () => {
-      const csv = document.getElementById('settings-sync-csv').value.trim();
-      if (!csv) { toast('请粘贴CSV数据', 'error'); return; }
-      const newExperts = parseCSVToExperts(csv);
-      if (newExperts.length === 0) { toast('未解析到有效数据', 'error'); return; }
-      if (!confirm('将导入全部 ' + newExperts.length + ' 条数据到观察库（不查重），确认？')) return;
-      newExperts.forEach(ne => {
-        const maxId = db.experts.reduce((m, e) => Math.max(m, e.id), 0);
-        db.experts.push({
-          id: maxId + 1, name: ne.name || '未命名', fields: ne.fields || [],
-          education: ne.education || '', qualifications: ne.qualifications || '',
-          courses: ne.courses || '', contactPerson: ne.contactPerson || '',
-          contactInfo: ne.contactInfo || '', referrer: ne.referrer || '',
-          advantages: [], scores: { professional: 5, influence: 5, overall: 5 },
-          status: 'observation', observationStatus: 'evaluating',
-          observationDate: new Date().toISOString(),
-          createdAt: new Date().toISOString(), createdBy: '系统同步'
-        });
-        maxId++;
-      });
-      updateFieldsList(db);
-      db.updateTime = new Date().toISOString();
-      saveDB(db);
-      renderSettingsTab(panel);
-      toast('已导入 ' + newExperts.length + ' 条至观察库', 'success');
-    }
-  }, '导入至观察库（不查重）'));
-  panel.appendChild(syncBtns);
-  
-  function addNewExpertsSimple(experts, db) {
-    const maxId = db.experts.reduce((m, e) => Math.max(m, e.id), 0);
-    experts.forEach((ne, i) => {
-      const e = {
-        id: maxId + i + 1, name: ne.name || '未命名',
-        fields: Array.isArray(ne.fields) ? ne.fields : (ne.fields ? ne.fields.split(/[,，]/).map(f => f.trim()).filter(Boolean) : []),
-        education: ne.education || '', qualifications: ne.qualifications || '',
-        courses: ne.courses || '', contactPerson: ne.contactPerson || '',
-        contactInfo: ne.contactInfo || '', contactType: detectContactType(ne.contactInfo || ''),
-        referrer: ne.referrer || '', advantages: [],
-        scores: { professional: 5, influence: 5, overall: 5 },
-        status: 'active', createdAt: new Date().toISOString(), createdBy: '数据同步'
-      };
-      e.subScores = null; aiScoreExpert(e);
-      const cfg = db.ratingConfig;
-      const profDim = cfg.dimensions.find(d => d.id === 'professional');
-      const inflDim = cfg.dimensions.find(d => d.id === 'influence');
-      let p = 0, inf = 0;
-      if (profDim && profDim.subDimensions) profDim.subDimensions.forEach(sd => { p += (e.subScores.professional[sd.name] || 5) * sd.weight; });
-      if (inflDim && inflDim.subDimensions) inflDim.subDimensions.forEach(sd => { inf += (e.subScores.influence[sd.name] || 5) * sd.weight; });
-      e.scores.professional = Math.round(p * 10) / 10;
-      e.scores.influence = Math.round(inf * 10) / 10;
-      e.scores.overall = Math.round((e.scores.professional * profDim.weight + e.scores.influence * inflDim.weight) * 10) / 10;
-      e.status = 'active';
-      db.experts.push(e);
-    });
-    updateFieldsList(db);
-  }
-  
-  function parseCSVToExperts(csvText) {
-    const lines = csvText.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) return [];
-    const header = lines[0].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(h => h.replace(/^"|"$/g, '').trim());
-    const nameIdx = header.findIndex(h => h === '姓名' || h.toLowerCase() === 'name');
-    if (nameIdx < 0) return [];
-    const experts = [];
-    for (let i = 1; i < lines.length; i++) {
-      const vals = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim());
-      if (!vals[nameIdx]) continue;
-      const expert = { name: vals[nameIdx], fields: [], education: '', qualifications: '', courses: '', contactPerson: '', contactInfo: '', contactType: 'phone', contacts: [], referrer: '' };
-      header.forEach((h, idx) => {
-        const val = vals[idx] || '';
-        if (h === '适用领域') expert.fields = val.split(/[,，、]/).map(f => f.trim()).filter(Boolean);
-        else if (h === '学历') expert.education = val;
-        else if (h === '资历资质') expert.qualifications = val;
-        else if (h === '参考案例' || h === '课程/案例') expert.courses = val;
-        else if (h === '联系人') expert.contactPerson = val;
-        else if (h === '联系方式') expert.contactInfo = val;
-        else if (h === '内部推荐人') expert.referrer = val;
-      });
-      experts.push(expert);
-    }
-    return experts;
-  }
-  
-  // ===== UI Settings =====
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '界面设置'));
+  // ===== ① 界面设置（放第一项，功能相对独立）=====
+  panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '① 界面设置'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'12px' } }, '调整前端界面的标题名称与配色方案，修改后即时预览。'));
   
   const uiCard = h('div', { style:{ background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border)' } });
@@ -6633,55 +6441,114 @@ function renderSettingsTab(panel) {
   uiCard.appendChild(uiBtns);
   panel.appendChild(uiCard);
   
-  // ===== Update time ====="
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '数据更新时间'));
+  // ===== ② 系统更新时间 =====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '② 系统更新时间'));
+  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '记录系统配置与部署的最近更新日期（非专家数据更新时间）。'));
   const timeDiv = h('div', { style:{ display:'flex', gap:'8px', alignItems:'center' } });
-  timeDiv.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text-secondary)' } }, '当前：' + formatDate(db.updateTime)));
+  timeDiv.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text-secondary)' } }, '最近更新：' + formatDate(db.updateTime)));
   timeDiv.appendChild(h('button', { className:'btn btn-secondary btn-sm', onclick: () => {
     db.updateTime = new Date().toISOString();
     saveDB(db);
     renderSettingsTab(panel);
-    toast('更新时间已刷新', 'success');
+    toast('系统更新时间已刷新', 'success');
   } }, '刷新'));
   panel.appendChild(timeDiv);
-
-  // ===== 系统文档（合并自原系统文档Tab）=====
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '📋 系统文档'));
-  var docsList = [
+  
+  // ===== ③ 数据源（合并原"数据源管理"+"系统文档"，只读查看）=====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '③ 数据源'));
+  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'12px' } }, '核心数据来源及版本管理文档，仅供查看。批量导入请通过专家管理页的模板导入进行。'));
+  
+  // Current data source link (read-only)
+  const currentLinkRow = h('div', { style:{ background:'var(--primary-light)', padding:'12px 16px', borderRadius:'8px', marginBottom:'12px', border:'1px solid #93c5fd' } });
+  currentLinkRow.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', color:'var(--primary)', marginBottom:'6px' } }, '📎 当前数据源链接'));
+  currentLinkRow.appendChild(h('a', {
+    href: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2',
+    target: '_blank',
+    style: { fontSize:'12px', color:'var(--primary)', wordBreak:'break-all', lineHeight:'1.6', textDecoration:'underline' }
+  }, 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2'));
+  currentLinkRow.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' } }, '主管理员最新更新的线上文档链接，点击可在新窗口打开'));
+  panel.appendChild(currentLinkRow);
+  
+  // Doc cards
+  var dataDocsList = [
+    {
+      icon: '📁',
+      title: '初始源数据表',
+      desc: '专家资源库初始数据来源（腾讯文档，n99xou 工作表）',
+      url: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou',
+      label: '打开源数据表'
+    },
     {
       icon: '📊',
       title: '版本更新进度管理表',
       desc: '所有功能需求的优先级、排期、完成状态追踪',
       url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
       label: '打开进度表'
-    },
-    {
-      icon: '📁',
-      title: '初始源数据表',
-      desc: '专家资源库初始数据来源（腾讯文档）',
-      url: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou',
-      label: '打开源数据表'
     }
   ];
-  docsList.forEach(function(doc) {
+  dataDocsList.forEach(function(doc) {
     var card = h('div', {
       style: {
-        background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px 20px',
-        marginBottom:'10px', border:'1px solid var(--border)',
-        display:'flex', alignItems:'center', gap:'14px'
+        background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'14px 18px',
+        marginBottom:'8px', border:'1px solid var(--border)',
+        display:'flex', alignItems:'center', gap:'12px'
       }
     });
-    card.appendChild(h('div', { style:{ fontSize:'24px', width:'40px', height:'40px', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--primary-light)', borderRadius:'8px', flexShrink:0 } }, doc.icon));
+    card.appendChild(h('div', { style:{ fontSize:'22px', width:'36px', height:'36px', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--primary-light)', borderRadius:'8px', flexShrink:0 } }, doc.icon));
     card.appendChild(h('div', { style:{ flex:1 } },
-      h('div', { style:{ fontSize:'14px', fontWeight:600, marginBottom:'2px', color:'var(--text)' } }, doc.title),
+      h('div', { style:{ fontSize:'13px', fontWeight:600, marginBottom:'2px', color:'var(--text)' } }, doc.title),
       h('div', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'6px' } }, doc.desc),
-      h('a', { href:doc.url, target:'_blank', rel:'noopener', style:{ fontSize:'12px', color:'var(--primary)', textDecoration:'none', padding:'4px 10px', border:'1px solid var(--primary)', borderRadius:'6px', display:'inline-block' } }, doc.label)
+      h('a', { href:doc.url, target:'_blank', rel:'noopener', style:{ fontSize:'11px', color:'var(--primary)', textDecoration:'none', padding:'3px 8px', border:'1px solid var(--primary)', borderRadius:'5px', display:'inline-block' } }, doc.label)
     ));
     panel.appendChild(card);
   });
-
-  // ===== Dangerous operations =====
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px', color:'var(--danger)' } }, '危险操作'));
+  
+  // ===== ④ 系统文档（预留拓展区，供后续补充运维/权限/SOP等）=====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '④ 系统文档'));
+  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'12px' } }, '系统运维、权限规范及部署操作指引，持续补充中。'));
+  
+  var sysDocs = [
+    {
+      icon: '🔐',
+      title: '权限说明文档',
+      desc: '三角色权限体系说明（主管理员/管理员/前端用户），含RLS策略及Supabase数据访问规则',
+      status: '待补充'
+    },
+    {
+      icon: '🚀',
+      title: '部署操作SOP',
+      desc: 'EdgeOne Pages 静态托管部署流程、GitHub 同步操作、自定义域名与ICP备案指南',
+      status: '待补充'
+    }
+  ];
+  sysDocs.forEach(function(doc) {
+    var card = h('div', {
+      style: {
+        background:'#fafafa', borderRadius:'var(--radius-sm)', padding:'14px 18px',
+        marginBottom:'8px', border:'1px dashed var(--border)',
+        display:'flex', alignItems:'center', gap:'12px'
+      }
+    });
+    card.appendChild(h('div', { style:{ fontSize:'22px', width:'36px', height:'36px', display:'flex', alignItems:'center', justifyContent:'center', background:'#f0f0f0', borderRadius:'8px', flexShrink:0 } }, doc.icon));
+    card.appendChild(h('div', { style:{ flex:1 } },
+      h('div', { style:{ fontSize:'13px', fontWeight:600, marginBottom:'2px', color:'var(--text)' } }, doc.title),
+      h('div', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'2px' } }, doc.desc)
+    ));
+    card.appendChild(h('span', { style:{ fontSize:'11px', color:'#94a3b8', background:'#f0f0f0', padding:'3px 10px', borderRadius:'10px', whiteSpace:'nowrap' } }, doc.status));
+    panel.appendChild(card);
+  });
+  
+  // ===== ⑤ 部署信息 =====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '⑤ 部署信息'));
+  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '前端托管于 EdgeOne Pages（腾讯 CDN），数据库使用 Supabase（新加坡节点）。'));
+  panel.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text)', lineHeight:'2' } },
+    h('div', {}, '🔗 正式链接：yili-expert-library-bvw2itdk.zh-cn.edgeone.cool'),
+    h('div', {}, '📦 代码仓库：GitHub demon9802/yili-expert-library'),
+    h('div', {}, '☁️ 数据库：Supabase（新加坡）')
+  ));
+  
+  // ===== ⑥ 危险操作 =====
+  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px', color:'var(--danger)' } }, '⑥ 危险操作'));
   panel.appendChild(h('button', { className:'btn btn-danger', onclick: () => {
     if (confirm('确认重置所有数据到初始状态？此操作不可恢复！')) {
       if (confirm('再次确认：所有修改将丢失！')) {
@@ -6692,15 +6559,6 @@ function renderSettingsTab(panel) {
       }
     }
   } }, '重置所有数据'));
-  
-  // Share info
-  panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '分享与部署'));
-  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '本系统为纯前端应用。分享方式：'));
-  panel.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text)', lineHeight:'2' } },
-    h('div', {}, '1. 将项目文件夹压缩发送给其他用户'),
-    h('div', {}, '2. 部署到静态服务器（Nginx、GitHub Pages 等）'),
-    h('div', {}, '3. 通过局域网文件共享访问 index.html')
-  ));
 }
 
 // ===== v4.21: 用户管理 Tab（主管理员）=====
