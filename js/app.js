@@ -3786,6 +3786,19 @@ function renderProjectsTab(panel) {
   });
   toolbar.appendChild(visSel);
 
+  // v5.2: Import/Export buttons
+  toolbar.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    title: '导出合作项目为CSV',
+    onclick: () => exportProjectsCSV()
+  }, '📥 导出'));
+
+  toolbar.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    title: '批量导入合作项目',
+    onclick: () => showProjectImportDialog()
+  }, '📤 导入'));
+
   toolbar.appendChild(h('button', {
     className: 'btn btn-primary btn-sm',
     onclick: () => showProjectForm(null)
@@ -3925,6 +3938,258 @@ function renderProjectsTab(panel) {
   if (hiddenCount > 0) statsBar.appendChild(h('span', { style: 'color:#991b1b' }, '已隐藏 ' + hiddenCount));
   if (pendingCount > 0) statsBar.appendChild(h('span', { style: 'color:#b45309' }, '待关联 ' + pendingCount));
   panel.appendChild(statsBar);
+}
+
+// ===== v5.2: 合作项目导入/导出功能 =====
+
+// 导出合作项目为 CSV
+function exportProjectsCSV() {
+  var db = appState.db;
+  var projects = db.yiliProjects || [];
+  var headers = ['项目名称', '关联讲师', '合作年份', '合作月份', '满意度分值', '满意度量程', '项目描述', '前端显示', '创建时间'];
+  var rows = [headers.join(',')];
+
+  function csvEscape(v) {
+    return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  }
+
+  projects.forEach(function(p) {
+    var expName = p.expertId ? getProjectExpertName(p.expertId) : (p.pendingExpertName || '待关联');
+    var satVal = p.satisfaction && p.satisfaction.value != null ? p.satisfaction.value : '';
+    var satScale = p.satisfaction && p.satisfaction.scale ? p.satisfaction.scale : '';
+    rows.push([
+      p.title || '', expName, p.year || '', p.month || '',
+      satVal, satScale, p.desc || '', p.visible ? '是' : '否', p.createdAt || ''
+    ].map(csvEscape).join(','));
+  });
+
+  var blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, '合作项目_' + new Date().toISOString().slice(0,10) + '.csv');
+  toast('项目数据导出成功', 'success');
+}
+
+// 下载合作项目导入模板
+function downloadProjectTemplate() {
+  var headers = ['项目名称', '关联讲师姓名', '合作年份', '合作月份', '满意度分值', '满意度量程', '项目描述', '前端显示'];
+  var sampleRows = [
+    headers.join(','),
+    // 示例行1: 正常项目
+    '"数字化转型专题培训","张三",2025,6,8.5,10,"面向中高层的数字化转型培训，约50人参与","是"',
+    // 示例行2: 5分制满意度
+    '"精益生产工作坊","李四",2024,3,4.2,5,"生产现场改善专题，为期2天","是"',
+    // 示例行3: 待关联项目
+    '"待关联示例","待入库讲师",2026,,,,"此项目关联讲师尚未入库; 如暂不关联讲师请填「待入库讲师」","否"'
+  ];
+  var blob = new Blob(['\ufeff' + sampleRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, '合作项目导入模板.csv');
+  toast('模板已下载，请用 Excel/WPS 编辑后导入', 'success');
+}
+
+// 合作项目批量导入对话框
+function showProjectImportDialog() {
+  var db = appState.db;
+  var overlay = h('div', { className: 'modal-overlay', onclick: function(e) { if (e.target === overlay) overlay.remove(); } });
+  var content = h('div', { className: 'modal-content', style: { maxWidth: '600px' } });
+
+  var header = h('div', { className: 'modal-header' });
+  header.appendChild(h('div', { className: 'modal-title' }, '批量导入合作项目'));
+  header.appendChild(h('button', { className: 'modal-close', onclick: function() { overlay.remove(); } }, '\u2715'));
+  content.appendChild(header);
+
+  var body = h('div', { className: 'modal-body' });
+
+  // 导入说明
+  var helpText = h('div', {
+    style: 'margin-bottom:16px;padding:10px 12px;background:#f0f7ff;border-radius:8px;font-size:12px;color:var(--text-secondary);line-height:1.7'
+  });
+  helpText.innerHTML = '<b>导入说明（V5.2 模板）：</b><br>' +
+    '\u2460 关联讲师填写姓名，系统自动匹配已有讲师；匹配失败则标记为「待关联」<br>' +
+    '\u2461 满意度分值填写原始值，量程选 5 或 10，前端统一展示为 10 分制<br>' +
+    '\u2462 前端显示：填「是」则前端可见，「否」则仅管理后台可见<br>' +
+    '\u2463 合作月份不填则留空，系统不做季度推算';
+  body.appendChild(helpText);
+
+  // 模板下载
+  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '① 下载导入模板'));
+  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '下载标准模板（含示例行），参照格式填写项目数据后导入。'));
+  body.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    style: { marginBottom: '20px' },
+    onclick: function() { downloadProjectTemplate(); }
+  }, '\uD83D\uDCE5 下载导入模板（CSV）'));
+
+  // 文件上传
+  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '② 文件导入'));
+  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '支持 CSV（UTF-8 编码）格式文件。'));
+  var fileInput = h('input', { type: 'file', accept: '.csv', id: 'project-import-file', style: { marginBottom: '12px' } });
+  body.appendChild(fileInput);
+
+  body.appendChild(h('button', {
+    className: 'btn btn-primary btn-sm',
+    style: { marginBottom: '20px' },
+    onclick: function() {
+      var file = document.getElementById('project-import-file').files[0];
+      if (!file) { toast('请选择文件', 'error'); return; }
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var projects = parseCSVToProjects(e.target.result);
+          if (projects.length > 0) {
+            processProjectImport(projects, overlay);
+          } else {
+            toast('CSV中未找到有效项目数据', 'error');
+          }
+        } catch(err) {
+          toast('文件解析失败：' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+  }, '上传并导入'));
+
+  // 粘贴导入
+  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '③ 粘贴导入'));
+  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '直接从 Excel/WPS 复制数据粘贴到下方文本框。'));
+
+  var pasteArea = h('textarea', {
+    placeholder: '项目名称,关联讲师姓名,合作年份,合作月份,满意度分值,满意度量程,项目描述,前端显示\n数字化转型培训,张三,2025,6,8.5,10,培训项目描述,是',
+    style: 'width:100%;min-height:80px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace',
+    id: 'project-import-text'
+  });
+  body.appendChild(pasteArea);
+
+  body.appendChild(h('button', {
+    className: 'btn btn-primary btn-sm',
+    style: { marginTop: '8px' },
+    onclick: function() {
+      var text = document.getElementById('project-import-text').value.trim();
+      if (!text) { toast('请粘贴CSV数据', 'error'); return; }
+      var projects = parseCSVToProjects(text);
+      if (projects.length > 0) processProjectImport(projects, overlay);
+      else toast('未能解析出有效项目记录', 'error');
+    }
+  }, '解析并导入'));
+
+  // === 处理导入逻辑 ===
+  function processProjectImport(newProjects, importOverlay) {
+    if (!db.yiliProjects) db.yiliProjects = [];
+    var imported = 0;
+    var pendingCount = 0;
+    var now = new Date().toISOString();
+
+    newProjects.forEach(function(np) {
+      // 按姓名匹配已有讲师
+      var expertId = null;
+      var pendingExpertName = '';
+      if (np.expertName && np.expertName !== '待入库讲师') {
+        var match = db.experts.find(function(e) { return e.name === np.expertName; });
+        if (match) {
+          expertId = match.id;
+        } else {
+          pendingExpertName = np.expertName;
+          pendingCount++;
+        }
+      } else if (np.expertName === '待入库讲师') {
+        pendingExpertName = np.expertName;
+        pendingCount++;
+      }
+
+      var id = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) + '_' + imported;
+
+      db.yiliProjects.push({
+        id: id,
+        title: np.title || '',
+        expertId: expertId,
+        pendingExpertName: pendingExpertName,
+        year: np.year || new Date().getFullYear(),
+        month: np.month || null,
+        satisfaction: np.satisfaction,
+        desc: np.desc || '',
+        visible: np.visible !== false,
+        createdAt: now,
+        createdBy: appState.currentUser ? appState.currentUser.email : ''
+      });
+      imported++;
+    });
+
+    saveDB(db);
+    renderProjectsTab(document.getElementById('admin-panel'));
+
+    var msg = '成功导入 ' + imported + ' 条项目';
+    if (pendingCount > 0) msg += '（其中 ' + pendingCount + ' 条待关联讲师）';
+    toast(msg, 'success');
+    importOverlay.remove();
+  }
+
+  content.appendChild(body);
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
+}
+
+// 解析 CSV 文本为合作项目对象数组
+function parseCSVToProjects(csvText) {
+  var lines = csvText.split(/\r?\n/).filter(function(l) { return l.trim(); });
+  if (lines.length < 2) return [];
+
+  // 解析表头
+  var header = lines[0].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(function(h) { return h.replace(/^"|"$/g, '').trim(); });
+
+  // 列索引映射
+  var col = {};
+  header.forEach(function(h, i) {
+    var n = h.toLowerCase();
+    if (!col.title && (n.indexOf('项目名称') !== -1 || n === 'title')) col.title = i;
+    else if (!col.expertName && (n.indexOf('讲师') !== -1 || n.indexOf('姓名') !== -1)) col.expertName = i;
+    else if (!col.year && (n.indexOf('年份') !== -1 || n === 'year')) col.year = i;
+    else if (!col.month && (n.indexOf('月份') !== -1 || n === 'month')) col.month = i;
+    else if (!col.scale && (n.indexOf('量程') !== -1 || n.indexOf('制') !== -1)) col.scale = i;
+    else if (!col.satValue && (n.indexOf('分值') !== -1)) col.satValue = i;
+    else if (!col.desc && (n.indexOf('描述') !== -1 || n === 'desc')) col.desc = i;
+    else if (!col.visible && (n.indexOf('显示') !== -1 || n.indexOf('可见') !== -1)) col.visible = i;
+  });
+
+  // 兜底: 如果分值和量程尚未分开匹配，把满意度列同时用于两者
+  if (col.satValue == null) {
+    header.forEach(function(h, i) {
+      if (col.satValue == null && h.indexOf('满意度') !== -1 && h.indexOf('量程') === -1) col.satValue = i;
+    });
+  }
+
+  var projects = [];
+  for (var i = 1; i < lines.length; i++) {
+    var vals = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(function(v) { return v.replace(/^"|"$/g, '').trim(); });
+
+    var title = col.title != null ? (vals[col.title] || '') : '';
+    if (!title) continue;
+
+    var expertName = col.expertName != null ? (vals[col.expertName] || '') : '';
+    var year = col.year != null ? (parseInt(vals[col.year]) || new Date().getFullYear()) : new Date().getFullYear();
+    var month = col.month != null ? (parseInt(vals[col.month]) || null) : null;
+
+    // 解析满意度 — 存储原始值+量程，不做换算
+    var satisfaction = null;
+    if (col.satValue != null) {
+      var satVal = parseFloat(vals[col.satValue]);
+      if (!isNaN(satVal) && satVal > 0) {
+        var scale = col.scale != null ? (parseInt(vals[col.scale]) || 10) : 10;
+        satisfaction = { value: satVal, scale: scale };
+      }
+    }
+
+    var desc = col.desc != null ? (vals[col.desc] || '') : '';
+    var visible = col.visible != null ? !(vals[col.visible] === '\u5426' || vals[col.visible] === 'false' || vals[col.visible] === '0') : true;
+
+    projects.push({
+      title: title,
+      expertName: expertName,
+      year: year,
+      month: month,
+      satisfaction: satisfaction,
+      desc: desc,
+      visible: visible
+    });
+  }
+  return projects;
 }
 
 // 项目表单弹窗 — 新建/编辑
