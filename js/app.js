@@ -3540,8 +3540,8 @@ function renderExpertsTab(panel) {
   
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
-    onclick: () => showExportOptions()
-  }, '📥 导出'));
+    onclick: () => exportToCSV()
+  }, '📥 导出CSV'));
   
   toolbar.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
@@ -3970,17 +3970,33 @@ function exportProjectsCSV() {
 
 // 下载合作项目导入模板
 function downloadProjectTemplate() {
+  // 第一行：列头
   var headers = ['项目名称', '关联讲师姓名', '合作年份', '合作月份', '满意度分值', '满意度量程', '项目描述', '前端显示'];
-  var sampleRows = [
-    headers.join(','),
-    // 示例行1: 正常项目
-    '"数字化转型专题培训","张三",2025,6,8.5,10,"面向中高层的数字化转型培训，约50人参与","是"',
-    // 示例行2: 5分制满意度
-    '"精益生产工作坊","李四",2024,3,4.2,5,"生产现场改善专题，为期2天","是"',
-    // 示例行3: 待关联项目
-    '"待关联示例","待入库讲师",2026,,,,"此项目关联讲师尚未入库; 如暂不关联讲师请填「待入库讲师」","否"'
+
+  // 第二行：填写说明
+  var descRow = [
+    '必填，项目名称或培训主题',
+    '填写已入库专家姓名，系统自动匹配；未入库人员填「待入库讲师」',
+    '合作年份，如 2025',
+    '合作月份（1-12），可不填',
+    '满意度原始分值，如 8.5（不填则留空）',
+    '满意度量程，填 5 或 10（不填则留空）',
+    '项目简要描述（可选）',
+    '前端是否可见，填「是」或「否」'
   ];
-  var blob = new Blob(['\ufeff' + sampleRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+
+  // 第三行：示例数据
+  var exampleRows = [
+    '"数字化转型专题培训","张三",2025,6,8.5,10,"面向中高层的数字化转型培训，约50人参与","是"',
+    '"精益生产工作坊","李四",2024,3,4.2,5,"生产现场改善专题，为期2天","是"',
+    '"待关联示例","待入库讲师",2026,,,,"此项目关联讲师尚未入库","否"'
+  ];
+
+  var rows = [headers.join(',')];
+  rows.push('"' + descRow.map(function(d) { return (d || '').replace(/"/g, '""'); }).join('","') + '"');
+  rows = rows.concat(exampleRows);
+
+  var blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
   downloadBlob(blob, '合作项目导入模板.csv');
   toast('模板已下载，请用 Excel/WPS 编辑后导入', 'success');
 }
@@ -3989,7 +4005,7 @@ function downloadProjectTemplate() {
 function showProjectImportDialog() {
   var db = appState.db;
   var overlay = h('div', { className: 'modal-overlay', onclick: function(e) { if (e.target === overlay) overlay.remove(); } });
-  var content = h('div', { className: 'modal-content', style: { maxWidth: '600px' } });
+  var content = h('div', { className: 'modal-content', style: { maxWidth: '540px' } });
 
   var header = h('div', { className: 'modal-header' });
   header.appendChild(h('div', { className: 'modal-title' }, '批量导入合作项目'));
@@ -3997,36 +4013,26 @@ function showProjectImportDialog() {
   content.appendChild(header);
 
   var body = h('div', { className: 'modal-body' });
-
-  // 导入说明
-  var helpText = h('div', {
-    style: 'margin-bottom:16px;padding:10px 12px;background:#f0f7ff;border-radius:8px;font-size:12px;color:var(--text-secondary);line-height:1.7'
-  });
-  helpText.innerHTML = '<b>导入说明（V5.2 模板）：</b><br>' +
-    '\u2460 关联讲师填写姓名，系统自动匹配已有讲师；匹配失败则标记为「待关联」<br>' +
-    '\u2461 满意度分值填写原始值，量程选 5 或 10，前端统一展示为 10 分制<br>' +
-    '\u2462 前端显示：填「是」则前端可见，「否」则仅管理后台可见<br>' +
-    '\u2463 合作月份不填则留空，系统不做季度推算';
-  body.appendChild(helpText);
+  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '系统会自动匹配讲师姓名，未匹配到则标记为「待关联」。模板中已包含填写说明和示例。'));
 
   // 模板下载
-  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '① 下载导入模板'));
-  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '下载标准模板（含示例行），参照格式填写项目数据后导入。'));
+  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '\u2460 下载导入模板'));
+  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '模板包含填写说明和示例数据，参照格式填写后导入。'));
   body.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     style: { marginBottom: '20px' },
     onclick: function() { downloadProjectTemplate(); }
-  }, '\uD83D\uDCE5 下载导入模板（CSV）'));
+  }, '\uD83D\uDCE5 下载导入模板'));
 
   // 文件上传
-  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '② 文件导入'));
-  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '支持 CSV（UTF-8 编码）格式文件。'));
+  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '\u2461 选择文件并导入'));
+  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '支持 CSV（UTF-8 编码）。建议下载模板填写后导出为 CSV 再上传。'));
   var fileInput = h('input', { type: 'file', accept: '.csv', id: 'project-import-file', style: { marginBottom: '12px' } });
   body.appendChild(fileInput);
 
   body.appendChild(h('button', {
     className: 'btn btn-primary btn-sm',
-    style: { marginBottom: '20px' },
+    style: { marginBottom: '10px' },
     onclick: function() {
       var file = document.getElementById('project-import-file').files[0];
       if (!file) { toast('请选择文件', 'error'); return; }
@@ -4046,29 +4052,6 @@ function showProjectImportDialog() {
       reader.readAsText(file, 'utf-8');
     }
   }, '上传并导入'));
-
-  // 粘贴导入
-  body.appendChild(h('h4', { style: 'font-size:14px;margin-bottom:8px' }, '③ 粘贴导入'));
-  body.appendChild(h('div', { style: 'font-size:12px;color:var(--text-muted);margin-bottom:8px' }, '直接从 Excel/WPS 复制数据粘贴到下方文本框。'));
-
-  var pasteArea = h('textarea', {
-    placeholder: '项目名称,关联讲师姓名,合作年份,合作月份,满意度分值,满意度量程,项目描述,前端显示\n数字化转型培训,张三,2025,6,8.5,10,培训项目描述,是',
-    style: 'width:100%;min-height:80px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:monospace',
-    id: 'project-import-text'
-  });
-  body.appendChild(pasteArea);
-
-  body.appendChild(h('button', {
-    className: 'btn btn-primary btn-sm',
-    style: { marginTop: '8px' },
-    onclick: function() {
-      var text = document.getElementById('project-import-text').value.trim();
-      if (!text) { toast('请粘贴CSV数据', 'error'); return; }
-      var projects = parseCSVToProjects(text);
-      if (projects.length > 0) processProjectImport(projects, overlay);
-      else toast('未能解析出有效项目记录', 'error');
-    }
-  }, '解析并导入'));
 
   // === 处理导入逻辑 ===
   function processProjectImport(newProjects, importOverlay) {
@@ -4160,6 +4143,8 @@ function parseCSVToProjects(csvText) {
     var vals = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(function(v) { return v.replace(/^"|"$/g, '').trim(); });
 
     var title = col.title != null ? (vals[col.title] || '') : '';
+    // 跳过模板说明行（第一列包含"必填"等填写说明）
+    if (title && /^(必填|填写已入库|合作年份|合作月份|满意度原始|满意度量程|项目简要|前端)/.test(title)) continue;
     if (!title) continue;
 
     var expertName = col.expertName != null ? (vals[col.expertName] || '') : '';
@@ -5361,91 +5346,72 @@ function deleteExpert(id) {
 }
 
 // ===== EXPORT / IMPORT =====
-function showExportOptions() {
-  const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
-  const content = h('div', { className: 'modal-content', style: { maxWidth: '500px' } });
-  
-  const header = h('div', { className: 'modal-header' });
-  header.appendChild(h('div', { className: 'modal-title' }, '导出数据'));
-  header.appendChild(h('button', { className: 'modal-close', onclick: () => overlay.remove() }, '✕'));
-  content.appendChild(header);
-  
-  const body = h('div', { className: 'modal-body' });
-  const options = h('div', { className: 'export-options' });
-  
-  // Excel
-  const excelOpt = h('div', {
-    className: 'export-option',
-    onclick: () => {
-      exportToCSV();
-      overlay.remove();
-    }
-  });
-  excelOpt.appendChild(h('div', { className: 'icon' }, '📊'));
-  excelOpt.appendChild(h('div', { className: 'label' }, '导出 Excel / CSV'));
-  options.appendChild(excelOpt);
-  
-  // Copy JSON
-  const jsonOpt = h('div', {
-    className: 'export-option',
-    onclick: () => {
-      exportToJSON();
-      overlay.remove();
-    }
-  });
-  jsonOpt.appendChild(h('div', { className: 'icon' }, '📋'));
-  jsonOpt.appendChild(h('div', { className: 'label' }, '复制 JSON 数据'));
-  options.appendChild(jsonOpt);
-  
-  // Print
-  const printOpt = h('div', {
-    className: 'export-option',
-    onclick: () => {
-      window.print();
-      overlay.remove();
-    }
-  });
-  printOpt.appendChild(h('div', { className: 'icon' }, '🖨️'));
-  printOpt.appendChild(h('div', { className: 'label' }, '打印 / PDF'));
-  options.appendChild(printOpt);
-  
-  body.appendChild(options);
-  content.appendChild(body);
-  overlay.appendChild(content);
-  document.body.appendChild(overlay);
-}
-
 function exportToCSV() {
-  const db = appState.db;
-  const headers = ['姓名','适用领域','突出优势','学历','资历资质','参考案例','联系人','联系方式','内部推荐人','专业度','影响力','综合评分'];
-  const rows = [headers.join(',')];
-  
-  db.experts.forEach(e => {
-    const advText = e.advantages.map(a => a.title ? '■' + a.title + '：' + a.desc : '■' + a.desc).join('\n');
-    const csvContacts = getContactsList(e);
-    const contactPersons = csvContacts.map(c => c.person).filter(Boolean).join(' | ');
-    const contactInfos = csvContacts.map(c => (c.type === 'email' ? '📧' : c.type === 'wechat' ? '💬' : '📞') + c.info).filter(Boolean).join(' | ');
-    const row = [
-      e.name, e.fields.join('/'), advText, e.education, e.qualifications, e.courses,
-      contactPersons, contactInfos, e.referrer,
-      e.scores.professional, e.scores.influence, e.scores.overall
-    ].map(v => '"' + (v || '').replace(/"/g,'""') + '"');
-    rows.push(row.join(','));
-  });
-  
-  const blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-  downloadBlob(blob, '专家资源库_' + new Date().toISOString().slice(0,10) + '.csv');
-  toast('导出成功', 'success');
+  try {
+    const db = appState.db;
+    if (!db || !db.experts || db.experts.length === 0) {
+      toast('没有可导出的专家数据', 'warning');
+      return;
+    }
+    // 列头与导入模板完全一致，确保导出后可复用为导入模板
+    const headers = ['姓名','适用领域','突出优势','学历','资历资质','课程/案例','联系人','联系方式','内部推荐人','是否库内供应商'];
+    const rows = [headers.join(',')];
+
+    const csvEscape = function(v) {
+      return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    };
+
+    db.experts.forEach(function(e) {
+      // 突出优势：兼容旧版字符串和新版数组
+      var advText = '';
+      if (Array.isArray(e.advantages)) {
+        advText = e.advantages.map(function(a) { return a.title ? '■' + a.title + '：' + a.desc : '■' + a.desc; }).join('\n');
+      } else if (typeof e.advantages === 'string') {
+        advText = e.advantages;
+      }
+      // 联系人
+      var contactsList = getContactsList(e);
+      var contactPersons = contactsList.map(function(c) { return c.person; }).filter(Boolean).join(' | ');
+      var contactInfos = contactsList.map(function(c) { return (c.type === 'email' ? '📧' : c.type === 'wechat' ? '💬' : '📞') + c.info; }).filter(Boolean).join(' | ');
+      var row = [
+        e.name,
+        (e.fields || []).join(', '),
+        advText,
+        e.education || '',
+        e.qualifications || '',
+        e.courses || '',
+        contactPersons,
+        contactInfos,
+        e.referrer || '',
+        e.isSupplier ? '是' : '否'
+      ].map(csvEscape);
+      rows.push(row.join(','));
+    });
+
+    var blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    downloadBlob(blob, '专家资源库_' + new Date().toISOString().slice(0,10) + '.csv');
+    toast('导出成功（' + db.experts.length + ' 位专家）', 'success');
+  } catch(err) {
+    toast('导出失败：' + err.message, 'error');
+    console.error('[exportToCSV]', err);
+  }
 }
 
+// 保留 JSON 导出入口（小工具栏用）
 function exportToJSON() {
-  const db = appState.db;
-  const clean = JSON.parse(JSON.stringify(db));
-  delete clean.permissions;
-  const text = JSON.stringify(clean, null, 2);
-  navigator.clipboard.writeText(text).then(() => {
-    toast('JSON 数据已复制到剪贴板', 'success');
-  });
+  try {
+    const db = appState.db;
+    const clean = JSON.parse(JSON.stringify(db));
+    delete clean.permissions;
+    const text = JSON.stringify(clean, null, 2);
+    navigator.clipboard.writeText(text).then(function() {
+      toast('JSON 数据已复制到剪贴板', 'success');
+    }, function() {
+      toast('复制失败，请手动复制', 'error');
+    });
+  } catch(err) {
+    toast('导出失败：' + err.message, 'error');
+  }
 }
 
 function downloadBlob(blob, filename) {
@@ -5458,47 +5424,61 @@ function downloadBlob(blob, filename) {
 }
 
 function downloadImportTemplate() {
-  const db = appState.db;
-  const sample = db.experts.length > 1 ? db.experts[1] : (db.experts.length > 0 ? db.experts[0] : null);
-  
-  const headers = ['姓名', '适用领域', '突出优势', '学历', '资历资质', '课程/案例', '联系人', '联系方式', '内部推荐人', '是否库内供应商'];
-  
-  // Generate CSV with BOM for Excel/WPS compatibility
-  const rows = [headers.join(',')];
-  
-  if (sample) {
-    // Escape CSV values: wrap in quotes, double internal quotes
-    const csvEscape = (v) => {
-      const s = String(v || '').replace(/"/g, '""');
-      return '"' + s + '"';
-    };
-    
-    const advText = sample.advantages ? sample.advantages.map(a => a.title ? '■' + a.title + '：' + a.desc : '■' + a.desc).join('\n') : '';
-    const row = [
-      sample.name,
-      (sample.fields || []).join(', '),
-      advText,
-      sample.education || '',
-      sample.qualifications || '',
-      sample.courses || '',
-      sample.contactPerson || '',
-      sample.contactInfo || '',
-      sample.referrer || '',
-      sample.isSupplier ? '是' : '否'
-    ].map(csvEscape);
-    rows.push(row.join(','));
+  var db = appState.db;
+  // 动态获取所有领域名称
+  var fieldNames = (db.fields || []).map(function(f) { return f.name; });
+  var fieldList = fieldNames.length > 0 ? fieldNames.join('/') : 'AI/产品/战略规划/技术/数据/数智化营销/组织人才';
+
+  // 第一行：列头（与导入解析精确匹配）
+  var headers = ['姓名', '适用领域', '突出优势', '学历', '资历资质', '课程/案例', '联系人', '联系方式', '内部推荐人', '是否库内供应商'];
+
+  // 第二行：填写说明
+  var descRow = [
+    '必填，专家中文姓名',
+    '可选多领域，用英文逗号分隔。当前可选：' + fieldList,
+    '用 ■标题：描述 格式分行填写',
+    '最高学历或学位信息',
+    '请填写：【职称/荣誉头衔】、【社会职务】、【履职资历】三项，用全角分号；分隔',
+    '请填写：【核心课程】、【服务经历】两项，用全角分号；分隔',
+    '主要联系人或对接人姓名',
+    '手机/邮箱/微信等联系方式',
+    '内部推荐该专家的人员姓名',
+    '填「是」或「否」'
+  ];
+
+  // 第三行：示例数据
+  var exampleRow = [
+    '张教授',
+    'AI, 战略规划',
+    '■数字化转型：曾主导多个大型企业数字化转型项目\n■行业研究：在智能制造领域有深入研究\n■方法论：擅长将理论框架与实战结合',
+    '博士',
+    '【职称/荣誉头衔】教授、博导；【社会职务】中国人工智能学会理事；【履职资历】曾任某集团首席数字官',
+    '【核心课程】数字化转型战略与实践、AI赋能企业创新；【服务经历】曾为伊利、华为等企业提供培训咨询',
+    '李经理',
+    '📞13800138000',
+    '王主任',
+    '是'
+  ];
+
+  function csvEscape(v) {
+    return '"' + String(v || '').replace(/"/g, '""') + '"';
   }
-  
-  // UTF-8 BOM for Excel recognition
-  const blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-  downloadBlob(blob, '专家导入模版_参照示例.csv');
-  toast('模版已下载，请用 Excel/WPS 打开编辑后导入', 'success');
+
+  var rows = [
+    headers.join(','),
+    descRow.map(csvEscape).join(','),
+    exampleRow.map(csvEscape).join(',')
+  ];
+
+  var blob = new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, '专家导入模板.csv');
+  toast('模板已下载，请用 Excel/WPS 打开编辑后导入', 'success');
 }
 
 function showImportDialog() {
   const db = appState.db;
   const overlay = h('div', { className: 'modal-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
-  const content = h('div', { className: 'modal-content', style: { maxWidth: '600px' } });
+  const content = h('div', { className: 'modal-content', style: { maxWidth: '540px' } });
   
   const header = h('div', { className: 'modal-header' });
   header.appendChild(h('div', { className: 'modal-title' }, '批量导入专家数据'));
@@ -5506,27 +5486,27 @@ function showImportDialog() {
   content.appendChild(header);
   
   const body = h('div', { className: 'modal-body' });
-  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '导入不会覆盖已有数据。系统会自动检测重复专家，由管理员确认后处理。'));
+  body.appendChild(h('p', { style: { marginBottom:'16px', fontSize:'13px', color:'var(--text-secondary)' } }, '系统会自动检测重复专家（基于姓名），由管理员确认后处理。导入不会覆盖已有数据。'));
   
-  // ===== Import Template Download =====
-  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '导入模版'));
-  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '下载标准模版查看格式要求，参照模版填写专家数据后导入。'));
+  // ===== Step 1: Download Template =====
+  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '① 下载导入模板'));
+  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px', lineHeight:'1.6' } }, '模板包含填写说明和示例数据，请参照模板格式填写后导入。'));
   body.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     style: { marginBottom:'20px' },
     onclick: () => downloadImportTemplate()
-  }, '📥 下载导入模版（Excel）'));
+  }, '📥 下载导入模板'));
   
-  // ===== File Import =====
-  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '文件导入'));
-  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '支持格式：Excel (.xlsx/.xls)、CSV（UTF-8）、JSON'));
+  // ===== Step 2: Select File & Import =====
+  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '② 选择文件并导入'));
+  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '支持 CSV（UTF-8）、JSON 格式。建议下载模板填写后导出为 CSV 再上传。'));
   
-  const fileInput = h('input', { type: 'file', accept: '.csv,.json,.xlsx,.xls', id: 'import-file', style: { marginBottom:'12px' } });
+  const fileInput = h('input', { type: 'file', accept: '.csv,.json', id: 'import-file', style: { marginBottom:'10px' } });
   body.appendChild(fileInput);
   
   body.appendChild(h('button', {
     className: 'btn btn-primary btn-sm',
-    style: { marginBottom:'20px' },
+    style: { marginBottom:'12px' },
     onclick: () => {
       const file = document.getElementById('import-file').files[0];
       if (!file) { toast('请选择文件', 'error'); return; }
@@ -5535,20 +5515,15 @@ function showImportDialog() {
         try {
           const result = e.target.result;
           const ext = file.name.split('.').pop().toLowerCase();
-          
           if (ext === 'json') {
             const data = JSON.parse(result);
-            if (data.experts) {
-              processImport(data.experts);
-            } else if (Array.isArray(data)) {
-              processImport(data);
-            } else {
-              toast('JSON格式不正确，需要experts数组', 'error');
-            }
+            if (data.experts) processImport(data.experts);
+            else if (Array.isArray(data)) processImport(data);
+            else toast('JSON格式不正确，需要experts数组', 'error');
           } else if (ext === 'csv') {
             const experts = parseCSVToExperts(result);
             if (experts.length > 0) processImport(experts);
-            else toast('CSV中未找到有效数据', 'error');
+            else toast('CSV中未找到有效专家数据', 'error');
           } else {
             toast('不支持的文件格式：' + ext, 'error');
           }
@@ -5556,36 +5531,9 @@ function showImportDialog() {
           toast('文件解析失败：' + err.message, 'error');
         }
       };
-      if (file.name.endsWith('.json') || file.name.endsWith('.csv')) {
-        reader.readAsText(file, 'utf-8');
-      } else {
-        toast('请将Excel文件转为CSV格式后再导入，或使用JSON格式', 'error');
-      }
+      reader.readAsText(file, 'utf-8');
     }
   }, '上传并导入'));
-  
-  // ===== Tencent Docs Import =====
-  body.appendChild(h('h4', { style: { fontSize:'14px', marginBottom:'8px' } }, '腾讯文档导入'));
-  body.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px' } }, '粘贴腾讯文档导出的CSV内容，或输入腾讯文档公开链接。'));
-  
-  const docTextarea = h('textarea', {
-    placeholder: '在此粘贴腾讯文档导出的CSV内容（每行一条专家数据，列格式与导出格式一致）...',
-    style: { width:'100%', minHeight:'100px', padding:'10px', border:'1px solid var(--border)', borderRadius:'8px', fontSize:'12px', fontFamily:'monospace' },
-    id: 'import-text'
-  });
-  body.appendChild(docTextarea);
-  
-  body.appendChild(h('button', {
-    className: 'btn btn-primary btn-sm',
-    style: { marginTop:'8px' },
-    onclick: () => {
-      const text = document.getElementById('import-text').value.trim();
-      if (!text) { toast('请粘贴CSV数据', 'error'); return; }
-      const experts = parseCSVToExperts(text);
-      if (experts.length > 0) processImport(experts);
-      else toast('未能从数据中解析出有效专家记录', 'error');
-    }
-  }, '解析并导入'));
   
   // ===== Duplicate handling function =====
   function processImport(newExperts) {
@@ -5755,6 +5703,11 @@ function showImportDialog() {
     const experts = [];
     for (let i = 1; i < lines.length; i++) {
       const vals = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim());
+      
+      // 跳过模板说明行（第二行以填写说明开头，如"必填"、"可选多领域"等）
+      if (vals[nameIdx] && /^(必填|可选多领域|用|请|支持|主要|内部|填「)/.test(vals[nameIdx])) {
+        continue;
+      }
       if (!vals[nameIdx]) continue;
       
       const expert = {
@@ -5766,7 +5719,8 @@ function showImportDialog() {
         contactPerson: '',
         contactInfo: '',
         referrer: '',
-        advantages: ''
+        advantages: '',
+        isSupplier: false
       };
       
       header.forEach((h, idx) => {
@@ -5779,6 +5733,7 @@ function showImportDialog() {
         else if (h === '联系方式') expert.contactInfo = val;
         else if (h === '内部推荐人') expert.referrer = val;
         else if (h === '突出优势') expert.advantages = val;
+        else if (h === '是否库内供应商') expert.isSupplier = (val === '是' || val.toLowerCase() === 'yes' || val === 'true');
         else if (h === '姓名' || h === 'name') { /* already set */ }
       });
       
@@ -6722,17 +6677,6 @@ function renderSettingsTab(panel) {
   // ===== ③ 数据源（合并原"数据源管理"+"系统文档"，只读查看）=====
   panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '③ 数据源'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'12px' } }, '核心数据来源及版本管理文档，仅供查看。批量导入请通过专家管理页的模板导入进行。'));
-  
-  // Current data source link (read-only)
-  const currentLinkRow = h('div', { style:{ background:'var(--primary-light)', padding:'12px 16px', borderRadius:'8px', marginBottom:'12px', border:'1px solid #93c5fd' } });
-  currentLinkRow.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', color:'var(--primary)', marginBottom:'6px' } }, '📎 当前数据源链接'));
-  currentLinkRow.appendChild(h('a', {
-    href: 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2',
-    target: '_blank',
-    style: { fontSize:'12px', color:'var(--primary)', wordBreak:'break-all', lineHeight:'1.6', textDecoration:'underline' }
-  }, 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=BB08J2'));
-  currentLinkRow.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' } }, '主管理员最新更新的线上文档链接，点击可在新窗口打开'));
-  panel.appendChild(currentLinkRow);
   
   // Doc cards
   var dataDocsList = [
