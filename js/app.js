@@ -5354,7 +5354,7 @@ function exportToCSV() {
       return;
     }
     // 列头与导入模板完全一致，确保导出后可复用为导入模板
-    const headers = ['姓名','适用领域','突出优势','学历','资历资质','课程/案例','联系人','联系方式','内部推荐人','是否库内供应商'];
+    const headers = ['姓名','适用领域','突出优势','专家卡优势概括','学历','资历资质','专家卡资历概括','课程/案例','联系人','联系方式','内部推荐人','是否库内供应商'];
     const rows = [headers.join(',')];
 
     const csvEscape = function(v) {
@@ -5377,8 +5377,10 @@ function exportToCSV() {
         e.name,
         (e.fields || []).join(', '),
         advText,
+        e.advDisplay || '',
         e.education || '',
         e.qualifications || '',
+        e.qualDisplay || '',
         e.courses || '',
         contactPersons,
         contactInfos,
@@ -5430,15 +5432,17 @@ function downloadImportTemplate() {
   var fieldList = fieldNames.length > 0 ? fieldNames.join('/') : 'AI/产品/战略规划/技术/数据/数智化营销/组织人才';
 
   // 第一行：列头（与导入解析精确匹配）
-  var headers = ['姓名', '适用领域', '突出优势', '学历', '资历资质', '课程/案例', '联系人', '联系方式', '内部推荐人', '是否库内供应商'];
+  var headers = ['姓名', '适用领域', '突出优势', '专家卡优势概括', '学历', '资历资质', '专家卡资历概括', '课程/案例', '联系人', '联系方式', '内部推荐人', '是否库内供应商'];
 
   // 第二行：填写说明
   var descRow = [
     '必填，专家中文姓名',
     '可选多领域，用英文逗号分隔。当前可选：' + fieldList,
-    '用 ■标题：描述 格式分行填写',
+    '用 ■标题：描述 格式分行填写，详细介绍专家优势',
+    '可选，1-3条，每行一条；显示在专家卡片上的简要优势亮点（如：供应链管理专家，10年从业经历）',
     '最高学历或学位信息',
     '请填写：【职称/荣誉头衔】、【社会职务】、【履职资历】三项，用全角分号；分隔',
+    '可选，1-3条，每行一条；显示在专家卡片上的简要资历说明（如：智篆商业智库专家）',
     '请填写：【核心课程】、【服务经历】两项，用全角分号；分隔',
     '主要联系人或对接人姓名',
     '手机/邮箱/微信等联系方式',
@@ -5451,8 +5455,10 @@ function downloadImportTemplate() {
     '张教授',
     'AI, 战略规划',
     '■数字化转型：曾主导多个大型企业数字化转型项目\n■行业研究：在智能制造领域有深入研究\n■方法论：擅长将理论框架与实战结合',
+    '数字化转型领域专家\n15年企业管理实战经验',
     '博士',
     '【职称/荣誉头衔】教授、博导；【社会职务】中国人工智能学会理事；【履职资历】曾任某集团首席数字官',
+    '智篆商业智库专家\n某集团前首席数字官',
     '【核心课程】数字化转型战略与实践、AI赋能企业创新；【服务经历】曾为伊利、华为等企业提供培训咨询',
     '李经理',
     '📞13800138000',
@@ -5720,6 +5726,8 @@ function showImportDialog() {
         contactInfo: '',
         referrer: '',
         advantages: '',
+        advDisplay: '',
+        qualDisplay: '',
         isSupplier: false
       };
       
@@ -5733,6 +5741,8 @@ function showImportDialog() {
         else if (h === '联系方式') expert.contactInfo = val;
         else if (h === '内部推荐人') expert.referrer = val;
         else if (h === '突出优势') expert.advantages = val;
+        else if (h === '专家卡优势概括') expert.advDisplay = val;
+        else if (h === '专家卡资历概括') expert.qualDisplay = val;
         else if (h === '是否库内供应商') expert.isSupplier = (val === '是' || val.toLowerCase() === 'yes' || val === 'true');
         else if (h === '姓名' || h === 'name') { /* already set */ }
       });
