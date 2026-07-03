@@ -5387,6 +5387,24 @@ function initAIScoring() {
   saveDB(appState.db);
 }
 
+// Global autoSyncObservation function
+function autoSyncObservationGlobal() {
+  const db = appState.db;
+  const obsThreshold = 7;
+  let changed = false;
+  db.experts.forEach(e => {
+    if (e.status === 'eliminated') return;
+    if (e.scores.overall < obsThreshold && e.status !== 'observation') {
+      e.status = 'observation'; e.observationStatus = 'evaluating';
+      e.observationDate = new Date().toISOString(); changed = true;
+    }
+    if (e.scores.overall >= obsThreshold && e.status === 'observation' && e.observationStatus !== 'eliminated') {
+      e.status = 'active'; e.observationStatus = ''; changed = true;
+    }
+  });
+  if (changed) saveDB(db);
+}
+
 function updateFieldsList(db) {
   const allFields = new Set();
   db.experts.forEach(e => e.fields.forEach(f => allFields.add(f)));
@@ -6205,23 +6223,10 @@ function renderRatingsTab(panel) {
   const warnIdx = isMaster ? '④' : '③';
   panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警'));
 
-  const obsThreshold = 7;
-  function autoSyncObservation() {
-    let changed = false;
-    db.experts.forEach(e => {
-      if (e.status === 'eliminated') return;
-      if (e.scores.overall < obsThreshold && e.status !== 'observation') {
-        e.status = 'observation'; e.observationStatus = 'evaluating';
-        e.observationDate = new Date().toISOString(); changed = true;
-      }
-      if (e.scores.overall >= obsThreshold && e.status === 'observation' && e.observationStatus !== 'eliminated') {
-        e.status = 'active'; e.observationStatus = ''; changed = true;
-      }
-    });
-    if (changed) saveDB(db);
-  }
-  autoSyncObservation();
+  // Use global autoSyncObservation
+  autoSyncObservationGlobal();
 
+  const obsThreshold = 7;
   const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
 
   // 简化：只保留高亮跳转框，统计和处理统一在观察库Tab
@@ -6542,6 +6547,10 @@ function renderCategoriesTab(panel) {
 
 function renderObservationTab(panel) {
   const db = appState.db;
+  
+  // Sync observation status with current scores
+  autoSyncObservationGlobal();
+  
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '观察库'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '综合评分 < 7 分自动列入观察库（评分系统自动同步），或手动移入的待观察专家。'));
@@ -6553,7 +6562,8 @@ function renderObservationTab(panel) {
   const profDim = cfg.dimensions.find(function(d) { return d.id === 'professional'; });
   const inflDim = cfg.dimensions.find(function(d) { return d.id === 'influence'; });
 
-  var obsExperts = db.experts.filter(function(e) { return e.status === 'observation' || e.observationStatus; });
+  // Only show experts with status === 'observation'
+  var obsExperts = db.experts.filter(function(e) { return e.status === 'observation'; });
 
   if (obsExperts.length === 0) {
     panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'13px', color:'#059669' } }, '观察库为空 · 所有专家评分正常'));
@@ -7296,7 +7306,10 @@ async function boot() {
       throw new Error('DB object invalid after load');
     }
     
-    // Step 4: render
+    // Step 4: init AI scoring (calculate sub-scores for all experts)
+    initAIScoring();
+    
+    // Step 5: render
     renderFrontend();
   } catch(e) {
     console.error('Boot failed:', e, e.stack);
