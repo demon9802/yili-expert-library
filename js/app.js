@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6 | 2026-07-02 | 评分管理重构：合并评分细则+体系配置 + criteria可编辑 + 级联锁定 + 预警区整合 */
+/* Version 5.6.1 | 2026-07-03 | 预警区简化为跳转入口 + 详情页子维度评分按需生成 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -2029,6 +2029,10 @@ function showExpertDetail(expert) {
   scoreSection.appendChild(scoreRow);
   
   // Sub-dimension progress bars - in a unified area
+  // 确保subScores存在（启动时initAIScoring未调用的情况，按需生成）
+  if (!expert.subScores) {
+    aiScoreExpert(expert);
+  }
   if (expert.subScores) {
     const profDim = cfg.dimensions.find(d => d.id === 'professional');
     const inflDim = cfg.dimensions.find(d => d.id === 'influence');
@@ -6159,48 +6163,19 @@ function renderRatingsTab(panel) {
   ));
   panel.appendChild(summaryRow);
 
+  // 简化：不再逐个列出专家，统一跳转观察库处理
   if (lowExperts.length === 0) {
-    const ok = h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0' } });
-    ok.appendChild(h('div', { style:{ fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
-    panel.appendChild(ok);
+    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
   } else {
-    lowExperts.forEach(e => {
-      const item = h('div', { style:{ background:'#fffbeb', padding:'14px', borderRadius:'8px', marginBottom:'8px', border:'1px solid #fde68a' } });
-      item.appendChild(h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px' } },
-        h('strong', {}, e.name + '  综合：' + e.scores.overall.toFixed(1) + ' | ' + (e.status === 'observation' ? '🔍 已列入观察库' : '⚠️ 待处理')),
-        h('div', { style:{ display:'flex', gap:'6px' } },
-          h('button', { className:'btn btn-sm', style:{ background:'#059669', color:'white', fontSize:'11px' }, onclick: () => {
-            if (!e.subScores) { e.subScores = null; aiScoreExpert(e); }
-            // 将所有子维度调整至7分及以上
-            if (e.subScores) {
-              Object.keys(e.subScores).forEach(dimId => {
-                Object.keys(e.subScores[dimId]).forEach(sdName => {
-                  e.subScores[dimId][sdName] = Math.max(e.subScores[dimId][sdName], 7);
-                });
-              });
-            }
-            recalcExpertFromSubscores(e);
-            if (e.status === 'observation' && e.observationStatus !== 'eliminated') { e.status = 'active'; e.observationStatus = ''; }
-            saveDB(db); renderRatingsTab(panel);
-            toast(e.name + ' 已调整至7分', 'success');
-          } }, '调整至7分'),
-          h('button', { className:'btn btn-sm', style:{ background:'#d97706', color:'white', fontSize:'11px' }, onclick: () => {
-            appState.adminTab = 'observation'; renderAdmin();
-            toast('已切换至观察库Tab，请手动处理 ' + e.name, 'info');
-          } }, '前往观察库')
-        )
-      ));
-      item.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'6px' } }, '专业度：' + e.scores.professional + ' | 影响力：' + e.scores.influence));
-      const reasons = [];
-      if (e.scores.professional < 7) reasons.push('专业度评分偏低（' + e.scores.professional + '），建议核查学历、资质等维度');
-      if (e.scores.influence < 7) reasons.push('影响力评分偏低（' + e.scores.influence + '），建议核查荣誉、履历等维度');
-      if (reasons.length) {
-        const box = h('div', { style:{ marginTop:'8px', padding:'10px', background:'white', borderRadius:'6px' } });
-        reasons.forEach(r => { box.appendChild(h('div', { style:{ fontSize:'11px', color:'#92400e', padding:'2px 0' } }, '• ' + r)); });
-        item.appendChild(box);
-      }
-      panel.appendChild(item);
-    });
+    const warnBox = h('div', { style:{ padding:'20px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', textAlign:'center' } });
+    warnBox.appendChild(h('div', { style:{ fontSize:'16px', fontWeight:'700', color:'#92400e', marginBottom:'8px' } }, '⚠️ 共 ' + lowExperts.length + ' 位专家综合评分低于7分'));
+    warnBox.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'14px' } }, '以上专家已自动同步至观察库，请前往观察库Tab进行查看和处理'));
+    warnBox.appendChild(h('button', {
+      className: 'btn btn-primary',
+      style: { background:'#d97706', color:'white', fontSize:'13px', padding:'8px 24px' },
+      onclick: () => { appState.adminTab = 'observation'; renderAdmin(); }
+    }, '🔍 前往观察库处理'));
+    panel.appendChild(warnBox);
   }
 }
 
