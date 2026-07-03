@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.2 | 2026-07-03 | 预警区移除重复摘要 + 观察库增强（评分修改+按钮化操作+提示说明） */
+/* Version 5.6.4 | 2026-07-03 | 评分细则微调：信息缺失默认6分 + 学历专科4分 + 行业资质调整 + 合并影响力子维度 + 整体重置AI评分按钮 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.2] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.4] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -229,22 +229,23 @@ async function toggleFavorite(expertId) {
 // Default ratingConfig with sub-dimensions
 const DEFAULT_RATING_CONFIG = {
   dimensions: [
-    { 
-      id: 'professional', name: '专业度', weight: 0.5, 
+    {
+      id: 'professional', name: '专业度', weight: 0.5,
       desc: '评估专家的学历背景、行业资质及专业成果',
       subDimensions: [
-        { name: '学历与学术背景', weight: 0.35, maxScore: 10, criteria: '9分：博士/博士后/教授 | 8分：硕士/研究生/MBA | 7分：本科/学士 | 6分：专科及以下 | 5分：信息缺失' },
-        { name: '行业资质与认证', weight: 0.30, maxScore: 10, criteria: '9分：权威认证(CPA/CFA/PMP/律师等) | 8分：行业资质证书 | 7分：培训进修经历 | 5分：信息缺失' },
-        { name: '专业成果与经验', weight: 0.35, maxScore: 10, criteria: '9分：著作/论文/专利/公开演讲 | 8分：企业授课/主持项目 | 7分：企业服务经验 | 5分：信息缺失' }
+        { name: '学历与学术背景', weight: 0.35, maxScore: 10, criteria: '9分：博士/博士后/教授 | 8分：硕士/研究生/MBA | 7分：本科/学士 | 4分：专科及以下 | 6分：信息缺失/模糊' },
+        { name: '行业资质与认证', weight: 0.30, maxScore: 10, criteria: '9分：权威认证(CPA/CFA/PMP/律师等) | 8分：行业资质证书 | 7分：行业与社会头衔 | 6分：培训进修经历 | 6分：信息缺失/模糊' },
+        { name: '专业成果与经验', weight: 0.35, maxScore: 10, criteria: '9分：著作/论文/专利/公开演讲 | 8分：企业授课/主持项目 | 7分：企业服务经验 | 6分：信息缺失/模糊' }
       ]
     },
-    { 
-      id: 'influence', name: '影响力', weight: 0.5, 
-      desc: '评估专家的社会荣誉、专业头衔及行业地位',
+    {
+      id: 'influence', name: '影响力', weight: 0.5,
+      desc: '评估专家的社会荣誉、职称头衔、管理履历及任职机构权威性',
       subDimensions: [
-        { name: '社会荣誉与奖项', weight: 0.35, maxScore: 10, criteria: '9分：省部级以上奖项/荣誉称号/十大百强 | 8分：协会/学会任职 | 7分：行业认可/媒体报道 | 5分：信息缺失' },
-        { name: '职称与专业头衔', weight: 0.25, maxScore: 10, criteria: '9分：教授/研究员/院士/首席 | 8分：总监/VP/合伙人/副教授 | 7分：经理/高级工程师 | 5分：信息缺失' },
-        { name: '管理履历与行业地位', weight: 0.40, maxScore: 10, criteria: '9分：CEO/总裁/创始人/董事长 | 8分：总监/副总裁 | 7分：经理/主管 | 5分：信息缺失' }
+        { name: '社会荣誉与奖项', weight: 0.35, maxScore: 10, criteria: '9分：省部级以上奖项/荣誉称号/十大百强 | 8分：协会/学会任职 | 7分：行业认可/媒体报道 | 6分：信息缺失/模糊' },
+        { name: '职称、管理履历与行业地位', weight: 0.65, maxScore: 10,
+          criteria: '9分：教授/研究员/院士/首席/CEO/总裁/创始人/董事长（世界500强/央企/上市公司） | 8分：总监/VP/合伙人/副教授（行业百强/大厂） | 7分：经理/高级工程师/主管（普通企业） | 6分：信息缺失/模糊 | 注：任职机构权威性加权——世界500强/央企/上市公司+1分，行业百强/大厂+0.5分'
+        }
       ]
     }
   ],
@@ -307,11 +308,29 @@ function migrateRatingConfig(cfg) {
       dim.subDimensions.forEach(sd => {
         if (!sd.criteria) {
           const defaultSD = defaultDim && defaultDim.subDimensions ? defaultDim.subDimensions.find(ds => ds.name === sd.name) : null;
-          sd.criteria = defaultSD ? defaultSD.criteria : ('6-9分：按资质等级评定 | 5分：信息缺失（默认中值）');
+          sd.criteria = defaultSD ? defaultSD.criteria : ('6-9分：按资质等级评定 | 6分：信息缺失/模糊（默认中值）');
         }
       });
     }
   });
+  // v5.6.4: Migrate influence sub-dimensions - merge 职称 and 管理履历 into 职称、管理履历与行业地位
+  const inflDim = cfg.dimensions.find(d => d.id === 'influence');
+  if (inflDim && inflDim.subDimensions) {
+    const hasMerged = inflDim.subDimensions.some(sd => sd.name === '职称、管理履历与行业地位');
+    const hasSeparate = inflDim.subDimensions.some(sd => sd.name === '职称与专业头衔') || inflDim.subDimensions.some(sd => sd.name === '管理履历与行业地位');
+    if (hasSeparate && !hasMerged) {
+      // Merge: combine the two sub-dimensions into one
+      const merged = { name: '职称、管理履历与行业地位', weight: 0.65, maxScore: 10,
+        criteria: '9分：教授/研究员/院士/首席/CEO/总裁/创始人/董事长（世界500强/央企/上市公司） | 8分：总监/VP/合伙人/副教授（行业百强/大厂） | 7分：经理/高级工程师/主管（普通企业） | 6分：信息缺失/模糊 | 注：任职机构权威性加权——世界500强/央企/上市公司+1分，行业百强/大厂+0.5分'
+      };
+      // Remove the two old ones, keep 社会荣誉与奖项, add merged
+      inflDim.subDimensions = inflDim.subDimensions.filter(sd => sd.name !== '职称与专业头衔' && sd.name !== '管理履历与行业地位');
+      // Ensure 社会荣誉与奖项 exists with correct weight
+      const honorSD = inflDim.subDimensions.find(sd => sd.name === '社会荣誉与奖项');
+      if (honorSD) honorSD.weight = 0.35;
+      inflDim.subDimensions.push(merged);
+    }
+  }
   // Ensure both dimensions exist
   if (cfg.dimensions.length < 2) {
     const missing = DEFAULT_RATING_CONFIG.dimensions.filter(
@@ -5261,8 +5280,17 @@ function aiScoreExpert(expert) {
     // Build combined text for keyword analysis
     const qual = expert.qualifications || '';
     const adv = (expert.advantages || []).map(a => (a.title||'') + ' ' + a.desc).join(' ');
-    const combinedText = qual + ' ' + adv + ' ' + (expert.education || '');
+    const combinedText = qual + ' ' + adv + ' ' + (expert.education || '') + ' ' + (expert.background || '');
     const txt = combinedText.toLowerCase();
+    
+    // 辅助函数：判断任职机构权威性
+    function getCompanyAuthorityBonus(text) {
+      // 世界500强/央企/上市公司
+      if (/世界500强|财富500|央企|国企|上市公司|股份|集团|有限责任公司|有限公司| co\.? ltd|inc\.|corp/i.test(text)) return 1;
+      // 行业百强/大厂
+      if (/百强|大厂|头部|领军|龙头|行业前五|top\s?\d/i.test(text)) return 0.5;
+      return 0;
+    }
     
     // Generic keyword scoring for professional sub-dimensions
     const profDims = cfg.dimensions.find(d => d.id === 'professional');
@@ -5270,16 +5298,18 @@ function aiScoreExpert(expert) {
       expert.subScores.professional = {};
       profDims.subDimensions.forEach(sd => {
         const nameTxt = sd.name.toLowerCase();
-        let score = 5;
+        let score = 6; // 信息缺失/模糊默认6分（原5分）
         // High-score keywords (9+)
         if (/学历|学术|博士|博士后|phd|硕士|研究生|master|本科|学士|学位|教育|professor/i.test(nameTxt)) {
-          if (/博士|博士后|phd|教授/i.test(txt)) score = 9;
+          if (/博士|博士后|phd|教授|研究员/i.test(txt)) score = 9;
           else if (/硕士|研究生|master|mba/i.test(txt)) score = 8;
           else if (/本科|学士|bachelor/i.test(txt)) score = 7;
+          else if (/专科|大专|高职|中专/i.test(txt)) score = 4;
           else score = 6;
-        } else if (/资质|认证|资格|certif|注[册会]|cpa|cfa|acca|license/i.test(nameTxt)) {
-          if (/认证|certif|注[册会]|cpa|cfa|acca/i.test(txt)) score = 9;
-          else if (/资质|资格|license/i.test(txt)) score = 8;
+        } else if (/资质|认证|资格|certif|注[册会]|cpa|cfa|acca|license|头衔|社会/i.test(nameTxt)) {
+          if (/认证|certif|注[册会]|cpa|cfa|acca|权威/i.test(txt)) score = 9;
+          else if (/资质|资格|license|行业头衔|社会头衔/i.test(txt)) score = 7;
+          else if (/培训|进修|学习|课程/i.test(txt)) score = 6;
           else score = Math.min(8, Math.round(expert.scores.professional || 7));
         } else if (/成果|经验|著作|出版|论文|研究|课题|专利|项目|经历|实践/i.test(nameTxt)) {
           if (/著作|出版|论文|研究|课题|专利|发明/i.test(txt)) score = 9;
@@ -5297,22 +5327,25 @@ function aiScoreExpert(expert) {
     const inflDims = cfg.dimensions.find(d => d.id === 'influence');
     if (inflDims && inflDims.subDimensions) {
       expert.subScores.influence = {};
+      const authorityBonus = getCompanyAuthorityBonus(txt);
       inflDims.subDimensions.forEach(sd => {
         const nameTxt = sd.name.toLowerCase();
-        let score = 5;
+        let score = 6; // 信息缺失/模糊默认6分（原5分）
         if (/荣誉|奖项|奖|称号|表彰|殊荣|十大|百强|社会/i.test(nameTxt)) {
           if (/奖|荣誉|称号|表彰|十大|百强/i.test(txt)) score = 9;
           else if (/协会|学会|理事|委员|专家/i.test(txt)) score = 8;
           else score = Math.min(7, Math.round(expert.scores.influence || 7));
-        } else if (/职称|头衔|教授|研究员|工程师|院士|首席|高级|技术/i.test(nameTxt)) {
-          if (/教授|研究员|高级工程师|院士|首席/i.test(txt)) score = 9;
-          else if (/总监|副总裁|合伙人|创始人/i.test(txt)) score = 8;
-          else score = Math.min(7, Math.round(expert.scores.influence || 7));
-        } else if (/管理|履历|行业|地位|领导|职[位务]|ceo|总裁|总[经監]|董事|创始人/i.test(nameTxt)) {
-          if (/ceo|总裁|总经理|董事长|创始人|首席/i.test(txt)) score = 9;
-          else if (/总监|副总裁|vp|director/i.test(txt)) score = 8;
-          else if (/经理|主管|lead/i.test(txt)) score = 7;
-          else score = Math.min(6, Math.round(expert.scores.influence || 7));
+        } else if (/职称|头衔|教授|研究员|工程师|院士|首席|高级|技术|管理|履历|行业|地位|领导|职[位务]|ceo|总裁|总[经監]|董事|创始人/i.test(nameTxt)) {
+          // 合并后的子维度：职称、管理履历与行业地位
+          if (/教授|研究员|高级工程师|院士|首席|ceo|总裁|总经理|董事长|创始人|首席/i.test(txt)) {
+            score = Math.min(10, 9 + authorityBonus);
+          } else if (/总监|副总裁|合伙人|创始人|副教授|vp|director/i.test(txt)) {
+            score = Math.min(10, 8 + authorityBonus);
+          } else if (/经理|主管|lead|高级/i.test(txt)) {
+            score = 7;
+          } else {
+            score = Math.min(7, Math.round(expert.scores.influence || 7));
+          }
         } else {
           score = Math.min(7, Math.round(expert.scores.influence || 7));
         }
@@ -5833,7 +5866,7 @@ function renderRatingsTab(panel) {
 
   // 评分说明提示
   configSec.appendChild(h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
-    '💡 信息缺失（该维度完全无信息）统一默认5分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。AI评分仅供参考，管理员可手动调整每个子维度的分值。'
+    '💡 信息缺失（该维度完全无信息）统一默认6分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。AI评分仅供参考，管理员可手动调整每个子维度的分值。'
   ));
 
   // 遍历每个主维度
@@ -5975,7 +6008,7 @@ function renderRatingsTab(panel) {
       if (isMaster) {
         const critInp = h('textarea', {
           value: sd.criteria || '',
-          placeholder: '输入赋分标准（如：9分：... | 8分：... | 5分：信息缺失）',
+          placeholder: '输入赋分标准（如：9分：... | 8分：... | 6分：信息缺失/模糊）',
           style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', lineHeight:'1.5', resize:'vertical', minHeight:'36px' },
           onchange: (ev) => {
             sd.criteria = ev.target.value.trim();
@@ -6025,7 +6058,7 @@ function renderRatingsTab(panel) {
       const addBtn = h('button', {
         style: { background:'none', border:'1px dashed var(--border)', color:'var(--primary)', borderRadius:'6px', cursor:'pointer', fontSize:'12px', padding:'4px 14px' },
         onclick: () => {
-          const newSD = { name: '新子维度', weight: Math.round((1 / (dim.subDimensions.length + 1)) * 100) / 100, maxScore: 10, criteria: '6-9分：按资质等级评定 | 5分：信息缺失' };
+          const newSD = { name: '新子维度', weight: Math.round((1 / (dim.subDimensions.length + 1)) * 100) / 100, maxScore: 10, criteria: '6-9分：按资质等级评定 | 6分：信息缺失/模糊' };
           dim.subDimensions.push(newSD);
           const eq = Math.round(100 / dim.subDimensions.length) / 100;
           dim.subDimensions.forEach(d => { d.weight = eq; });
@@ -6062,8 +6095,20 @@ function renderRatingsTab(panel) {
   const scoreIdx = isMaster ? '③' : '②';
   panel.appendChild(h('h4', { style: { margin:'16px 0 8px', fontSize:'15px', color:'var(--primary)' } }, scoreIdx + ' 专家评分调整'));
 
-  const quickRow = h('div', { style: { display:'flex', gap:'8px', marginBottom:'12px' } });
+  const quickRow = h('div', { style: { display:'flex', gap:'8px', marginBottom:'12px', flexWrap:'wrap' } });
   quickRow.appendChild(h('input', { placeholder:'搜索专家姓名...', style:{ padding:'6px 12px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1, maxWidth:'200px' }, id:'rating-search', oninput: () => renderRatingTable() }));
+  // 整体重置AI评分按钮
+  quickRow.appendChild(h('button', {
+    className: 'btn btn-secondary btn-sm',
+    style: { fontSize:'12px', whiteSpace:'nowrap' },
+    onclick: () => {
+      if (!confirm('确认对所有专家重新执行AI评分？当前手动调整的分值将被覆盖。')) return;
+      db.experts.forEach(e => { e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); });
+      saveDB(db);
+      renderRatingTable();
+      toast('已对所有专家重新执行AI评分', 'success');
+    }
+  }, '🔄 整体重置AI评分'));
   panel.appendChild(quickRow);
 
   const tableDiv = h('div', { id:'rating-table', style:{ overflow:'auto', maxHeight:'45vh', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)' } });
