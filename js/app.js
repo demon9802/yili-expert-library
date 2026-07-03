@@ -448,8 +448,30 @@ async function getDB() {
         console.log('[getDB] Merged favorites: local=' + localFavs.length + ' supabase=' + appData.favorites.length + ' → merged=' + mergedFavorites.length);
       }
       
+      // 优先使用 localStorage 的专家数据（保留手动评分调整）
+      let finalExperts = appData.experts;
+      if (raw) {
+        try {
+          const localDB = JSON.parse(raw);
+          if (localDB.experts && localDB.experts.length > 0) {
+            // 以 Supabase 专家为基准，用 localStorage 的专家数据覆盖（保留 subScores 等手动调整）
+            const localExpertMap = {};
+            localDB.experts.forEach(function(le) { localExpertMap[le.id || le.name] = le; });
+            finalExperts = appData.experts.map(function(se) {
+              const local = localExpertMap[se.id || se.name];
+              if (local && local.subScores) {
+                // 保留本地手动调整的评分
+                return Object.assign({}, se, { subScores: local.subScores, scores: local.scores });
+              }
+              return se;
+            });
+            console.log('[getDB] 保留 localStorage 中的手动评分调整');
+          }
+        } catch(e) {}
+      }
+      
       const db = {
-        experts: appData.experts,
+        experts: finalExperts,
         fields: fields,
         yiliProjects: appData.yiliProjects,
         favorites: mergedFavorites,
@@ -460,7 +482,7 @@ async function getDB() {
         observationLibrary: localConfig.observationLibrary || [],
         permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
         categoryConfig: fields,
-        totalExperts: appData.experts.length,
+        totalExperts: finalExperts.length,
         totalFields: appData.fields.length,
         version: CURRENT_DB_VERSION,
         updateTime: new Date().toISOString()
@@ -5383,8 +5405,15 @@ function aiScoreExpert(expert) {
 
 function initAIScoring() {
   if (!appState.db.ratingConfig.aiScoringEnabled) return;
-  appState.db.experts.forEach(e => aiScoreExpert(e));
-  saveDB(appState.db);
+  // 只初始化没有subScores的专家（避免覆盖手动调整）
+  let changed = false;
+  appState.db.experts.forEach(e => {
+    if (!e.subScores) {
+      aiScoreExpert(e);
+      changed = true;
+    }
+  });
+  if (changed) saveDB(appState.db);
 }
 
 // Global autoSyncObservation function
