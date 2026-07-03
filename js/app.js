@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.1 | 2026-07-03 | 预警区简化为跳转入口 + 详情页子维度评分按需生成 */
+/* Version 5.6.2 | 2026-07-03 | 预警区移除重复摘要 + 观察库增强（评分修改+按钮化操作+提示说明） */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.1] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.2] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -6152,18 +6152,8 @@ function renderRatingsTab(panel) {
   autoSyncObservation();
 
   const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
-  const obsExperts = db.experts.filter(ex => ex.status === 'observation' || ex.observationStatus);
 
-  // 统计摘要
-  const summaryRow = h('div', { style: { display:'flex', gap:'12px', marginBottom:'12px', flexWrap:'wrap' } });
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: lowExperts.length > 0 ? '#fffbeb' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (lowExperts.length > 0 ? '#fde68a' : '#bbf7d0'), fontSize:'13px' } }, '⚠️ 综合 < 7分: ' + lowExperts.length + ' 位'));
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background: obsExperts.length > 0 ? '#eff6ff' : '#f0fdf4', borderRadius:'8px', border:'1px solid ' + (obsExperts.length > 0 ? '#bfdbfe' : '#bbf7d0'), fontSize:'13px' } }, '🔍 观察库: ' + obsExperts.length + ' 位'));
-  summaryRow.appendChild(h('div', { style:{ padding:'8px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', flex:'1', cursor:'pointer' }, onclick: () => { appState.adminTab = 'observation'; renderAdmin(); } },
-    '📋 观察库管理 → 跳转至观察库Tab处理（规则：综合 < 7 自动入库；≥ 7 自动移出）'
-  ));
-  panel.appendChild(summaryRow);
-
-  // 简化：不再逐个列出专家，统一跳转观察库处理
+  // 简化：只保留高亮跳转框，统计和处理统一在观察库Tab
   if (lowExperts.length === 0) {
     panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
   } else {
@@ -6483,64 +6473,82 @@ function renderObservationTab(panel) {
   const db = appState.db;
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '观察库'));
-  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } }, '综合评分 < 7 分自动列入观察库（评分系统自动同步），或手动移入的待观察专家。'));
+  panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '综合评分 < 7 分自动列入观察库（评分系统自动同步），或手动移入的待观察专家。'));
+  panel.appendChild(h('div', { style:{ padding:'10px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.7', marginBottom:'16px' } },
+    '📌 观察库中的专家将不在前端展示。此处可对专家评分进行复核与手动调整，判断分值是否准确，并决定是否持续评估或淘汰。'
+  ));
 
-  const obsExperts = db.experts.filter(e => e.status === 'observation' || e.observationStatus);
+  const cfg = db.ratingConfig;
+  const profDim = cfg.dimensions.find(function(d) { return d.id === 'professional'; });
+  const inflDim = cfg.dimensions.find(function(d) { return d.id === 'influence'; });
+
+  var obsExperts = db.experts.filter(function(e) { return e.status === 'observation' || e.observationStatus; });
 
   if (obsExperts.length === 0) {
-    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0' }, fontSize:'13px', color:'#059669' }, '观察库为空 · 所有专家评分正常'));
+    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'13px', color:'#059669' } }, '观察库为空 · 所有专家评分正常'));
     return;
   }
 
   // Summary
-  const autoCount = obsExperts.filter(e => e.scores.overall < 7).length;
-  const manualCount = obsExperts.filter(e => e.scores.overall >= 7).length;
-  const elimCount = obsExperts.filter(e => e.observationStatus === 'eliminated').length;
+  var autoCount = obsExperts.filter(function(e) { return e.scores.overall < 7; }).length;
+  var manualCount = obsExperts.filter(function(e) { return e.scores.overall >= 7; }).length;
+  var elimCount = obsExperts.filter(function(e) { return e.observationStatus === 'eliminated'; }).length;
   panel.appendChild(h('div', { style:{ display:'flex', gap:'10px', marginBottom:'16px', flexWrap:'wrap', fontSize:'12px' } },
     h('span', { style:{ padding:'4px 10px', background:'#fffbeb', borderRadius:'6px', border:'1px solid #fde68a' } }, '低分自动入库（<7分）: ' + autoCount + ' 位'),
     h('span', { style:{ padding:'4px 10px', background:'#eff6ff', borderRadius:'6px', border:'1px solid #bfdbfe' } }, '手动移入: ' + manualCount + ' 位'),
     h('span', { style:{ padding:'4px 10px', background: elimCount > 0 ? '#fef2f2' : '#f0fdf4', borderRadius:'6px', border:'1px solid ' + (elimCount > 0 ? '#fecaca' : '#bbf7d0') } }, '已淘汰: ' + elimCount + ' 位')
   ));
-  
-  obsExperts.forEach(expert => {
-    const card = h('div', { className: 'observation-card' + (expert.observationStatus === 'eliminated' ? ' eliminated' : '') });
-    
-    // Status select
-    const statusSelect = h('select', {
-      style:{ padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px' },
-      onchange: (ev) => {
-        expert.observationStatus = ev.target.value;
-        if (ev.target.value === 'eliminated') {
-          expert.status = 'eliminated';
-          expert.observationDate = new Date().toISOString();
-        }
-        saveDB(db);
-        renderObservationTab(panel);
-      }
-    });
-    const opt1 = h('option', { value:'evaluating' }, '持续评估');
-    if (expert.observationStatus === 'evaluating') opt1.selected = true;
-    const opt2 = h('option', { value:'eliminated' }, '淘汰');
-    if (expert.observationStatus === 'eliminated') opt2.selected = true;
-    statusSelect.appendChild(opt1);
-    statusSelect.appendChild(opt2);
+
+  obsExperts.forEach(function(expert) {
+    var card = h('div', { className: 'observation-card' + (expert.observationStatus === 'eliminated' ? ' eliminated' : '') });
+
+    // Ensure subScores exist
+    if (!expert.subScores) { aiScoreExpert(expert); recalcExpertFromSubscores(expert); }
 
     // Entry reason badge
-    const isAutoSync = expert.scores.overall < 7;
-    const entryBadge = isAutoSync
+    var isAutoSync = expert.scores.overall < 7;
+    var entryBadge = isAutoSync
       ? h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#fffbeb', borderRadius:'4px', border:'1px solid #fde68a', color:'#92400e' } }, '自动入库')
       : h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#eff6ff', borderRadius:'4px', border:'1px solid #bfdbfe', color:'#1e40af' } }, '手动移入');
+
+    // Status buttons (toggle)
+    var isEliminated = expert.observationStatus === 'eliminated';
+    var evalBtn = h('button', {
+      className: 'btn btn-sm',
+      style: { fontSize:'11px', padding:'4px 12px', background: !isEliminated ? '#3B82F6' : 'white', color: !isEliminated ? 'white' : '#3B82F6', border:'1px solid #3B82F6', borderRadius:'6px', cursor:'pointer' },
+      onclick: function() {
+        expert.observationStatus = 'evaluating';
+        expert.status = 'observation';
+        saveDB(db);
+        renderObservationTab(panel);
+        toast(expert.name + ' 已设为持续评估', 'success');
+      }
+    }, '持续评估');
+
+    var elimBtn = h('button', {
+      className: 'btn btn-sm',
+      style: { fontSize:'11px', padding:'4px 12px', background: isEliminated ? '#dc2626' : 'white', color: isEliminated ? 'white' : '#dc2626', border:'1px solid #dc2626', borderRadius:'6px', cursor:'pointer' },
+      onclick: function() {
+        expert.observationStatus = 'eliminated';
+        expert.status = 'eliminated';
+        expert.observationDate = new Date().toISOString();
+        saveDB(db);
+        renderObservationTab(panel);
+        toast(expert.name + ' 已设为淘汰', 'success');
+      }
+    }, '淘汰');
 
     card.appendChild(h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px' } },
       h('div', { style:{ display:'flex', gap:'8px', alignItems:'center' } },
         h('strong', {}, expert.name + '（综合：' + expert.scores.overall.toFixed(1) + '）'),
         entryBadge
       ),
-      h('div', { style:{ display:'flex', gap:'6px' } },
-        statusSelect,
-        h('button', { className:'btn btn-danger btn-sm', onclick: () => {
-          if (confirm('确认永久删除' + expert.name + '？')) {
-            db.experts = db.experts.filter(ex => ex.id !== expert.id);
+      h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
+        evalBtn,
+        elimBtn,
+        h('button', { className:'btn btn-danger btn-sm', style:{ fontSize:'11px' }, onclick: function() {
+          if (confirm('确认永久删除' + expert.name + '？此操作不可撤销。')) {
+            db.experts = db.experts.filter(function(ex) { return ex.id !== expert.id; });
             saveDB(db);
             renderObservationTab(panel);
             toast('已删除', 'success');
@@ -6548,32 +6556,84 @@ function renderObservationTab(panel) {
         } }, '删除')
       )
     ));
-    
+
     card.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' } },
-      '专业度：' + expert.scores.professional + ' | 影响力：' + expert.scores.influence + 
+      '专业度：' + expert.scores.professional + ' | 影响力：' + expert.scores.influence +
       (expert.observationDate ? ' | 录入日期：' + formatDate(expert.observationDate) : '') +
-      (expert.observationStatus === 'eliminated' ? ' | ⚠️ 状态：已淘汰' : ' | 状态：持续评估')
+      (isEliminated ? ' | ⚠️ 状态：已淘汰' : ' | 状态：持续评估')
     ));
 
+    // Sub-dimension score editing
+    var scoreBox = h('div', { style:{ marginTop:'10px', padding:'10px', background:'white', borderRadius:'6px', border:'1px solid var(--border)' } });
+    scoreBox.appendChild(h('div', { style:{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', marginBottom:'6px' } }, '子维度评分（可编辑，修改后自动重算综合评分）'));
+
+    function renderSubDimInputs(dim, dimId, color) {
+      if (!dim || !dim.subDimensions) return;
+      dim.subDimensions.forEach(function(sd) {
+        var row = h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'3px 0' } });
+        row.appendChild(h('span', { style:{ fontSize:'11px', color: color, minWidth:'120px', flex:'1' } }, sd.name));
+        var val = (expert.subScores && expert.subScores[dimId] && expert.subScores[dimId][sd.name] !== undefined) ? expert.subScores[dimId][sd.name] : 5;
+        var inp = h('input', {
+          type: 'number', value: String(val), min: 1, max: 10,
+          style: { width:'50px', padding:'3px 4px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', textAlign:'center' },
+          onchange: function(ev) {
+            var ns = parseInt(ev.target.value);
+            if (isNaN(ns) || ns < 1 || ns > 10) { toast('分值1-10', 'error'); return; }
+            if (!expert.subScores) expert.subScores = {};
+            if (!expert.subScores[dimId]) expert.subScores[dimId] = {};
+            expert.subScores[dimId][sd.name] = ns;
+            recalcExpertFromSubscores(expert);
+            // Auto-sync status based on new score
+            if (expert.scores.overall >= 7 && expert.observationStatus !== 'eliminated') {
+              expert.status = 'active';
+              expert.observationStatus = '';
+            }
+            saveDB(db);
+            renderObservationTab(panel);
+            toast(expert.name + ' 评分已更新（综合：' + expert.scores.overall.toFixed(1) + '）', 'success');
+          }
+        });
+        row.appendChild(inp);
+        row.appendChild(h('span', { style:{ fontSize:'10px', color:'var(--text-muted)' } }, '/10'));
+        scoreBox.appendChild(row);
+      });
+    }
+
+    renderSubDimInputs(profDim, 'professional', '#3B82F6');
+    renderSubDimInputs(inflDim, 'influence', '#F59E0B');
+
+    // Reset AI button
+    scoreBox.appendChild(h('div', { style:{ marginTop:'6px' } },
+      h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'10px', padding:'2px 10px' }, onclick: function() {
+        expert.subScores = null;
+        aiScoreExpert(expert);
+        recalcExpertFromSubscores(expert);
+        saveDB(db);
+        renderObservationTab(panel);
+        toast(expert.name + ' 已重置为AI评分', 'success');
+      } }, '重置为AI评分')
+    ));
+    card.appendChild(scoreBox);
+
     // Show reasons based on sub-scores
-    const reasons = [];
+    var reasons = [];
     if (expert.scores.professional < 7 && expert.subScores && expert.subScores.professional) {
-      const lowSub = Object.entries(expert.subScores.professional).filter(function(e2) { return e2[1] < 7; }).map(function(e2) { return e2[0]; });
+      var lowSub = Object.entries(expert.subScores.professional).filter(function(e2) { return e2[1] < 7; }).map(function(e2) { return e2[0]; });
       if (lowSub.length) reasons.push('专业度偏低：' + lowSub.join('、') + ' 分偏低');
     }
     if (expert.scores.influence < 7 && expert.subScores && expert.subScores.influence) {
-      const lowSub = Object.entries(expert.subScores.influence).filter(function(e2) { return e2[1] < 7; }).map(function(e2) { return e2[0]; });
-      if (lowSub.length) reasons.push('影响力偏低：' + lowSub.join('、') + ' 分偏低');
+      var lowSub2 = Object.entries(expert.subScores.influence).filter(function(e2) { return e2[1] < 7; }).map(function(e2) { return e2[0]; });
+      if (lowSub2.length) reasons.push('影响力偏低：' + lowSub2.join('、') + ' 分偏低');
     }
     if (reasons.length) {
-      const box = h('div', { style:{ marginTop:'6px', padding:'8px', background:'white', borderRadius:'6px' } });
+      var box = h('div', { style:{ marginTop:'6px', padding:'8px', background:'#fffbeb', borderRadius:'6px', border:'1px solid #fde68a' } });
       reasons.forEach(function(r) { box.appendChild(h('div', { style:{ fontSize:'11px', color:'#92400e', padding:'2px 0' } }, '• ' + r)); });
       card.appendChild(box);
     }
-    
+
     // 1 year elimination check
     if (expert.observationStatus === 'eliminated' && expert.observationDate) {
-      const oneYear = new Date(expert.observationDate);
+      var oneYear = new Date(expert.observationDate);
       oneYear.setFullYear(oneYear.getFullYear() + 1);
       if (new Date() >= oneYear) {
         card.appendChild(h('div', { style:{ marginTop:'8px', padding:'8px', background:'#fef2f2', borderRadius:'6px', fontSize:'12px', color:'#dc2626' } },
@@ -6581,7 +6641,7 @@ function renderObservationTab(panel) {
         ));
       }
     }
-    
+
     panel.appendChild(card);
   });
 }
