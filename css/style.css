@@ -706,23 +706,27 @@ body {
   border-top: 1px solid #f1f5f9;
 }
 
-/* 库内供应商 - bottom-right bookmark (异形书签) */
+/* 库内供应商 - 右下角圆角金色徽章 */
 .card-supplier-bookmark {
   position: absolute;
   bottom: 0;
   right: 0;
   font-size: 10px;
   color: #fff;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   z-index: 2;
-  padding: 5px 16px 5px 14px;
-  background: linear-gradient(150deg, #D4A574 0%, #C87533 35%, #A0622E 65%, #8B4513 100%);
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), 8px 100%, 0 100%);
-  box-shadow: -2px -3px 8px rgba(139, 69, 19, 0.35), inset 0 -1px 0 rgba(255,255,255,0.18);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.25);
-  line-height: 1.3;
+  padding: 3px 11px;
+  background: linear-gradient(135deg, #D4A574 0%, #C87533 35%, #A0622E 70%, #8B4513 100%);
+  border-radius: 6px 0 6px 0;
+  box-shadow: -1px -1px 4px rgba(139, 69, 19, 0.22), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.3);
+  line-height: 1.5;
+  border: none;
 }
+
+/* 移除旧折叠阴影伪元素 */
+.card-supplier-bookmark::after { display: none; }
 
 /* v3.1: 收藏星标 — 行内显示，在姓名右侧 */
 .card-fav-star {
