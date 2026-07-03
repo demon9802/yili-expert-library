@@ -1,5 +1,5 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.4 | 2026-07-03 | 评分细则微调：信息缺失默认6分 + 学历专科4分 + 行业资质调整 + 合并影响力子维度 + 整体重置AI评分按钮 */
+/* Version 5.6.4 | 2026-07-03 | 评分细则微调：信息缺失默认6分 + 学历专科4分 + 行业资质调整 + 合并影响力子维度 + 整体重置自动评分按钮 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
 console.log('%c[专家资源库 v5.6.4] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
@@ -228,6 +228,7 @@ async function toggleFavorite(expertId) {
 
 // Default ratingConfig with sub-dimensions
 const DEFAULT_RATING_CONFIG = {
+  configVersion: 2, // v5.6.4: 更新赋分标准（信息缺失默认分、学历评分、行业资质）
   dimensions: [
     {
       id: 'professional', name: '专业度', weight: 0.5,
@@ -297,6 +298,31 @@ function migrateRatingConfig(cfg) {
     cfg.dimensions = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG.dimensions));
     return cfg;
   }
+
+  // v5.6.4: Update criteria based on configVersion
+  const needUpdateCriteria = !cfg.configVersion || cfg.configVersion < DEFAULT_RATING_CONFIG.configVersion;
+  if (needUpdateCriteria) {
+    // Update criteria from DEFAULT_RATING_CONFIG
+    cfg.dimensions.forEach((dim, idx) => {
+      const defaultDim = DEFAULT_RATING_CONFIG.dimensions.find(d => d.id === dim.id) || DEFAULT_RATING_CONFIG.dimensions[0];
+      if (defaultDim && defaultDim.subDimensions) {
+        // Update existing subDimensions' criteria
+        if (dim.subDimensions && dim.subDimensions.length > 0) {
+          dim.subDimensions.forEach(sd => {
+            const defaultSD = defaultDim.subDimensions.find(ds => ds.name === sd.name);
+            if (defaultSD && defaultSD.criteria) {
+              sd.criteria = defaultSD.criteria;
+            }
+          });
+        } else {
+          // If no subDimensions, copy from default
+          dim.subDimensions = JSON.parse(JSON.stringify(defaultDim.subDimensions));
+        }
+      }
+    });
+    cfg.configVersion = DEFAULT_RATING_CONFIG.configVersion;
+  }
+
   // Ensure each dimension has subDimensions + criteria
   cfg.dimensions.forEach((dim, idx) => {
     const defaultDim = DEFAULT_RATING_CONFIG.dimensions.find(d => d.id === dim.id) || DEFAULT_RATING_CONFIG.dimensions[0];
@@ -5866,7 +5892,7 @@ function renderRatingsTab(panel) {
 
   // 评分说明提示
   configSec.appendChild(h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
-    '💡 信息缺失（该维度完全无信息）统一默认6分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。AI评分仅供参考，管理员可手动调整每个子维度的分值。'
+    '💡 信息缺失（该维度完全无信息）统一默认6分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。自动评分仅供参考，管理员可手动调整每个子维度的分值。'
   ));
 
   // 遍历每个主维度
@@ -6074,20 +6100,20 @@ function renderRatingsTab(panel) {
   });
   panel.appendChild(configSec);
 
-  // ===== AI 评分开关（仅主管理）=====
+  // ===== 自动评分开关（仅主管理）=====
   if (isMaster) {
     const aiSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-    aiSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, 'AI 自主评分'));
+    aiSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, '自动评分'));
     const aiRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center' } });
-    aiRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '启用AI自动评分：'));
+    aiRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '启用自动评分：'));
     aiRow.appendChild(h('input', { type:'checkbox', checked: cfg.aiScoringEnabled, onchange: (e) => {
       cfg.aiScoringEnabled = e.target.checked;
       if (e.target.checked) { db.experts.forEach(ex => { ex.subScores = null; aiScoreExpert(ex); }); recalcAllExperts(); }
       saveDB(db); renderRatingsTab(panel);
-      toast(e.target.checked ? 'AI评分已启用' : 'AI评分已关闭', 'success');
+      toast(e.target.checked ? '自动评分已启用' : '自动评分已关闭', 'success');
     }}));
     aiSec.appendChild(aiRow);
-    aiSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, 'AI根据专家学历、资历、履历等信息自动生成子维度评分。关闭后可手动调整每位专家的评分。'));
+    aiSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, '系统根据专家学历、资历、履历等信息自动生成子维度评分。关闭后可手动调整每位专家的评分。'));
     panel.appendChild(aiSec);
   }
 
@@ -6097,18 +6123,18 @@ function renderRatingsTab(panel) {
 
   const quickRow = h('div', { style: { display:'flex', gap:'8px', marginBottom:'12px', flexWrap:'wrap' } });
   quickRow.appendChild(h('input', { placeholder:'搜索专家姓名...', style:{ padding:'6px 12px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1, maxWidth:'200px' }, id:'rating-search', oninput: () => renderRatingTable() }));
-  // 整体重置AI评分按钮
+  // 整体重置自动评分按钮
   quickRow.appendChild(h('button', {
     className: 'btn btn-secondary btn-sm',
     style: { fontSize:'12px', whiteSpace:'nowrap' },
     onclick: () => {
-      if (!confirm('确认对所有专家重新执行AI评分？当前手动调整的分值将被覆盖。')) return;
+      if (!confirm('确认对所有专家重新执行自动评分？当前手动调整的分值将被覆盖。')) return;
       db.experts.forEach(e => { e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); });
       saveDB(db);
       renderRatingTable();
-      toast('已对所有专家重新执行AI评分', 'success');
+      toast('已对所有专家重新执行自动评分', 'success');
     }
-  }, '🔄 整体重置AI评分'));
+  }, '🔄 整体重置为自动评分'));
   panel.appendChild(quickRow);
 
   const tableDiv = h('div', { id:'rating-table', style:{ overflow:'auto', maxHeight:'45vh', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)' } });
@@ -6166,8 +6192,8 @@ function renderRatingsTab(panel) {
       const act = h('td', {});
       act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); saveDB(db);
-        renderRatingsTab(panel); toast(e.name + ' 已重置为AI评分', 'success');
-      } }, '重置AI'));
+        renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
+      } }, '重置为自动评分'));
       row.appendChild(act);
       tbody.appendChild(row);
     });
@@ -6655,8 +6681,8 @@ function renderObservationTab(panel) {
         recalcExpertFromSubscores(expert);
         saveDB(db);
         renderObservationTab(panel);
-        toast(expert.name + ' 已重置为AI评分', 'success');
-      } }, '重置为AI评分')
+        toast(expert.name + ' 已重置为自动评分', 'success');
+      } }, '重置为自动评分')
     ));
     card.appendChild(scoreBox);
 
