@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.4 | 2026-07-03 | 评分细则微调：信息缺失默认6分 + 学历专科4分 + 行业资质调整 + 合并影响力子维度 + 整体重置自动评分按钮 */
+/* Version 5.6.5 | 2026-07-06 | 修复：前端动态显示观察库专家 + 赋分计算函数 + 搜索状态隔离 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.4] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.5] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -626,6 +626,7 @@ let appState = {
   favoritesFilter: null, // v3.0: null=全部, true=仅显示收藏
   cooperationFilter: null, // v3.5: null=全部, true=已合作, false=尚未合作
   searchQuery: '',
+  adminSearchQuery: '',
   adminTab: 'experts',
   adminSubTab: 'list',
   editingExpert: null,
@@ -654,14 +655,14 @@ function recalcExpertFromSubscores(e) {
   let prof = 0, infl = 0;
   if (e.subScores && e.subScores.professional && profDim && profDim.subDimensions) {
     profDim.subDimensions.forEach(sd => {
-      const v = e.subScores.professional[sd.name] || 5;
-      prof += v * sd.weight;
+      const v = e.subScores.professional[sd.name];
+      prof += (v !== undefined ? v : 6) * sd.weight;
     });
   }
   if (e.subScores && e.subScores.influence && inflDim && inflDim.subDimensions) {
     inflDim.subDimensions.forEach(sd => {
-      const v = e.subScores.influence[sd.name] || 5;
-      infl += v * sd.weight;
+      const v = e.subScores.influence[sd.name];
+      infl += (v !== undefined ? v : 6) * sd.weight;
     });
   }
   e.scores.professional = Math.round(prof * 10) / 10;
@@ -952,7 +953,7 @@ function renderFrontend() {
   app.appendChild(header);
   
   // Stats bar
-  const activeExperts = db.experts.filter(e => e.status !== 'eliminated');
+  const activeExperts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   // 前端可见领域数（不含 hideWhenEmpty 且无讲师的标签）
   const frontendFieldSet = new Set(activeExperts.flatMap(e => e.fields || []));
@@ -1147,7 +1148,7 @@ function renderFrontend() {
   fieldFilters.appendChild(allTag);
   
   // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家中无对应讲师时不展示
-  const frontendExperts = db.experts.filter(e => e.status !== 'eliminated');
+  const frontendExperts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   const usedFieldNames = new Set(frontendExperts.flatMap(e => e.fields || []));
   const visibleFields = db.fields.filter(f => {
     if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
@@ -1585,7 +1586,7 @@ function getRelevanceScore(expert, query) {
 
 function getFilteredExperts() {
   const db = appState.db;
-  let experts = db.experts.filter(e => e.status !== 'eliminated');
+  let experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   // Score filter (only when user actively selects a threshold)
   if (appState.scoreFilter) {
@@ -2113,7 +2114,7 @@ function showExpertDetail(expert) {
         profBlock.appendChild(h('div', { className: 'detail-score-sub-title prof' }, '专业度 · 细分标准'));
         const profList = h('div', { className: 'score-bar-list' });
         profDim.subDimensions.forEach(sd => {
-          const val = expert.subScores.professional[sd.name] || 0;
+          const val = expert.subScores.professional[sd.name] !== undefined ? expert.subScores.professional[sd.name] : 6;
           profList.appendChild(renderScoreBar(sd.name, val, 'blue'));
         });
         profBlock.appendChild(profList);
@@ -2126,7 +2127,7 @@ function showExpertDetail(expert) {
         inflBlock.appendChild(h('div', { className: 'detail-score-sub-title infl' }, '影响力 · 细分标准'));
         const inflList = h('div', { className: 'score-bar-list' });
         inflDim.subDimensions.forEach(sd => {
-          const val = expert.subScores.influence[sd.name] || 0;
+          const val = expert.subScores.influence[sd.name] !== undefined ? expert.subScores.influence[sd.name] : 6;
           inflList.appendChild(renderScoreBar(sd.name, val, 'amber'));
         });
         inflBlock.appendChild(inflList);
@@ -2338,7 +2339,7 @@ function renderScoreBar(label, score, colorClass) {
 // ===== DASHBOARD =====
 function renderMainFieldChart() {
   const db = appState.db;
-  const experts = db.experts.filter(e => e.status !== 'eliminated');
+  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   // Filter fields same as filter bar logic
   const chartUsedFields = new Set(experts.flatMap(e => e.fields || []));
@@ -2502,7 +2503,7 @@ function renderHorizontalBarChart(containerId, displayLabels, fullLabels, data, 
 
 function showDashboard() {
   const db = appState.db;
-  const experts = db.experts.filter(e => e.status !== 'eliminated');
+  const experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   const overlay = h('div', { className: 'modal-overlay dashboard-modal', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
   const content = h('div', { className: 'modal-content' });
@@ -3603,9 +3604,9 @@ function renderExpertsTab(panel) {
   const searchInput = h('input', {
     className: 'admin-search',
     placeholder: '搜索专家姓名...',
-    value: appState.searchQuery,
+    value: appState.adminSearchQuery,
     oninput: (e) => {
-      appState.searchQuery = e.target.value;
+      appState.adminSearchQuery = e.target.value;
       renderExpertsTab(document.getElementById('admin-panel'));
     }
   });
@@ -3700,8 +3701,8 @@ function renderExpertsTab(panel) {
   
   // Filter data
   let experts = db.experts;
-  if (appState.searchQuery) {
-    const q = appState.searchQuery.toLowerCase();
+  if (appState.adminSearchQuery) {
+    const q = appState.adminSearchQuery.toLowerCase();
     experts = experts.filter(e => e.name.toLowerCase().includes(q));
   }
   if (af.field) {
@@ -5405,12 +5406,34 @@ function aiScoreExpert(expert) {
 
 function initAIScoring() {
   if (!appState.db.ratingConfig.aiScoringEnabled) return;
-  // 只初始化没有subScores的专家（避免覆盖手动调整）
+  const cfg = appState.db.ratingConfig;
   let changed = false;
   appState.db.experts.forEach(e => {
     if (!e.subScores) {
       aiScoreExpert(e);
+      recalcExpertFromSubscores(e);
       changed = true;
+    } else {
+      // 检查 subScores key 是否匹配当前 config 子维度名称
+      const profDim = cfg.dimensions.find(d => d.id === 'professional');
+      const inflDim = cfg.dimensions.find(d => d.id === 'influence');
+      let needRecalc = false;
+      if (profDim && profDim.subDimensions) {
+        profDim.subDimensions.forEach(sd => {
+          if (e.subScores.professional && e.subScores.professional[sd.name] === undefined) needRecalc = true;
+        });
+      }
+      if (inflDim && inflDim.subDimensions) {
+        inflDim.subDimensions.forEach(sd => {
+          if (e.subScores.influence && e.subScores.influence[sd.name] === undefined) needRecalc = true;
+        });
+      }
+      if (needRecalc) {
+        e.subScores = null; // 清除旧 subScores，强制重算
+        aiScoreExpert(e);
+        recalcExpertFromSubscores(e); // 重算综合评分
+        changed = true;
+      }
     }
   });
   if (changed) saveDB(appState.db);
@@ -6216,7 +6239,7 @@ function renderRatingsTab(panel) {
         ...(inflDim?.subDimensions || []).map(sd => ({ dim:'influence', ...sd }))
       ];
       allSubs.forEach(sd => {
-        const val = (e.subScores && e.subScores[sd.dim] && e.subScores[sd.dim][sd.name] !== undefined) ? e.subScores[sd.dim][sd.name] : 5;
+        const val = (e.subScores && e.subScores[sd.dim] && e.subScores[sd.dim][sd.name] !== undefined) ? e.subScores[sd.dim][sd.name] : 6;
         const td = h('td', { style:{ padding:'4px 6px' } });
         const inp = h('input', {
           type:'number', value: String(val), min:1, max:10,
@@ -6682,7 +6705,7 @@ function renderObservationTab(panel) {
       dim.subDimensions.forEach(function(sd) {
         var row = h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'3px 0' } });
         row.appendChild(h('span', { style:{ fontSize:'11px', color: color, minWidth:'120px', flex:'1' } }, sd.name));
-        var val = (expert.subScores && expert.subScores[dimId] && expert.subScores[dimId][sd.name] !== undefined) ? expert.subScores[dimId][sd.name] : 5;
+        var val = (expert.subScores && expert.subScores[dimId] && expert.subScores[dimId][sd.name] !== undefined) ? expert.subScores[dimId][sd.name] : 6;
         var inp = h('input', {
           type: 'number', value: String(val), min: 1, max: 10,
           style: { width:'50px', padding:'3px 4px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', textAlign:'center' },
@@ -7337,6 +7360,9 @@ async function boot() {
     
     // Step 4: init AI scoring (calculate sub-scores for all experts)
     initAIScoring();
+    
+    // Step 4.5: sync observation status with latest scores
+    autoSyncObservationGlobal();
     
     // Step 5: render
     renderFrontend();
