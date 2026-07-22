@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.5 | 2026-07-06 | 修复：前端动态显示观察库专家 + 赋分计算函数 + 搜索状态隔离 */
+/* Version 5.6.6 | 2026-07-22 | 仪表盘关联恢复：管理后台showCharts控制前端图表显示+弹窗入口 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.5] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.6] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -930,6 +930,13 @@ function renderFrontend() {
     }, 0);
   }
   
+  // 数据仪表盘按钮（所有用户可见）
+  headerActions.appendChild(h('button', {
+    className: 'btn btn-sm',
+    style: { background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: '12px', border: '1px solid rgba(255,255,255,0.2)', marginRight: '4px' },
+    onclick: () => showDashboard()
+  }, '📊 数据仪表盘'));
+
   // 管理员入口按钮
   headerActions.appendChild(h('button', {
     className: 'btn btn-sm',
@@ -964,6 +971,9 @@ function renderFrontend() {
   
   const statsBar = h('div', { className: 'stats-bar' });
   
+  // 领域人数分布：受管理后台 dashboardConfig.showCharts 控制
+  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'] };
+  if (dc.showCharts.includes('fields')) {
   // 领域人数分布：带专家总数头部的整合图表卡片
   const chartCard = h('div', { className: 'stat-card stat-chart-card', style: { flex: '1', minWidth: '400px', padding: '16px 20px' } });
   
@@ -985,6 +995,7 @@ function renderFrontend() {
   const chartContainer = h('div', { id: 'main-field-chart-inline', style: { width: '100%' } });
   chartCard.appendChild(chartContainer);
   statsBar.appendChild(chartCard);
+  } // if dc.showCharts.includes('fields')
   
   app.appendChild(statsBar);
   
@@ -1309,8 +1320,10 @@ function renderFrontend() {
   
   renderExpertGrid();
   
-  // Render main page field chart
-  setTimeout(() => renderMainFieldChart(), 200);
+  // Render main page field chart — 受管理后台 showCharts 控制
+  if (dc.showCharts.includes('fields')) {
+    setTimeout(() => renderMainFieldChart(), 200);
+  }
 }
 
 // ===== v4.12: 筛选 UI 同步 — 筛选变化后更新按钮高亮状态 =====
@@ -2503,6 +2516,7 @@ function renderHorizontalBarChart(containerId, displayLabels, fullLabels, data, 
 
 function showDashboard() {
   const db = appState.db;
+  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
   const experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   const overlay = h('div', { className: 'modal-overlay dashboard-modal', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
@@ -2516,29 +2530,41 @@ function showDashboard() {
   const body = h('div', { className: 'modal-body' });
   const grid = h('div', { className: 'dashboard-grid' });
   
-  // Field distribution chart
-  const fieldCard = h('div', { className: 'dashboard-card full' });
-  fieldCard.appendChild(h('h4', {}, '领域分布情况'));
-  const fieldChart = h('div', { className: 'chart-container tall' });
-  fieldChart.id = 'chart-fields';
-  fieldCard.appendChild(fieldChart);
-  grid.appendChild(fieldCard);
+  // Field distribution chart — 受管理后台 showCharts 控制
+  if (dc.showCharts.includes('fields')) {
+    const fieldCard = h('div', { className: 'dashboard-card full' });
+    fieldCard.appendChild(h('h4', {}, '领域分布情况'));
+    const fieldChart = h('div', { className: 'chart-container tall' });
+    fieldChart.id = 'chart-fields';
+    fieldCard.appendChild(fieldChart);
+    grid.appendChild(fieldCard);
+  }
   
-  // Average scores - numeric display (controlled by showScores)
+  // Score charts — 受 showCharts + showScores 双重控制
   if (db.ratingConfig.showScores !== false) {
-  const avgCard = h('div', { className: 'dashboard-card' });
-  avgCard.appendChild(h('h4', {}, '各项评分平均分'));
-  const avgDisplay = h('div', { id: 'chart-avg-display' });
-  avgCard.appendChild(avgDisplay);
-  grid.appendChild(avgCard);
+    // Average scores numeric display
+    if (dc.showCharts.includes('scoreNumeric')) {
+      const avgCard = h('div', { className: 'dashboard-card' });
+      avgCard.appendChild(h('h4', {}, '各项评分平均分'));
+      const avgDisplay = h('div', { id: 'chart-avg-display' });
+      avgCard.appendChild(avgDisplay);
+      grid.appendChild(avgCard);
+    }
+    
+    // Score distribution doughnut chart
+    if (dc.showCharts.includes('scoreDist')) {
+      const distCard = h('div', { className: 'dashboard-card' });
+      distCard.appendChild(h('h4', {}, '综合评分专家数量占比（7分及以上）'));
+      const distChart = h('div', { className: 'chart-container' });
+      distChart.id = 'chart-dist';
+      distCard.appendChild(distChart);
+      grid.appendChild(distCard);
+    }
+  }
   
-  // Score distribution - doughnut chart
-  const distCard = h('div', { className: 'dashboard-card' });
-  distCard.appendChild(h('h4', {}, '综合评分专家数量占比（7分及以上）'));
-  const distChart = h('div', { className: 'chart-container' });
-  distChart.id = 'chart-dist';
-  distCard.appendChild(distChart);
-  grid.appendChild(distCard);
+  // 如果所有图表都被关闭，显示提示
+  if (!dc.showCharts.includes('fields') && !dc.showCharts.includes('scoreNumeric') && !dc.showCharts.includes('scoreDist')) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px">📋 当前未启用任何图表模块<br><small style="font-size:12px">请联系管理员在后台「仪表盘」中开启展示模块</small></div>';
   }
   
   body.appendChild(grid);
