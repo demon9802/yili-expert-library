@@ -439,7 +439,8 @@ async function createField(field) {
     color: field.color || '#2563EB',
     text_color: field.textColor || '#ffffff',
     hide_when_empty: field.hideWhenEmpty || false,
-    sort_order: field.sortOrder || 0
+    sort_order: field.sortOrder || 0,
+    creator: field.creator || null
   }).select().single();
   if (error) throw error;
   return rowToField(data);
@@ -451,7 +452,8 @@ async function updateField(name, field) {
     color: field.color,
     text_color: field.textColor,
     hide_when_empty: field.hideWhenEmpty,
-    sort_order: field.sortOrder || 0
+    sort_order: field.sortOrder || 0,
+    creator: field.creator || null
   }).eq('name', name);
   if (error) throw error;
 }
@@ -619,7 +621,8 @@ function rowToField(row) {
     color: row.color,
     textColor: row.text_color || '#ffffff',
     hideWhenEmpty: row.hide_when_empty || false,
-    sortOrder: row.sort_order || 0
+    sortOrder: row.sort_order || 0,
+    creator: row.creator || null
   };
 }
 

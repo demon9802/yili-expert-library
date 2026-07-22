@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.6 | 2026-07-22 | 仪表盘关联恢复：管理后台showCharts控制前端图表显示+弹窗入口 */
+/* Version 5.6.7 | 2026-07-22 | 修复测试模式仪表盘未跟随管理后台showCharts设置 + 子管理员权限细化 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.6] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.7] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -104,7 +104,7 @@ async function loadTestDB() {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.experts && parsed.experts.length > 0) {
         console.log('[test mode] 使用已有测试数据:', parsed.experts.length, '位专家');
-        return parsed;
+        return ensureMinimalConfig(parsed);
       }
     } catch(e) { console.warn('[test mode] 测试数据损坏，重新初始化'); }
   }
@@ -153,7 +153,7 @@ async function loadTestDB() {
   seedDb.ratingConfig = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG));
   seedDb.sortOptions = DEFAULT_SORT_OPTIONS;
   seedDb.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
-  seedDb.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  seedDb.dashboardConfig = seedDb.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
   seedDb.yiliProjects = seedDb.yiliProjects || [];
   seedDb.observationLibrary = [];
   seedDb.favorites = [];
@@ -540,6 +540,10 @@ function ensureMinimalConfig(db) {
   if (!db.dashboardConfig) db.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
   if (!db.observationLibrary) db.observationLibrary = [];
   if (!db.permissions) db.permissions = { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } };
+  // v5.6.7: 确保现有领域的 creator 字段初始化
+  if (db.fields) {
+    db.fields.forEach(function(f) { if (!f.creator) f.creator = 'master'; });
+  }
   return db;
 }
 
@@ -6373,6 +6377,8 @@ function renderDashboardTab(panel) {
   
   // Chart config
   const dc = db.dashboardConfig;
+  const isMaster = isMasterAdmin();
+  
   panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '展示模块设置'));
   
   const moduleSettings = [
@@ -6381,28 +6387,44 @@ function renderDashboardTab(panel) {
     { id: 'scoreDist', name: '综合评分专家数量占比', desc: '环形图展示7分及以上专家在各分值区间的数量占比' }
   ];
   
-  moduleSettings.forEach(ms => {
-    const row = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'var(--bg)', borderRadius:'8px', marginBottom:'8px', border:'1px solid var(--border)' } });
-    const infoDiv = h('div', {});
-    infoDiv.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600' } }, ms.name));
-    infoDiv.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)' } }, ms.desc));
-    row.appendChild(infoDiv);
-    const showCheckbox = h('input', {
-      type: 'checkbox',
-      checked: dc.showCharts.includes(ms.id),
-      onchange: (e) => {
-        if (e.target.checked) {
-          if (!dc.showCharts.includes(ms.id)) dc.showCharts.push(ms.id);
-        } else {
-          dc.showCharts = dc.showCharts.filter(c => c !== ms.id);
+  if (isMaster) {
+    // 主管理员：可勾选开关控制展示模块
+    moduleSettings.forEach(ms => {
+      const row = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'var(--bg)', borderRadius:'8px', marginBottom:'8px', border:'1px solid var(--border)' } });
+      const infoDiv = h('div', {});
+      infoDiv.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600' } }, ms.name));
+      infoDiv.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)' } }, ms.desc));
+      row.appendChild(infoDiv);
+      const showCheckbox = h('input', {
+        type: 'checkbox',
+        checked: dc.showCharts.includes(ms.id),
+        onchange: (e) => {
+          if (e.target.checked) {
+            if (!dc.showCharts.includes(ms.id)) dc.showCharts.push(ms.id);
+          } else {
+            dc.showCharts = dc.showCharts.filter(c => c !== ms.id);
+          }
+          saveDB(db);
+          toast(ms.name + '已' + (e.target.checked ? '显示' : '隐藏'), 'success');
         }
-        saveDB(db);
-        toast(ms.name + '已' + (e.target.checked ? '显示' : '隐藏'), 'success');
-      }
+      });
+      row.appendChild(showCheckbox);
+      panel.appendChild(row);
     });
-    row.appendChild(showCheckbox);
-    panel.appendChild(row);
-  });
+  } else {
+    // 子管理员：只读查看已启用的模块
+    moduleSettings.forEach(ms => {
+      const enabled = dc.showCharts.includes(ms.id);
+      const row = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', background:'var(--bg)', borderRadius:'8px', marginBottom:'8px', border:'1px solid var(--border)', opacity: enabled ? '1' : '0.5' } });
+      const infoDiv = h('div', {});
+      infoDiv.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600' } }, ms.name));
+      infoDiv.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)' } }, ms.desc));
+      row.appendChild(infoDiv);
+      row.appendChild(h('span', { style:{ fontSize:'12px', fontWeight:'600', padding:'2px 10px', borderRadius:'4px', background: enabled ? '#D1FAE5' : '#FEE2E2', color: enabled ? '#065F46' : '#991B1B' } }, enabled ? '✓ 已启用' : '✗ 未启用'));
+      panel.appendChild(row);
+    });
+    panel.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', textAlign:'right' } }, '展示模块开关仅主管理员可修改'));
+  }
   
   // Bar chart type selector for fields distribution
   panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '领域分布图表形式'));
@@ -6536,18 +6558,33 @@ function exportDashboardCSV() {
 
 function renderCategoriesTab(panel) {
   const db = appState.db;
+  const isMaster = isMasterAdmin();
+  const subAccount = isMaster ? null : (appState.currentUser ? appState.currentUser.account : null);
+  
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '分类管理'));
-  panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } }, '管理"适用领域"标签的名称、颜色。'));
+  panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } }, isMaster ? '管理"适用领域"标签的名称、颜色。' : '查看和管理自己的"适用领域"标签，预设标签仅主管理员可修改。'));
   
   db.fields.forEach((f, idx) => {
+    // 权限判断：主管理员可编辑所有，子管理员仅可编辑自己创建的标签
+    const fieldCreator = f.creator || 'master'; // 无creator的旧标签默认属于主管理员
+    const canEdit = isMaster || (fieldCreator === subAccount);
+    
     const item = h('div', { style: { display:'flex', gap:'12px', alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)', flexWrap:'wrap' } });
+    
+    // Creator badge (show who created the label)
+    if (fieldCreator !== 'master' && isMaster) {
+      const badge = h('span', { style:{ fontSize:'10px', padding:'2px 6px', borderRadius:'4px', background:'#DBEAFE', color:'#1E40AF', flexShrink:'0' } }, '子管理: ' + fieldCreator);
+      item.appendChild(badge);
+    }
     
     // Name
     const nameInput = h('input', { 
       value: f.name, 
       style: { padding:'6px 10px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'13px', minWidth:'150px', flex:1 },
+      disabled: !canEdit,
       onchange: (e) => {
+        if (!canEdit) return;
         const oldName = f.name;
         const newName = e.target.value.trim();
         if (!newName) return;
@@ -6566,7 +6603,9 @@ function renderCategoriesTab(panel) {
     const colorInput = h('input', { 
       type: 'color', 
       value: f.color,
+      disabled: !canEdit,
       onchange: (e) => {
+        if (!canEdit) return;
         f.color = e.target.value;
         saveDB(db);
       }
@@ -6581,26 +6620,32 @@ function renderCategoriesTab(panel) {
     }, f.name);
     item.appendChild(preview);
     
-    // Delete with batch management
-    const deleteBtn = h('button', {
-      className: 'btn btn-danger btn-sm',
-      onclick: () => {
-        const affectedExperts = db.experts.filter(e => e.fields.includes(f.name));
-        if (affectedExperts.length > 0) {
-          const msg = '有 ' + affectedExperts.length + ' 位专家使用此标签（' + affectedExperts.map(e=>e.name).join('、') + '），确认删除？';
-          if (!confirm(msg)) return;
-          affectedExperts.forEach(e => {
-            e.fields = e.fields.filter(fn => fn !== f.name);
-          });
+    // Delete — only for editable fields
+    if (canEdit) {
+      const deleteBtn = h('button', {
+        className: 'btn btn-danger btn-sm',
+        onclick: () => {
+          const affectedExperts = db.experts.filter(e => e.fields.includes(f.name));
+          if (affectedExperts.length > 0) {
+            const msg = '有 ' + affectedExperts.length + ' 位专家使用此标签（' + affectedExperts.map(e=>e.name).join('、') + '），确认删除？';
+            if (!confirm(msg)) return;
+            affectedExperts.forEach(e => {
+              e.fields = e.fields.filter(fn => fn !== f.name);
+            });
+          }
+          db.fields.splice(idx, 1);
+          updateFieldsList(db);
+          saveDB(db);
+          renderCategoriesTab(panel);
+          toast('标签已删除', 'success');
         }
-        db.fields.splice(idx, 1);
-        updateFieldsList(db);
-        saveDB(db);
-        renderCategoriesTab(panel);
-        toast('标签已删除', 'success');
-      }
-    }, '删除');
-    item.appendChild(deleteBtn);
+      }, '删除');
+      item.appendChild(deleteBtn);
+    } else {
+      // Read-only indicator for sub-admins viewing preset labels
+      const lockIcon = h('span', { style:{ fontSize:'11px', color:'var(--text-muted)', padding:'2px 8px', background:'#F3F4F6', borderRadius:'4px' } }, '🔒 预设');
+      item.appendChild(lockIcon);
+    }
     
     panel.appendChild(item);
   });
@@ -6614,7 +6659,10 @@ function renderCategoriesTab(panel) {
     const color = document.getElementById('new-cat-color').value;
     if (!name) { toast('请输入标签名称', 'error'); return; }
     if (db.fields.some(f => f.name === name)) { toast('标签已存在', 'error'); return; }
-    db.fields.push({ name, color });
+    const newField = { name, color };
+    // 标记创建者：主管理员为'master'，子管理员为账号名
+    newField.creator = isMaster ? 'master' : subAccount;
+    db.fields.push(newField);
     db.totalFields = db.fields.length;
     saveDB(db);
     renderCategoriesTab(panel);
