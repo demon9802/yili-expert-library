@@ -1,0 +1,31 @@
+# Supabase Keep-Alive
+# 防止 Supabase 免费版因 7 天无 API 请求而自动暂停
+# 每 5 天自动调用一次 Supabase REST API，保持项目活跃
+# anon key 已在前端代码中公开（受 RLS 保护），可安全使用
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # 每 5 天 UTC 0:00 运行一次（北京时间 8:00）
+    - cron: '0 0 */5 * *'
+  # 支持手动触发
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://owjdwwdipfsnumgoxzih.supabase.co/rest/v1/experts?select=id&limit=1" \
+            -H "apikey: sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j" \
+            -H "Authorization: Bearer sb_publishable_GQR4Qj9MMaau2V-Zm7_bLA_XUhfaN6j")
+          echo "HTTP status: $RESPONSE"
+          if [ "$RESPONSE" -ge 200 ] && [ "$RESPONSE" -lt 300 ]; then
+            echo "Supabase is alive and responding."
+          else
+            echo "WARNING: Supabase returned non-2xx status ($RESPONSE). Project may be paused."
+            exit 1
+          fi
