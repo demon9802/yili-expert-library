@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.7 | 2026-07-22 | 修复测试模式仪表盘未跟随管理后台showCharts设置 + 子管理员权限细化 */
+/* Version 5.6.8 | 2026-07-22 | 子管理员分类Tab修复+账号管理UI改进+仪表盘图片/PDF直接下载 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.7] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.8] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -3590,7 +3590,7 @@ function renderAdmin() {
     { id: 'settings', name: '系统设置', perm: 'systemSettings' }
   ];
   
-  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm) && t.id !== 'categories');
+  const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm));
   
   visibleTabs.forEach(tab => {
     nav.appendChild(h('button', {
@@ -6449,10 +6449,10 @@ function renderDashboardTab(panel) {
   panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '数据统计导出'));
   const exportRow = h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap' } });
   exportRow.appendChild(h('button', { className:'btn btn-primary btn-sm', onclick: () => {
-    toast('请使用浏览器截图工具（Ctrl+Shift+S / Cmd+Shift+4）导出图表为图片', '');
+    exportDashboardImage();
   } }, '📸 导出为图片'));
   exportRow.appendChild(h('button', { className:'btn btn-secondary btn-sm', onclick: () => {
-    window.print();
+    exportDashboardPDF();
   } }, '📄 导出为PDF'));
   exportRow.appendChild(h('button', { className:'btn btn-secondary btn-sm', onclick: () => {
     exportDashboardCSV();
@@ -6528,6 +6528,491 @@ function renderDashboardTab(panel) {
       renderDoughnutChart('admin-chart-dist', ranges, rangeCount);
     }
   }, 100);
+}
+
+// ===== 仪表盘导出为图片（Canvas 渲染 → PNG 直接下载） =====
+function exportDashboardImage() {
+  var db = appState.db;
+  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  var experts = db.experts.filter(function(e) { return e.status !== 'eliminated'; });
+  
+  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric' || c === 'scoreDist'; });
+  if (enabledCharts.length === 0) {
+    toast('当前未启用任何图表模块，请先在仪表盘「展示模块设置」中开启', 'warning');
+    return;
+  }
+  
+  // Calculate canvas height based on enabled charts
+  var hasFields = enabledCharts.indexOf('fields') >= 0;
+  var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
+  var hasDist = enabledCharts.indexOf('scoreDist') >= 0;
+  
+  var chartSections = 0;
+  if (hasFields) chartSections++;
+  if (hasNumeric) chartSections++;
+  if (hasDist) chartSections++;
+  
+  var titleH = 60;
+  var barChartH = hasFields ? 340 : 0;
+  var numericH = hasNumeric ? 140 : 0;
+  var distH = hasDist ? 320 : 0;
+  var gap = 20;
+  var canvasW = 800;
+  var canvasH = titleH + barChartH + numericH + distH + (chartSections + 1) * gap;
+  
+  var canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  var ctx = canvas.getContext('2d');
+  
+  // ---- White background ----
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  
+  var currentY = 20;
+  
+  // ---- Title ----
+  ctx.fillStyle = '#1E293B';
+  ctx.font = 'bold 22px -apple-system, "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('伊利集团 · 数智化赋能优质专家资源库 — 数据仪表盘', canvasW / 2, currentY + 25);
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '13px -apple-system, "Microsoft YaHei", sans-serif';
+  ctx.fillText('导出时间：' + new Date().toLocaleString('zh-CN'), canvasW / 2, currentY + 48);
+  currentY += titleH;
+  
+  // ---- Fields bar chart ----
+  if (hasFields) {
+    var fieldCount = {};
+    db.fields.forEach(function(f) { fieldCount[f.name] = 0; });
+    experts.forEach(function(e) { e.fields.forEach(function(f) { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
+    
+    var labels = Object.keys(fieldCount);
+    var data = Object.values(fieldCount);
+    var colorsArr = db.fields.map(function(f) { return f.color; });
+    
+    // Section title
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('领域分布情况', 40, currentY + 20);
+    currentY += 30;
+    
+    drawBarChartOnCanvas(ctx, labels, data, colorsArr, 40, currentY, canvasW - 80, barChartH - 40);
+    currentY += barChartH;
+  }
+  
+  // ---- Score numeric cards ----
+  if (hasNumeric) {
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('各项评分平均分', 40, currentY + 20);
+    currentY += 30;
+    
+    var profAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.professional; }, 0) / experts.length).toFixed(1) : '0';
+    var inflAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.influence; }, 0) / experts.length).toFixed(1) : '0';
+    var overallAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.overall; }, 0) / experts.length).toFixed(1) : '0';
+    
+    drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, 40, currentY, canvasW - 80, numericH - 40);
+    currentY += numericH;
+  }
+  
+  // ---- Score distribution doughnut ----
+  if (hasDist) {
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('综合评分专家数量占比', 40, currentY + 20);
+    currentY += 30;
+    
+    var ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
+    var rangeCount = [0,0,0,0,0];
+    experts.forEach(function(e) {
+      var s = e.scores.overall;
+      if (s < 7.5) rangeCount[0]++;
+      else if (s < 8.0) rangeCount[1]++;
+      else if (s < 8.5) rangeCount[2]++;
+      else if (s < 9.0) rangeCount[3]++;
+      else rangeCount[4]++;
+    });
+    
+    drawDoughnutChartOnCanvas(ctx, ranges, rangeCount, 40, currentY, canvasW - 80, distH - 40);
+    currentY += distH;
+  }
+  
+  // Download as PNG
+  canvas.toBlob(function(blob) {
+    downloadBlob(blob, '仪表盘_' + new Date().toISOString().slice(0,10) + '.png');
+    toast('仪表盘图片已下载', 'success');
+  }, 'image/png');
+}
+
+// ===== Canvas 柱状图绘制 =====
+function drawBarChartOnCanvas(ctx, labels, data, colors, x, y, w, h) {
+  var maxVal = Math.max.apply(null, data.concat([1]));
+  var chartLeft = x + 60;
+  var chartRight = x + w - 20;
+  var chartTop = y + 10;
+  var chartBottom = y + h - 40;
+  var chartW = chartRight - chartLeft;
+  var chartH = chartBottom - chartTop;
+  
+  // Grid lines
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 1;
+  for (var i = 0; i <= 4; i++) {
+    var gy = chartBottom - (chartH * i / 4);
+    ctx.beginPath();
+    ctx.moveTo(chartLeft, gy);
+    ctx.lineTo(chartRight, gy);
+    ctx.stroke();
+    
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '11px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(Math.round(maxVal * i / 4).toString(), chartLeft - 8, gy + 4);
+  }
+  
+  // Axes
+  ctx.strokeStyle = '#CBD5E1';
+  ctx.beginPath();
+  ctx.moveTo(chartLeft, chartTop);
+  ctx.lineTo(chartLeft, chartBottom);
+  ctx.lineTo(chartRight, chartBottom);
+  ctx.stroke();
+  
+  // Bars
+  var barCount = labels.length;
+  var gap = Math.min(12, chartW / (barCount * 3));
+  var barW = Math.min(50, (chartW - gap * (barCount + 1)) / barCount);
+  var totalBarW = barW * barCount + gap * (barCount - 1);
+  var startX = chartLeft + (chartW - totalBarW) / 2;
+  
+  for (var j = 0; j < barCount; j++) {
+    var bx = startX + j * (barW + gap);
+    var bh = Math.max(2, (data[j] / maxVal) * chartH);
+    var by = chartBottom - bh;
+    
+    // Bar with rounded top
+    var radius = Math.min(4, barW / 2);
+    ctx.fillStyle = colors[j] || '#3B82F6';
+    ctx.beginPath();
+    ctx.moveTo(bx, chartBottom);
+    ctx.lineTo(bx, by + radius);
+    ctx.quadraticCurveTo(bx, by, bx + radius, by);
+    ctx.lineTo(bx + barW - radius, by);
+    ctx.quadraticCurveTo(bx + barW, by, bx + barW, by + radius);
+    ctx.lineTo(bx + barW, chartBottom);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Value on top
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 11px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(data[j].toString(), bx + barW / 2, by - 6);
+    
+    // Label below
+    ctx.fillStyle = '#64748B';
+    ctx.font = '10px -apple-system, "Microsoft YaHei", sans-serif';
+    var labelText = labels[j].length > 6 ? labels[j].substring(0,6) + '…' : labels[j];
+    ctx.save();
+    ctx.translate(bx + barW / 2, chartBottom + 14);
+    ctx.rotate(-20 * Math.PI / 180);
+    ctx.fillText(labelText, 0, 0);
+    ctx.restore();
+  }
+}
+
+// ===== Canvas 评分数值卡片绘制 =====
+function drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, x, y, w, h) {
+  var cardW = (w - 40) / 3;
+  var cardH = h - 10;
+  var cards = [
+    { label: '专业度', value: profAvg, color: '#3B82F6', bg: '#EFF6FF' },
+    { label: '影响力', value: inflAvg, color: '#F59E0B', bg: '#FFFBEB' },
+    { label: '综合评分', value: overallAvg, color: '#10B981', bg: '#ECFDF5' }
+  ];
+  
+  for (var i = 0; i < 3; i++) {
+    var cx = x + i * (cardW + 20);
+    var cy = y + 5;
+    
+    // Card background with shadow
+    ctx.fillStyle = cards[i].bg;
+    ctx.strokeStyle = cards[i].color;
+    ctx.lineWidth = 2;
+    roundRect(ctx, cx, cy, cardW, cardH, 10, true, true);
+    
+    // Label
+    ctx.fillStyle = '#64748B';
+    ctx.font = '14px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(cards[i].label, cx + cardW / 2, cy + 30);
+    
+    // Value
+    ctx.fillStyle = cards[i].color;
+    ctx.font = 'bold 36px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.fillText(cards[i].value, cx + cardW / 2, cy + 72);
+  }
+}
+
+// ===== Canvas 环形图绘制 =====
+function drawDoughnutChartOnCanvas(ctx, labels, data, x, y, w, h) {
+  var colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+  var total = data.reduce(function(a,b) { return a+b; }, 0);
+  if (total === 0) return;
+  
+  var cx = x + w * 0.35;
+  var cy = y + h / 2;
+  var r = Math.min(w * 0.22, 100);
+  var innerR = r * 0.55;
+  
+  var startAngle = -Math.PI / 2;
+  var legendX = x + w * 0.62;
+  var legendY = cy - (data.length * 20) / 2;
+  
+  for (var i = 0; i < data.length; i++) {
+    if (data[i] === 0) continue;
+    var angle = (data[i] / total) * Math.PI * 2;
+    var endAngle = startAngle + angle;
+    
+    // Arc
+    ctx.fillStyle = colors[i];
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Percentage label inside arc
+    var midAngle = startAngle + angle / 2;
+    var labelR = (r + innerR) / 2;
+    var lx = cx + Math.cos(midAngle) * labelR;
+    var ly = cy + Math.sin(midAngle) * labelR;
+    var pct = Math.round(data[i] / total * 100);
+    
+    if (pct >= 8) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 10px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pct + '%', lx, ly);
+    }
+    
+    // Center text
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 18px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(total + '位', cx, cy - 6);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '11px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.fillText('专家总数', cx, cy + 14);
+    
+    // Legend
+    var ly = legendY + i * 22;
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(legendX, ly - 5, 12, 12);
+    ctx.fillStyle = '#334155';
+    ctx.font = '12px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labels[i] + ' (' + data[i] + '位)', legendX + 18, ly + 1);
+    
+    startAngle = endAngle;
+  }
+}
+
+// ===== 辅助：Canvas 圆角矩形 =====
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
+}
+
+// ===== 仪表盘导出为PDF（Canvas → JPEG → PDF 直接下载） =====
+function exportDashboardPDF() {
+  var db = appState.db;
+  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  var experts = db.experts.filter(function(e) { return e.status !== 'eliminated'; });
+  
+  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric' || c === 'scoreDist'; });
+  if (enabledCharts.length === 0) {
+    toast('当前未启用任何图表模块，请先在仪表盘「展示模块设置」中开启', 'warning');
+    return;
+  }
+  
+  var hasFields = enabledCharts.indexOf('fields') >= 0;
+  var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
+  var hasDist = enabledCharts.indexOf('scoreDist') >= 0;
+  
+  var chartSections = (hasFields ? 1 : 0) + (hasNumeric ? 1 : 0) + (hasDist ? 1 : 0);
+  var titleH = 60;
+  var barChartH = hasFields ? 340 : 0;
+  var numericH = hasNumeric ? 140 : 0;
+  var distH = hasDist ? 320 : 0;
+  var gap = 20;
+  var canvasW = 800;
+  var canvasH = titleH + barChartH + numericH + distH + (chartSections + 1) * gap;
+  
+  var canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  var ctx = canvas.getContext('2d');
+  
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  
+  var currentY = 20;
+  
+  ctx.fillStyle = '#1E293B';
+  ctx.font = 'bold 22px -apple-system, "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('伊利集团 · 数智化赋能优质专家资源库 — 数据仪表盘', canvasW / 2, currentY + 25);
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '13px -apple-system, "Microsoft YaHei", sans-serif';
+  ctx.fillText('导出时间：' + new Date().toLocaleString('zh-CN'), canvasW / 2, currentY + 48);
+  currentY += titleH;
+  
+  if (hasFields) {
+    var fieldCount = {};
+    db.fields.forEach(function(f) { fieldCount[f.name] = 0; });
+    experts.forEach(function(e) { e.fields.forEach(function(f) { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
+    var labels = Object.keys(fieldCount);
+    var data = Object.values(fieldCount);
+    var colorsArr = db.fields.map(function(f) { return f.color; });
+    
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('领域分布情况', 40, currentY + 20);
+    currentY += 30;
+    drawBarChartOnCanvas(ctx, labels, data, colorsArr, 40, currentY, canvasW - 80, barChartH - 40);
+    currentY += barChartH;
+  }
+  
+  if (hasNumeric) {
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('各项评分平均分', 40, currentY + 20);
+    currentY += 30;
+    var profAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.professional; }, 0) / experts.length).toFixed(1) : '0';
+    var inflAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.influence; }, 0) / experts.length).toFixed(1) : '0';
+    var overallAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.overall; }, 0) / experts.length).toFixed(1) : '0';
+    drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, 40, currentY, canvasW - 80, numericH - 40);
+    currentY += numericH;
+  }
+  
+  if (hasDist) {
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('综合评分专家数量占比', 40, currentY + 20);
+    currentY += 30;
+    var ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
+    var rangeCount = [0,0,0,0,0];
+    experts.forEach(function(e) {
+      var s = e.scores.overall;
+      if (s < 7.5) rangeCount[0]++;
+      else if (s < 8.0) rangeCount[1]++;
+      else if (s < 8.5) rangeCount[2]++;
+      else if (s < 9.0) rangeCount[3]++;
+      else rangeCount[4]++;
+    });
+    drawDoughnutChartOnCanvas(ctx, ranges, rangeCount, 40, currentY, canvasW - 80, distH - 40);
+    currentY += distH;
+  }
+  
+  // Use JPEG for PDF (smaller, DCTDecode compatible)
+  canvas.toBlob(function(jpegBlob) {
+    var reader = new FileReader();
+    reader.onload = function() {
+      generatePDFFromJPEG(reader.result, canvasW, canvasH);
+    };
+    reader.readAsArrayBuffer(jpegBlob);
+  }, 'image/jpeg', 0.92);
+}
+
+// ===== 从 JPEG ArrayBuffer 生成 PDF 并下载 =====
+function generatePDFFromJPEG(jpegBuffer, imgW, imgH) {
+  var pdfW = 595;  // A4 width in points
+  var scale = pdfW / imgW;
+  var pdfH = imgH * scale;
+  var jpegBytes = new Uint8Array(jpegBuffer);
+  
+  var encoder = new TextEncoder();
+  
+  // Build PDF objects as byte arrays
+  var header = encoder.encode('%PDF-1.4\n');
+  
+  var obj1 = encoder.encode('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  var obj2 = encoder.encode('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  var obj3 = encoder.encode('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pdfW + ' ' + pdfH + '] /Contents 4 0 R /Resources << /XObject << /Img0 5 0 R >> >> >>\nendobj\n');
+  
+  var contentStream = 'q\n' + pdfW + ' 0 0 ' + pdfH + ' 0 0 cm\n/Img0 Do\nQ\n';
+  var obj4header = '4 0 obj\n<< /Length ' + contentStream.length + ' >>\nstream\n';
+  var obj4footer = '\nendstream\nendobj\n';
+  
+  var obj5header = encoder.encode('5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + imgW + ' /Height ' + imgH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegBytes.length + ' >>\nstream\n');
+  var obj5footer = encoder.encode('\nendstream\nendobj\n');
+  
+  // Calculate offsets
+  var offset = 0;
+  var offsets = [];
+  
+  offsets.push(offset); offset += header.length;                          // obj1
+  offsets.push(offset); offset += obj1.length;                            // obj2
+  offsets.push(offset); offset += obj2.length;                            // obj3
+  offsets.push(offset); offset += obj3.length;                            // obj4 (header + stream + footer)
+  
+  var obj4Offset = offset;
+  offset += encoder.encode(obj4header).length + contentStream.length + encoder.encode(obj4footer).length;
+  
+  offsets.push(offset);                                                   // obj5
+  offset += obj5header.length + jpegBytes.length + obj5footer.length;
+  
+  // Cross-reference
+  var xref = 'xref\n0 6\n0000000000 65535 f \n';
+  for (var k = 0; k < offsets.length; k++) {
+    var offStr = offsets[k].toString();
+    while (offStr.length < 10) offStr = '0' + offStr;
+    xref += offStr + ' 00000 n \n';
+  }
+  
+  var trailer = 'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + offset + '\n%%EOF';
+  
+  // Combine all parts
+  var parts = [
+    header,
+    obj1,
+    obj2,
+    obj3,
+    encoder.encode(obj4header),
+    encoder.encode(contentStream),
+    encoder.encode(obj4footer),
+    obj5header,
+    jpegBytes,
+    obj5footer,
+    encoder.encode(xref),
+    encoder.encode(trailer)
+  ];
+  
+  var pdfBlob = new Blob(parts, { type: 'application/pdf' });
+  downloadBlob(pdfBlob, '仪表盘_' + new Date().toISOString().slice(0,10) + '.pdf');
+  toast('仪表盘PDF已下载', 'success');
 }
 
 function exportDashboardCSV() {
@@ -6916,12 +7401,34 @@ function renderPermissionsTab(panel) {
     const item = h('div', { style:{ padding:'16px', background:'var(--bg)', borderRadius:'8px', marginBottom:'12px', border:'1px solid var(--border)' } });
     
     // User header
-    const userHeader = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' } });
-    userHeader.appendChild(h('div', {},
-      h('div', { style:{ fontWeight:'600', fontSize:'14px' } }, user.name || '未命名'),
-      h('div', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '账号：' + user.account + (user.binding ? ' | 已绑定：' + user.binding : ' | 未绑定'))
-    ));
-    userHeader.appendChild(h('button', { className:'btn btn-danger btn-sm', onclick: () => {
+    const userHeader = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', flexWrap:'wrap', gap:'8px' } });
+    const infoDiv = h('div', {});
+    infoDiv.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'14px' } }, user.name || '未命名'));
+    
+    // Account row with copy buttons
+    const accountRow = h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginTop:'4px' } });
+    accountRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '账号：'));
+    accountRow.appendChild(h('code', { style:{ fontSize:'12px', padding:'2px 6px', background:'#F1F5F9', borderRadius:'4px', fontFamily:'monospace' } }, user.account));
+    accountRow.appendChild(h('button', { 
+      className:'btn btn-xs', 
+      style:{ fontSize:'11px', padding:'2px 8px' },
+      title:'复制账号',
+      onclick: () => { copyToClipboard(user.account); toast('账号已复制', 'success'); }
+    }, '📋'));
+    accountRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)', marginLeft:'4px' } }, '密码：'));
+    accountRow.appendChild(h('code', { style:{ fontSize:'12px', padding:'2px 6px', background:'#F1F5F9', borderRadius:'4px', fontFamily:'monospace' } }, user.password));
+    accountRow.appendChild(h('button', { 
+      className:'btn btn-xs', 
+      style:{ fontSize:'11px', padding:'2px 8px' },
+      title:'复制密码',
+      onclick: () => { copyToClipboard(user.password); toast('密码已复制', 'success'); }
+    }, '📋'));
+    accountRow.appendChild(h('span', { style:{ fontSize:'11px', color:'var(--text-muted)', marginLeft:'4px' } }, user.binding ? '已绑定：' + user.binding : '未绑定'));
+    infoDiv.appendChild(accountRow);
+    userHeader.appendChild(infoDiv);
+    
+    const btnGroup = h('div', { style:{ display:'flex', gap:'6px' } });
+    btnGroup.appendChild(h('button', { className:'btn btn-danger btn-sm', onclick: () => {
       if (confirm('确认删除子管理员「' + (user.name || user.account) + '」？')) {
         db.permissions.users.splice(idx, 1);
         saveDB(db);
@@ -6929,6 +7436,7 @@ function renderPermissionsTab(panel) {
         toast('已删除子管理员', 'success');
       }
     } }, '删除'));
+    userHeader.appendChild(btnGroup);
     item.appendChild(userHeader);
     
     // Permissions grid
@@ -6966,7 +7474,7 @@ function renderPermissionsTab(panel) {
       db.permissions.users.push(user);
       saveDB(db);
       renderPermissionsTab(panel);
-      alert('子管理员账号已生成：\n账号：' + account + '\n密码：' + password + '\n\n请妥善保管，分享给对应子管理员。');
+      showAccountModal(account, password, name);
     }
   }, '+ 生成子管理员账号'));
   genDiv.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)', marginLeft:'8px' } }, '生成账号和随机密码，默认赋予基础编辑权限'));
@@ -6986,6 +7494,104 @@ function renderPermissionsTab(panel) {
       saveDB(db);
     } })
   ));
+}
+
+// 复制到剪贴板辅助函数
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(function(){});
+    return;
+  }
+  // Fallback for older browsers
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+}
+
+// 子管理员账号生成成功弹窗（带复制按钮）
+function showAccountModal(account, password, name) {
+  var overlay = h('div', {
+    style: 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;'
+  });
+  
+  var modal = h('div', {
+    style: 'background:white;border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);'
+  });
+  
+  modal.appendChild(h('div', {
+    style: 'font-size:18px;font-weight:700;margin-bottom:4px;color:#059669;'
+  }, '子管理员账号已生成'));
+  
+  modal.appendChild(h('p', {
+    style: 'font-size:13px;color:#64748B;margin-bottom:20px;'
+  }, '请立即复制并妥善保管，关闭后无法再次查看密码'));
+  
+  if (name) {
+    modal.appendChild(h('div', { style:'font-size:13px;color:#334155;margin-bottom:12px;' },
+      '名称：' + h('strong', {}, name)
+    ));
+  }
+  
+  // Account row
+  var acctDiv = h('div', { style:'display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 14px;background:#F1F5F9;border-radius:8px;' });
+  acctDiv.appendChild(h('span', { style:'font-size:13px;color:#64748B;whiteSpace:nowrap;' }, '账号：'));
+  acctDiv.appendChild(h('code', { id:'modal-account', style:'flex:1;font-size:14px;font-weight:600;font-family:monospace;color:#1E293B;word-break:break-all;' }, account));
+  acctDiv.appendChild(h('button', {
+    className: 'btn btn-primary btn-sm',
+    style: 'white-space:nowrap;',
+    onclick: function() {
+      copyToClipboard(account);
+      toast('账号已复制', 'success');
+    }
+  }, '复制'));
+  modal.appendChild(acctDiv);
+  
+  // Password row
+  var pwdDiv = h('div', { style:'display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px 14px;background:#FEF3C7;border-radius:8px;' });
+  pwdDiv.appendChild(h('span', { style:'font-size:13px;color:#64748B;whiteSpace:nowrap;' }, '密码：'));
+  pwdDiv.appendChild(h('code', { id:'modal-password', style:'flex:1;font-size:14px;font-weight:600;font-family:monospace;color:#92400E;word-break:break-all;' }, password));
+  pwdDiv.appendChild(h('button', {
+    className: 'btn btn-primary btn-sm',
+    style: 'white-space:nowrap;',
+    onclick: function() {
+      copyToClipboard(password);
+      toast('密码已复制', 'success');
+    }
+  }, '复制'));
+  modal.appendChild(pwdDiv);
+  
+  // One-click copy all
+  var copyAll = h('button', {
+    className: 'btn btn-secondary',
+    style: 'width:100%;margin-bottom:12px;',
+    onclick: function() {
+      var text = '账号：' + account + '\n密码：' + password + (name ? '\n名称：' + name : '') + '\n\n登录链接：' + window.location.origin + window.location.pathname;
+      copyToClipboard(text);
+      toast('账号信息已全部复制', 'success');
+    }
+  }, '📋 一键复制全部（含登录链接）');
+  modal.appendChild(copyAll);
+  
+  // Close button
+  modal.appendChild(h('button', {
+    className: 'btn btn-danger',
+    style: 'width:100%;',
+    onclick: function() { overlay.remove(); }
+  }, '关闭（请确认已复制密码）'));
+  
+  overlay.appendChild(modal);
+  
+  // Click outside to close
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  
+  document.body.appendChild(overlay);
 }
 
 function renderSettingsTab(panel) {
