@@ -2438,26 +2438,36 @@ function renderScoreBar(label, score, colorClass) {
 }
 
 // ===== DASHBOARD =====
+// v5.7.2: 统一领域分布计算 — 只返回有专家的领域，空领域不显示不统计
+function getFieldDistribution(experts) {
+  const db = appState.db;
+  const usedFieldNames = new Set(experts.flatMap(e => e.fields || []));
+  const visibleFields = db.fields.filter(f => {
+    if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
+    return true;
+  });
+  const fieldCount = {};
+  visibleFields.forEach(f => { fieldCount[f.name] = 0; });
+  experts.forEach(e => {
+    (e.fields || []).forEach(f => { if (fieldCount[f] !== undefined) fieldCount[f]++; });
+  });
+  // 过滤掉 0 人领域
+  const names = [], values = [], colors = [];
+  visibleFields.forEach(f => {
+    if (fieldCount[f.name] > 0) {
+      names.push(f.name);
+      values.push(fieldCount[f.name]);
+      colors.push(f.color);
+    }
+  });
+  return { names, values, colors };
+}
+
 function renderMainFieldChart() {
   const db = appState.db;
   const experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
-  // Filter fields same as filter bar logic
-  const chartUsedFields = new Set(experts.flatMap(e => e.fields || []));
-  const chartVisibleFields = db.fields.filter(f => {
-    if (f.hideWhenEmpty && !chartUsedFields.has(f.name)) return false;
-    return true;
-  });
-  
-  const fieldCount = {};
-  chartVisibleFields.forEach(f => { fieldCount[f.name] = 0; });
-  experts.forEach(e => {
-    e.fields.forEach(f => { if (fieldCount[f] !== undefined) fieldCount[f]++; });
-  });
-  
-  const fieldNames = Object.keys(fieldCount);
-  const fieldValues = Object.values(fieldCount);
-  const fieldColors = chartVisibleFields.map(f => f.color);
+  const { names: fieldNames, values: fieldValues, colors: fieldColors } = getFieldDistribution(experts);
   
   // Try both old and new container IDs
   let container = document.getElementById('main-field-chart-inline');
@@ -2667,23 +2677,8 @@ function showDashboard() {
 function renderCharts(experts) {
   const db = appState.db;
   
-  // 仪表盘领域分布：同样过滤 hideWhenEmpty 且当前可见专家中无对应讲师的标签
-  const chartUsedFields = new Set(experts.flatMap(e => e.fields || []));
-  const chartVisibleFields = db.fields.filter(f => {
-    if (f.hideWhenEmpty && !chartUsedFields.has(f.name)) return false;
-    return true;
-  });
-
-  // Field distribution
-  const fieldCount = {};
-  chartVisibleFields.forEach(f => { fieldCount[f.name] = 0; });
-  experts.forEach(e => {
-    e.fields.forEach(f => { if (fieldCount[f] !== undefined) fieldCount[f]++; });
-  });
-  
-  const fieldNames = Object.keys(fieldCount);
-  const fieldValues = Object.values(fieldCount);
-  const fieldColors = chartVisibleFields.map(f => f.color);
+  // v5.7.2: 领域分布只显示有专家的领域
+  const { names: fieldNames, values: fieldValues, colors: fieldColors } = getFieldDistribution(experts);
   
   renderBarChart('chart-fields', fieldNames, fieldValues, fieldColors, '领域分布');
   
@@ -6595,10 +6590,8 @@ function renderDashboardTab(panel) {
   setTimeout(() => {
     const fieldChartContainer = document.getElementById('admin-chart-fields');
     if (fieldChartContainer) {
-      const fieldCount = {};
-      db.fields.forEach(f => { fieldCount[f.name] = 0; });
-      experts.forEach(e => { e.fields.forEach(f => { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
-      renderBarChart('admin-chart-fields', Object.keys(fieldCount), Object.values(fieldCount), db.fields.map(f => f.color));
+      var dist = getFieldDistribution(experts);
+      renderBarChart('admin-chart-fields', dist.names, dist.values, dist.colors);
     }
     
     const numericContainer = document.getElementById('admin-chart-numeric');
@@ -6683,13 +6676,10 @@ function exportDashboardImage() {
   
   // ---- Fields bar chart ----
   if (hasFields) {
-    var fieldCount = {};
-    db.fields.forEach(function(f) { fieldCount[f.name] = 0; });
-    experts.forEach(function(e) { e.fields.forEach(function(f) { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
-    
-    var labels = Object.keys(fieldCount);
-    var data = Object.values(fieldCount);
-    var colorsArr = db.fields.map(function(f) { return f.color; });
+    var dist = getFieldDistribution(experts);
+    var labels = dist.names;
+    var data = dist.values;
+    var colorsArr = dist.colors;
     
     // Section title
     ctx.fillStyle = '#1E293B';
@@ -6987,12 +6977,10 @@ function exportDashboardPDF() {
   currentY += titleH;
   
   if (hasFields) {
-    var fieldCount = {};
-    db.fields.forEach(function(f) { fieldCount[f.name] = 0; });
-    experts.forEach(function(e) { e.fields.forEach(function(f) { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
-    var labels = Object.keys(fieldCount);
-    var data = Object.values(fieldCount);
-    var colorsArr = db.fields.map(function(f) { return f.color; });
+    var dist = getFieldDistribution(experts);
+    var labels = dist.names;
+    var data = dist.values;
+    var colorsArr = dist.colors;
     
     ctx.fillStyle = '#1E293B';
     ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
@@ -7119,14 +7107,12 @@ function exportDashboardCSV() {
   const db = appState.db;
   const experts = db.experts.filter(e => e.status !== 'eliminated');
   
-  // Field distribution
-  const fieldCount = {};
-  db.fields.forEach(f => { fieldCount[f.name] = 0; });
-  experts.forEach(e => { e.fields.forEach(f => { if (fieldCount[f] !== undefined) fieldCount[f]++; }); });
+  // v5.7.2: 领域分布只导出有专家的领域
+  var dist = getFieldDistribution(experts);
   
   let csv = '类别,数值\n';
   csv += '--- 领域分布 ---\n';
-  Object.entries(fieldCount).forEach(([k,v]) => { csv += k + ',' + v + '\n'; });
+  dist.names.forEach((name, i) => { csv += name + ',' + dist.values[i] + '\n'; });
   
   const profAvg = (experts.reduce((s,e) => s + e.scores.professional, 0) / experts.length).toFixed(1);
   const inflAvg = (experts.reduce((s,e) => s + e.scores.influence, 0) / experts.length).toFixed(1);
