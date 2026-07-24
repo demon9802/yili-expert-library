@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.9 | 2026-07-24 | 手机端切换：手动按钮+localStorage记忆+首次自动检测 */
+/* Version 5.7.0 | 2026-07-24 | 修复fields数据丢失bug(并集合并)+子管理员密码管理+主管理员重置密码 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.9] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.7.0] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -414,11 +414,15 @@ async function getDB() {
       
       // 合并字段：Supabase 提供字段列表，localStorage 提供颜色覆盖
       // 修复 v4.0 初始阶段管理员修改未同步到 Supabase 导致刷新后颜色丢失
-      let fields = appData.fields;
+      // V5.7.0-hotfix: 改为并集合并 —— localStorage 独有字段不再被丢弃
+      let fields = [];
       if (localConfig.fields && localConfig.fields.length > 0) {
+        const supabaseFieldMap = {};
+        appData.fields.forEach(function(f) { if (f && f.name) supabaseFieldMap[f.name] = true; });
         const localFieldMap = {};
         localConfig.fields.forEach(function(f) { if (f && f.name) localFieldMap[f.name] = f; });
-        fields = fields.map(function(f) {
+        // 1. 以 Supabase 为基准，合并 localStorage 的颜色覆盖
+        fields = appData.fields.map(function(f) {
           const local = localFieldMap[f.name];
           if (local && local.color) {
             return {
@@ -426,11 +430,21 @@ async function getDB() {
               color: local.color,
               textColor: local.textColor || '#ffffff',
               hideWhenEmpty: local.hideWhenEmpty !== undefined ? local.hideWhenEmpty : f.hideWhenEmpty,
-              sortOrder: local.sortOrder !== undefined ? local.sortOrder : f.sortOrder
+              sortOrder: local.sortOrder !== undefined ? local.sortOrder : f.sortOrder,
+              creator: local.creator !== undefined ? local.creator : f.creator
             };
           }
           return f;
         });
+        // 2. 追加 localStorage 中独有的字段（防止同步失败导致新增字段丢失）
+        localConfig.fields.forEach(function(f) {
+          if (f && f.name && !supabaseFieldMap[f.name]) {
+            fields.push(f);
+            console.log('[getDB] 保留 localStorage 独有字段:', f.name);
+          }
+        });
+      } else {
+        fields = appData.fields;
       }
       
       // v4.4: 登录用户收藏双向合并 — localStorage ∪ Supabase
@@ -483,7 +497,7 @@ async function getDB() {
         permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
         categoryConfig: fields,
         totalExperts: finalExperts.length,
-        totalFields: appData.fields.length,
+        totalFields: fields.length,
         version: CURRENT_DB_VERSION,
         updateTime: new Date().toISOString()
       };
@@ -589,14 +603,22 @@ async function syncToSupabase(db) {
       } catch(e) { console.warn('Project sync error:', proj.title, e.message); }
     }
   }
-  // Sync fields
+  // Sync fields — V5.7.0-hotfix: 先查后写，避免 update 对不存在的行静默成功导致 create 永不触发
   if (db.fields) {
+    let supabaseFieldNames = new Set();
+    try {
+      const sf = await fetchFields();
+      supabaseFieldNames = new Set(sf.map(function(f) { return f.name; }));
+    } catch(e) { console.warn('[sync] fetchFields failed:', e.message); }
     for (const field of db.fields) {
       try {
-        await updateField(field.name, field);
-      } catch(e) {
-        try { await createField(field); } catch(e2) { console.warn('Field sync error:', field.name, e2.message); }
-      }
+        if (supabaseFieldNames.has(field.name)) {
+          await updateField(field.name, field);
+        } else {
+          await createField(field);
+          supabaseFieldNames.add(field.name);
+        }
+      } catch(e) { console.warn('Field sync error:', field.name, e.message); }
     }
   }
   // Sync permissions (sub-admin accounts, share settings)
@@ -3599,6 +3621,15 @@ function renderAdmin() {
     onclick: function() { toggleMobileMode(); }
   }, isMobileAdmin ? '💻 桌面版' : '📱 手机版'));
   
+  // 子管理员可修改自己的密码
+  if (!isMaster) {
+    headerActions.appendChild(h('button', {
+      className: 'btn btn-sm',
+      style: { background:'rgba(255,255,255,0.15)', color:'white', fontSize:'12px', border:'1px solid rgba(255,255,255,0.2)', marginRight:'4px' },
+      onclick: function() { showSubAdminChangePasswordModal(); }
+    }, '🔑 修改密码'));
+  }
+
   headerActions.appendChild(h('button', {
     className: 'btn btn-sm',
     style: { background:'rgba(255,255,255,0.15)', color:'white', fontSize:'12px', border:'1px solid rgba(255,255,255,0.2)' },
@@ -7469,6 +7500,18 @@ function renderPermissionsTab(panel) {
     userHeader.appendChild(infoDiv);
     
     const btnGroup = h('div', { style:{ display:'flex', gap:'6px' } });
+    // 重置密码按钮
+    btnGroup.appendChild(h('button', {
+      className:'btn btn-sm',
+      style:{ background:'#F59E0B', color:'white', border:'none', fontSize:'12px', padding:'4px 10px', borderRadius:'6px' },
+      onclick: function() {
+        var newPwd = Math.random().toString(36).substring(2, 10);
+        user.password = newPwd;
+        saveDB(db);
+        renderPermissionsTab(panel);
+        showResetPasswordModal(user.account, newPwd, user.name);
+      }
+    }, '重置密码'));
     btnGroup.appendChild(h('button', { className:'btn btn-danger btn-sm', onclick: () => {
       if (confirm('确认删除子管理员「' + (user.name || user.account) + '」？')) {
         db.permissions.users.splice(idx, 1);
@@ -7535,6 +7578,93 @@ function renderPermissionsTab(panel) {
       saveDB(db);
     } })
   ));
+}
+
+// ===== 子管理员修改密码弹窗 =====
+function showSubAdminChangePasswordModal() {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '24px', width: '380px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 16px', fontSize: '16px' } }, '🔑 修改密码'));
+
+  var oldPwdIn = h('input', { type: 'password', placeholder: '当前密码', style: { width: '100%', padding: '10px 12px', marginBottom: '10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' } });
+  var newPwdIn = h('input', { type: 'password', placeholder: '新密码', style: { width: '100%', padding: '10px 12px', marginBottom: '10px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' } });
+  var confirmPwdIn = h('input', { type: 'password', placeholder: '确认新密码', style: { width: '100%', padding: '10px 12px', marginBottom: '16px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' } });
+  modal.appendChild(oldPwdIn);
+  modal.appendChild(newPwdIn);
+  modal.appendChild(confirmPwdIn);
+
+  var btnRow = h('div', { style: { display: 'flex', gap: '10px' } });
+  btnRow.appendChild(h('button', {
+    className: 'btn btn-secondary',
+    style: { flex: 1 },
+    onclick: function() { overlay.remove(); }
+  }, '取消'));
+  btnRow.appendChild(h('button', {
+    className: 'btn btn-primary',
+    style: { flex: 1 },
+    onclick: function() {
+      var oldPwd = oldPwdIn.value.trim();
+      var newPwd = newPwdIn.value.trim();
+      var confirmPwd = confirmPwdIn.value.trim();
+      if (!oldPwd || !newPwd || !confirmPwd) { toast('请填写所有字段', 'error'); return; }
+      if (newPwd !== confirmPwd) { toast('两次输入的新密码不一致', 'error'); return; }
+      if (newPwd.length < 4) { toast('新密码至少需要4位', 'error'); return; }
+      var db = appState.db;
+      var cu = appState.currentUser;
+      var user = db.permissions.users.find(function(u) { return u.account === cu.account; });
+      if (!user) { toast('账号信息异常', 'error'); return; }
+      if (user.password !== oldPwd) { toast('当前密码不正确', 'error'); return; }
+      user.password = newPwd;
+      saveDB(db);
+      overlay.remove();
+      toast('密码修改成功，请牢记新密码', 'success');
+    }
+  }, '确认修改'));
+  modal.appendChild(btnRow);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+// ===== 主管理员重置密码后弹窗展示 =====
+function showResetPasswordModal(account, password, name) {
+  var overlay = h('div', {
+    style: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    onclick: function(e) { if (e.target === overlay) overlay.remove(); }
+  });
+  var modal = h('div', { style: { background: '#fff', borderRadius: '12px', padding: '24px', width: '400px', maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' } });
+  modal.appendChild(h('h3', { style: { margin: '0 0 16px', fontSize: '16px' } }, '🔑 密码已重置'));
+  modal.appendChild(h('p', { style: { fontSize: '13px', color: '#64748B', marginBottom: '16px' } }, '子管理员「' + (name || account) + '」的密码已重置，请及时将新密码告知对方。'));
+
+  var row1 = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '10px 12px', background: '#F1F5F9', borderRadius: '8px' } });
+  row1.appendChild(h('span', { style: { fontSize: '13px', color: '#64748B', whiteSpace: 'nowrap' } }, '账号'));
+  row1.appendChild(h('code', { style: { flex: 1, fontSize: '14px', fontFamily: 'monospace' } }, account));
+  row1.appendChild(h('button', { className: 'btn btn-xs', onclick: function() { copyToClipboard(account); toast('账号已复制', 'success'); } }, '📋'));
+  modal.appendChild(row1);
+
+  var row2 = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 12px', background: '#F1F5F9', borderRadius: '8px' } });
+  row2.appendChild(h('span', { style: { fontSize: '13px', color: '#64748B', whiteSpace: 'nowrap' } }, '新密码'));
+  row2.appendChild(h('code', { style: { flex: 1, fontSize: '14px', fontFamily: 'monospace' } }, password));
+  row2.appendChild(h('button', { className: 'btn btn-xs', onclick: function() { copyToClipboard(password); toast('密码已复制', 'success'); } }, '📋'));
+  modal.appendChild(row2);
+
+  var allInfo = '账号：' + account + '\n新密码：' + password + '\n登录地址：' + window.location.origin;
+  modal.appendChild(h('button', {
+    className: 'btn btn-primary',
+    style: { width: '100%', marginBottom: '12px' },
+    onclick: function() { copyToClipboard(allInfo); toast('账号信息已复制', 'success'); }
+  }, '📋 一键复制全部信息'));
+
+  modal.appendChild(h('button', {
+    className: 'btn btn-secondary',
+    style: { width: '100%' },
+    onclick: function() { overlay.remove(); }
+  }, '关闭'));
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 // 复制到剪贴板辅助函数
