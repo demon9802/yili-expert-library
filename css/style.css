@@ -1718,3 +1718,126 @@ mark {
   color: inherit;
   padding: 0;
 }
+
+/* ===== v5.6.9: 手机端切换模式 ===== */
+/* 手动切换 — body.mobile-mode 优先级高于 @media 响应式 */
+body.mobile-mode {
+  --max-width: 100%;
+}
+body.mobile-mode .header-inner {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0 12px;
+  gap: 8px;
+}
+body.mobile-mode .header-title {
+  font-size: 16px;
+}
+body.mobile-mode .header-actions {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+body.mobile-mode .header-update {
+  display: none;
+}
+body.mobile-mode .stats-bar {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0 12px;
+}
+body.mobile-mode .stat-chart-card {
+  min-width: auto !important;
+}
+body.mobile-mode .search-bar {
+  flex-wrap: wrap;
+  padding: 0 12px;
+}
+body.mobile-mode .search-input-wrapper {
+  max-width: 100%;
+  flex: 1 1 100%;
+}
+body.mobile-mode .filter-bar {
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0 12px;
+}
+body.mobile-mode .field-filters {
+  flex-wrap: wrap;
+}
+body.mobile-mode .expert-grid {
+  grid-template-columns: 1fr;
+  padding: 0 12px 56px 12px;
+  gap: 12px;
+}
+body.mobile-mode .expert-card {
+  padding: 14px 16px 12px 14px;
+}
+body.mobile-mode .card-name {
+  font-size: 15px;
+}
+body.mobile-mode .card-avatar {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  font-size: 20px;
+}
+body.mobile-mode .admin-nav {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+body.mobile-mode .score-numeric-grid {
+  grid-template-columns: 1fr;
+}
+body.mobile-mode .dashboard-grid {
+  grid-template-columns: 1fr;
+}
+body.mobile-mode .detail-score-row {
+  flex-direction: column;
+}
+body.mobile-mode .detail-score-sub-area {
+  grid-template-columns: 1fr;
+}
+body.mobile-mode .modal-content {
+  max-width: 100%;
+  max-height: 90vh;
+  margin: 0;
+}
+body.mobile-mode .modal-overlay {
+  padding: 8px;
+}
+body.mobile-mode .table-scroll-wrapper {
+  overflow-x: auto;
+}
+body.mobile-mode .admin-container {
+  padding: 12px;
+}
+body.mobile-mode .admin-panel {
+  padding: 14px;
+}
+body.mobile-mode .inline-chart-section {
+  padding: 0 12px;
+}
+body.mobile-mode .page-navigation-float {
+  padding: 6px 8px;
+}
+body.mobile-mode .page-nav-inline-btn,
+body.mobile-mode .page-nav-inline-num {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+/* 手机版切换按钮 */
+.mobile-toggle-btn {
+  background: rgba(255,255,255,0.15) !important;
+  color: white !important;
+  font-size: 12px !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.mobile-toggle-btn:hover {
+  background: rgba(255,255,255,0.25) !important;
+}
+.mobile-toggle-btn.active {
+  background: rgba(255,255,255,0.3) !important;
+  border-color: rgba(255,255,255,0.4) !important;
+}

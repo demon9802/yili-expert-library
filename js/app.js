@@ -1,8 +1,8 @@
 /* ===== 伊利集团·数智化赋能优质专家资源库 - 主应用 ===== */
-/* Version 5.6.8 | 2026-07-22 | 子管理员分类Tab修复+账号管理UI改进+仪表盘图片/PDF直接下载 */
+/* Version 5.6.9 | 2026-07-24 | 手机端切换：手动按钮+localStorage记忆+首次自动检测 */
 
 // 前端版本标记 - 打开控制台（F12）可查看当前加载版本
-console.log('%c[专家资源库 v5.6.8] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
+console.log('%c[专家资源库 v5.6.9] 加载时间: ' + new Date().toLocaleString() + ' | Supabase Cloud | EdgeOne Pages', 'color:#059669;font-weight:700;font-size:13px;');
 
 // v4.0 兜底声明 — 确保 supabase.js 的全局变量在任何情况下都可用
 if (typeof currentUser === 'undefined') var currentUser = null;
@@ -727,6 +727,33 @@ function toast(msg, type='') {
   setTimeout(() => { el.remove(); }, 2500);
 }
 
+// v5.6.9: 手机端切换
+function toggleMobileMode() {
+  var isMobile = document.body.classList.toggle('mobile-mode');
+  try { localStorage.setItem('yili_mobile_mode', isMobile ? '1' : '0'); } catch(e) {}
+  toast(isMobile ? '已切换到手机版' : '已切换到桌面版', 'success');
+  // 重新渲染当前页面以更新按钮文字
+  if (appState.mode === 'admin') {
+    renderAdmin();
+  } else {
+    renderFrontend();
+  }
+}
+
+function initMobileMode() {
+  var saved = null;
+  try { saved = localStorage.getItem('yili_mobile_mode'); } catch(e) {}
+  if (saved === '1') {
+    document.body.classList.add('mobile-mode');
+  } else if (saved === null) {
+    // 首次访问：自动检测屏幕宽度
+    if (window.innerWidth < 768) {
+      document.body.classList.add('mobile-mode');
+      try { localStorage.setItem('yili_mobile_mode', '1'); } catch(e) {}
+    }
+  }
+}
+
 function formatDate(isoStr) {
   if (!isoStr) return '';
   try {
@@ -940,6 +967,13 @@ function renderFrontend() {
     style: { background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: '12px', border: '1px solid rgba(255,255,255,0.2)', marginRight: '4px' },
     onclick: () => showDashboard()
   }, '📊 数据仪表盘'));
+
+  // v5.6.9: 手机版切换按钮
+  var isMobile = document.body.classList.contains('mobile-mode');
+  headerActions.appendChild(h('button', {
+    className: 'btn btn-sm mobile-toggle-btn' + (isMobile ? ' active' : ''),
+    onclick: function() { toggleMobileMode(); }
+  }, isMobile ? '💻 桌面版' : '📱 手机版'));
 
   // 管理员入口按钮
   headerActions.appendChild(h('button', {
@@ -3557,6 +3591,13 @@ function renderAdmin() {
       renderFrontend();
     }
   }, '← 返回前端'));
+  
+  // v5.6.9: 手机版切换按钮（管理后台）
+  var isMobileAdmin = document.body.classList.contains('mobile-mode');
+  headerActions.appendChild(h('button', {
+    className: 'btn btn-sm mobile-toggle-btn' + (isMobileAdmin ? ' active' : ''),
+    onclick: function() { toggleMobileMode(); }
+  }, isMobileAdmin ? '💻 桌面版' : '📱 手机版'));
   
   headerActions.appendChild(h('button', {
     className: 'btn btn-sm',
@@ -8005,6 +8046,9 @@ function renderDocsTab(panel) {
 
 // ===== INIT (v4.0 — async Supabase load with timeout) =====
 async function boot() {
+  // v5.6.9: 初始化手机版模式（localStorage 记忆 + 首次自动检测）
+  initMobileMode();
+  
   var app = document.getElementById('app');
   function showError(msg, detail) {
     app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#ef4444;flex-direction:column;padding:20px;text-align:center;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="margin-bottom:8px;font-weight:bold;">' + msg + '</div><div style="font-size:11px;color:#94a3b8;margin-bottom:8px;max-width:500px;word-break:break-all;">' + detail + '</div><div style="font-size:10px;color:#cbd5e1;margin-bottom:16px;">DEBUG: supabase=' + (typeof supabase === 'undefined' ? 'undefined' : (supabase === null ? 'null' : 'ok')) + ' | EXPERT_DATA=' + (typeof EXPERT_DATA === 'undefined' ? 'undefined' : 'ok') + '</div><button onclick="location.reload()" style="padding:8px 20px;background:#2563EB;color:#fff;border:none;border-radius:6px;cursor:pointer;">重新加载</button></div>';
