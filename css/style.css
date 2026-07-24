@@ -1746,7 +1746,7 @@ body.mobile-mode .stats-bar {
   padding: 0 12px;
 }
 body.mobile-mode .stat-chart-card {
-  min-width: auto !important;
+  display: none;
 }
 body.mobile-mode .search-bar {
   flex-wrap: wrap;
@@ -1792,7 +1792,17 @@ body.mobile-mode .dashboard-grid {
   grid-template-columns: 1fr;
 }
 body.mobile-mode .detail-score-row {
-  flex-direction: column;
+  flex-direction: row;
+  gap: 8px;
+}
+body.mobile-mode .detail-score-card {
+  padding: 10px 6px;
+}
+body.mobile-mode .detail-score-card-val {
+  font-size: 22px;
+}
+body.mobile-mode .detail-score-card-label {
+  font-size: 10px;
 }
 body.mobile-mode .detail-score-sub-area {
   grid-template-columns: 1fr;

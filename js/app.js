@@ -802,6 +802,12 @@ function highlightText(text, query) {
   return escaped.replace(re, '<mark>$1</mark>');
 }
 
+// v5.7.1: 卡片展示名 — 去掉括号内容，避免过长换行
+function getCardDisplayName(name) {
+  if (!name) return '';
+  return name.replace(/[（(][^）)]*[）)]/g, '').trim() || name;
+}
+
 // v4.18: 搜索高亮 — 含HTML的富文本（只替换标签外的文本内容）
 function highlightHtml(html, query) {
   if (!query || !html) return html;
@@ -1200,83 +1206,8 @@ function renderFrontend() {
   
   app.appendChild(filterBar);
   
-  // Field filter
-  const fieldBar = h('div', { className: 'filter-bar field-bar-wrapper', style: { marginTop: '8px' } });
-  const fieldGroup = h('div', { className: 'filter-group' });
-  fieldGroup.appendChild(h('span', { className: 'filter-label' }, '适用领域：'));
-  const fieldFilters = h('div', { className: 'field-filters', id: 'field-filters' });
-  
-  // "全部" tag
-  const allTag = h('span', {
-    className: 'field-tag field-tag-all' + (appState.fieldFilter.size === 0 ? ' active' : ''),
-    onclick: () => {
-      appState.fieldFilter = new Set();
-      appState.currentPage = 1;
-      syncFilterUI();
-      renderExpertGrid();
-    }
-  }, '全部');
-  fieldFilters.appendChild(allTag);
-  
-  // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家中无对应讲师时不展示
-  const frontendExperts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
-  const usedFieldNames = new Set(frontendExperts.flatMap(e => e.fields || []));
-  const visibleFields = db.fields.filter(f => {
-    if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
-    return true;
-  });
-
-  const maxVisible = 8;
-  const showAll = !appState.fieldsCollapsed;
-  const fieldsToShow = showAll ? visibleFields : visibleFields.slice(0, maxVisible);
-  
-  fieldsToShow.forEach(f => {
-    const isActive = appState.fieldFilter.has(f.name);
-    // 顶部筛选栏：背景保持领域色，文字统一深灰色
-    const activeBgColor = f.color;
-    const activeTextColor = '#4A4A4A';
-    const inactiveBgColor = f.color + '22';
-    const inactiveTextColor = '#4A4A4A';
-    
-    const tag = h('span', {
-      className: 'field-tag' + (isActive ? ' active' : ''),
-      style: {
-        background: isActive ? activeBgColor : inactiveBgColor,
-        color: isActive ? activeTextColor : inactiveTextColor,
-        borderColor: f.color
-      },
-      onclick: () => {
-        const newFilter = new Set(appState.fieldFilter);
-        if (newFilter.has(f.name)) {
-          newFilter.delete(f.name);
-        } else {
-          newFilter.add(f.name);
-        }
-        appState.fieldFilter = newFilter;
-        appState.currentPage = 1;
-        syncFilterUI();
-        renderExpertGrid();
-      }
-    }, f.name);
-    fieldFilters.appendChild(tag);
-  });
-  
-  if (visibleFields.length > maxVisible) {
-    const toggleBtn = h('button', {
-      className: 'field-toggle-btn',
-      onclick: () => {
-        appState.fieldsCollapsed = !appState.fieldsCollapsed;
-        appState.currentPage = 1;
-        syncFilterUI();
-        renderExpertGrid();
-      }
-    }, showAll ? '收起 ▲' : '更多 ▼');
-    fieldFilters.appendChild(toggleBtn);
-  }
-  
-  fieldGroup.appendChild(fieldFilters);
-  fieldBar.appendChild(fieldGroup);
-  app.appendChild(fieldBar);
+  // v5.7.1: Field filter — extracted to reusable function for collapse button
+  renderFieldFilterBar();
   
   // v3.5: 合并筛选栏 — 是否在库 + 合作经历 + 收藏筛选 同行
   const mergedBar = h('div', { className: 'filter-bar merged-bar-wrapper', style: { marginTop: '8px' } });
@@ -1383,6 +1314,100 @@ function renderFrontend() {
   // Render main page field chart — 受管理后台 showCharts 控制
   if (dc.showCharts.includes('fields')) {
     setTimeout(() => renderMainFieldChart(), 200);
+  }
+}
+
+// ===== v5.7.1: 字段筛选栏独立渲染（用于收起/展开按钮） =====
+function renderFieldFilterBar() {
+  var db = appState.db;
+  var app = document.getElementById('app');
+  if (!app) return;
+  
+  // Remove existing field bar
+  var oldBar = document.querySelector('.field-bar-wrapper');
+  if (oldBar) oldBar.remove();
+  
+  var fieldBar = h('div', { className: 'filter-bar field-bar-wrapper', style: { marginTop: '8px' } });
+  var fieldGroup = h('div', { className: 'filter-group' });
+  fieldGroup.appendChild(h('span', { className: 'filter-label' }, '适用领域：'));
+  var fieldFilters = h('div', { className: 'field-filters', id: 'field-filters' });
+  
+  // "全部" tag
+  var allTag = h('span', {
+    className: 'field-tag field-tag-all' + (appState.fieldFilter.size === 0 ? ' active' : ''),
+    onclick: function() {
+      appState.fieldFilter = new Set();
+      appState.currentPage = 1;
+      syncFilterUI();
+      renderExpertGrid();
+    }
+  }, '全部');
+  fieldFilters.appendChild(allTag);
+  
+  // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家中无对应讲师时不展示
+  var frontendExperts = db.experts.filter(function(e) { return e.status !== 'eliminated' && e.status !== 'observation'; });
+  var usedFieldNames = new Set(frontendExperts.flatMap(function(e) { return e.fields || []; }));
+  var visibleFields = db.fields.filter(function(f) {
+    if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
+    return true;
+  });
+
+  var maxVisible = 8;
+  var showAll = !appState.fieldsCollapsed;
+  var fieldsToShow = showAll ? visibleFields : visibleFields.slice(0, maxVisible);
+  
+  fieldsToShow.forEach(function(f) {
+    var isActive = appState.fieldFilter.has(f.name);
+    var activeBgColor = f.color;
+    var activeTextColor = '#4A4A4A';
+    var inactiveBgColor = f.color + '22';
+    var inactiveTextColor = '#4A4A4A';
+    
+    var tag = h('span', {
+      className: 'field-tag' + (isActive ? ' active' : ''),
+      style: {
+        background: isActive ? activeBgColor : inactiveBgColor,
+        color: isActive ? activeTextColor : inactiveTextColor,
+        borderColor: f.color
+      },
+      onclick: function() {
+        var newFilter = new Set(appState.fieldFilter);
+        if (newFilter.has(f.name)) {
+          newFilter.delete(f.name);
+        } else {
+          newFilter.add(f.name);
+        }
+        appState.fieldFilter = newFilter;
+        appState.currentPage = 1;
+        syncFilterUI();
+        renderExpertGrid();
+      }
+    }, f.name);
+    fieldFilters.appendChild(tag);
+  });
+  
+  if (visibleFields.length > maxVisible) {
+    var toggleBtn = h('button', {
+      className: 'field-toggle-btn',
+      onclick: function() {
+        appState.fieldsCollapsed = !appState.fieldsCollapsed;
+        appState.currentPage = 1;
+        renderFieldFilterBar();
+        renderExpertGrid();
+      }
+    }, showAll ? '收起 ▲' : '更多 ▼');
+    fieldFilters.appendChild(toggleBtn);
+  }
+  
+  fieldGroup.appendChild(fieldFilters);
+  fieldBar.appendChild(fieldGroup);
+  
+  // Insert before merged bar or append
+  var mergedBar = document.querySelector('.merged-bar-wrapper');
+  if (mergedBar) {
+    app.insertBefore(fieldBar, mergedBar);
+  } else {
+    app.appendChild(fieldBar);
   }
 }
 
@@ -1791,7 +1816,10 @@ function renderExpertGrid() {
     
     // Row 1: name + fav star + scores (v4.18: name with search highlight)
     const nameRow = h('div', { className: 'card-name-row' });
-    nameRow.appendChild(h('div', { className: 'card-name', innerHTML: highlightText(expert.name, sq) }));
+    const cardDisplayName = getCardDisplayName(expert.name);
+    const nameEl = h('div', { className: 'card-name', innerHTML: highlightText(cardDisplayName, sq) });
+    if (cardDisplayName !== expert.name) nameEl.title = expert.name;
+    nameRow.appendChild(nameEl);
     
     // v3.1: 收藏星标 ⭐ — 放在姓名右侧行内
     const favved = isFavorited(expert.id);
