@@ -1347,8 +1347,9 @@ function renderFieldFilterBar() {
   // 前端过滤：hideWhenEmpty=true 的标签，在前端可见专家中无对应讲师时不展示
   var frontendExperts = db.experts.filter(function(e) { return e.status !== 'eliminated' && e.status !== 'observation'; });
   var usedFieldNames = new Set(frontendExperts.flatMap(function(e) { return e.fields || []; }));
+  // V5.7.3: 所有0人领域均不显示（与仪表盘动态显示规则一致）
   var visibleFields = db.fields.filter(function(f) {
-    if (f.hideWhenEmpty && !usedFieldNames.has(f.name)) return false;
+    if (!usedFieldNames.has(f.name)) return false;
     return true;
   });
 
