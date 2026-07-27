@@ -3678,12 +3678,12 @@ function renderAdmin() {
     { id: 'projects', name: '合作项目管理', perm: 'projectsManage' },
     { id: 'ratings', name: '评分管理', perm: 'ratingManage' },
     { id: 'observation', name: '观察库', perm: 'observationManage' },
-    { id: 'sort', name: '排序标签', perm: 'sortManage' },
     { id: 'dashboard', name: '仪表盘', perm: 'dashboardManage' },
     { id: 'categories', name: '分类管理', perm: 'categoryManage' },
     { id: 'permissions', name: '权限管理', perm: 'permissionManage' },
     { id: 'users', name: '👥 用户管理', perm: 'systemSettings' },
-    { id: 'settings', name: '系统设置', perm: 'systemSettings' }
+    { id: 'settings', name: '系统设置', perm: 'systemSettings' },
+    { id: 'monthlyReport', name: '📊 月度报告', perm: 'systemSettings' }
   ];
   
   const visibleTabs = isMaster ? allTabs : allTabs.filter(t => hasPermission(t.perm));
@@ -3709,13 +3709,13 @@ function renderAdmin() {
     case 'experts': renderExpertsTab(panel); break;
     case 'projects': renderProjectsTab(panel); break;
     case 'ratings': renderRatingsTab(panel); break;
-    case 'sort': renderSortTab(panel); break;
     case 'dashboard': renderDashboardTab(panel); break;
     case 'categories': renderCategoriesTab(panel); break;
     case 'observation': renderObservationTab(panel); break;
     case 'permissions': renderPermissionsTab(panel); break;
     case 'users': renderUsersTab(panel); break;
     case 'settings': renderSettingsTab(panel); break;
+    case 'monthlyReport': renderMonthlyReportTab(panel); break;
   }
 }
 
@@ -5334,6 +5334,7 @@ function showExpertForm(expert) {
         observationStatus: (expert && expert.observationStatus) || null,
         observationDate: (expert && expert.observationDate) || null,
         createdAt: (expert && expert.createdAt) || new Date().toISOString(),
+        updatedAt: isEdit ? new Date().toISOString() : ((expert && expert.createdAt) || new Date().toISOString()),
         createdBy: (expert && expert.createdBy) || '主管理员'
       };
       
@@ -7869,6 +7870,44 @@ function renderSettingsTab(panel) {
   uiCard.appendChild(uiBtns);
   panel.appendChild(uiCard);
   
+  // ===== ①-2: 排序标签管理（原独立 Tab，v5.8 迁入界面设置）=====
+  var sortCard = h('div', { style:{ background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border)', marginTop:'12px' } });
+  sortCard.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', marginBottom:'8px' } }, '排序标签'));
+  sortCard.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginBottom:'10px' } }, '管理前端展示的排序选项，可新增或删除。'));
+  db.sortOptions.forEach(function(opt, idx) {
+    var item = h('div', { style: { display:'flex', gap:'12px', alignItems:'center', padding:'6px 0', borderBottom:'1px solid var(--border)' } });
+    item.appendChild(h('span', { style: { fontWeight:'600', minWidth:'80px', fontSize:'13px' } }, opt.name));
+    item.appendChild(h('span', { style: { fontSize:'11px', color:'var(--text-muted)' } }, 'ID: ' + opt.id));
+    if (idx > 0) {
+      item.appendChild(h('button', { className: 'btn btn-danger btn-sm', onclick: function() {
+        db.sortOptions.splice(idx, 1);
+        saveDB(db);
+        renderSettingsTab(panel);
+        toast('已删除排序项', 'success');
+      } }, '删除'));
+    }
+    sortCard.appendChild(item);
+  });
+  var sortAdd = h('div', { style: { marginTop:'10px', display:'flex', gap:'8px', alignItems:'center' } });
+  var sortNameInput = h('input', { placeholder: '排序名称', style: { padding:'6px 10px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1 }, id: 'new-sort-name' });
+  var sortIdInput = h('input', { placeholder: '排序ID（英文）', style: { padding:'6px 10px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', flex:1 }, id: 'new-sort-id' });
+  sortAdd.appendChild(sortNameInput);
+  sortAdd.appendChild(sortIdInput);
+  sortAdd.appendChild(h('button', {
+    className: 'btn btn-primary btn-sm',
+    onclick: function() {
+      var name = document.getElementById('new-sort-name').value.trim();
+      var id = document.getElementById('new-sort-id').value.trim();
+      if (!name || !id) { toast('请填写完整', 'error'); return; }
+      db.sortOptions.push({ id: id, name: name });
+      saveDB(db);
+      renderSettingsTab(panel);
+      toast('排序项已添加', 'success');
+    }
+  }, '添加'));
+  sortCard.appendChild(sortAdd);
+  panel.appendChild(sortCard);
+  
   // ===== ② 系统更新时间 =====
   panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '② 系统更新时间'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '记录系统配置与部署的最近更新日期（非专家数据更新时间）。'));
@@ -8233,12 +8272,335 @@ async function boot() {
     // Step 4.5: sync observation status with latest scores
     autoSyncObservationGlobal();
     
+    // Step 4.6: increment page view counter (v5.8)
+    incrementPageView();
+    
     // Step 5: render
     renderFrontend();
   } catch(e) {
     console.error('Boot failed:', e, e.stack);
     showError('页面加载失败', (e && e.message) || '未知错误');
   }
+}
+
+// ===== v5.8: 月度系统数据报告 =====
+var VERSION_CHANGELOG = [
+  { version: 'v5.8.0', date: '2026-07-27', summary: '月度报告功能上线 + 排序标签迁移至系统设置', module: '系统管理' },
+  { version: 'v5.7.3', date: '2026-07-24', summary: '适用领域筛选标签——0人领域不显示', module: 'UI/交互' },
+  { version: 'v5.7.2', date: '2026-07-24', summary: '仪表盘动态显示——空领域不显示不统计', module: '仪表盘' },
+  { version: 'v5.7.1', date: '2026-07-22', summary: '手机端UI修复 + 收起按钮修复 + 专家卡片名字截断 + 评分并排', module: 'UI/交互' },
+  { version: 'v5.7.0', date: '2026-07-21', summary: '修复严重数据丢失bug + 子管理员密码管理', module: '基础架构' },
+  { version: 'v5.6.9', date: '2026-07-18', summary: '手机端切换功能', module: 'UI/交互' },
+  { version: 'v5.6.8', date: '2026-07-17', summary: '账号管理UI改进 + 仪表盘导出重构', module: 'UI/交互' },
+  { version: 'v5.6.7', date: '2026-07-16', summary: '测试模式仪表盘修复 + 子管理员标签权限 + 子管理员仪表盘只读', module: '权限设置' }
+];
+
+function renderMonthlyReportTab(panel) {
+  var db = appState.db;
+  panel.innerHTML = '';
+  
+  // Header
+  panel.appendChild(h('h3', {}, '📊 月度系统数据报告'));
+  panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } }, '按月汇总专家库变动、仪表盘数据、系统使用情况及更新日志。'));
+  
+  // Month selector
+  var now = new Date();
+  var defaultYear = now.getFullYear();
+  var defaultMonth = now.getMonth() + 1;
+  if (!appState.reportMonth) appState.reportMonth = { year: defaultYear, month: defaultMonth };
+  
+  var headerBar = h('div', { style: { display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px', flexWrap:'wrap' } });
+  
+  var prevBtn = h('button', { className: 'btn btn-sm', style: { background:'#f3f4f6' }, onclick: function() {
+    var m = appState.reportMonth.month - 1;
+    var y = appState.reportMonth.year;
+    if (m < 1) { m = 12; y--; }
+    appState.reportMonth = { year: y, month: m };
+    renderMonthlyReportTab(panel);
+  } }, '◀ 上月');
+  
+  var monthLabel = h('span', { style: { fontSize:'18px', fontWeight:'700', minWidth:'140px', textAlign:'center' } }, appState.reportMonth.year + '年' + appState.reportMonth.month + '月');
+  
+  var nextBtn = h('button', { className: 'btn btn-sm', style: { background:'#f3f4f6' }, onclick: function() {
+    var m = appState.reportMonth.month + 1;
+    var y = appState.reportMonth.year;
+    if (m > 12) { m = 1; y++; }
+    appState.reportMonth = { year: y, month: m };
+    renderMonthlyReportTab(panel);
+  } }, '下月 ▶');
+  
+  headerBar.appendChild(prevBtn);
+  headerBar.appendChild(monthLabel);
+  headerBar.appendChild(nextBtn);
+  
+  // Export buttons (placeholder for future)
+  headerBar.appendChild(h('span', { style: { flex: 1 } }));
+  headerBar.appendChild(h('a', {
+    href: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+    target: '_blank',
+    style: { fontSize:'12px', color:'var(--primary)', textDecoration:'none', padding:'4px 10px', border:'1px solid var(--primary)', borderRadius:'5px' }
+  }, '查看完整进度表 →'));
+  
+  panel.appendChild(headerBar);
+  
+  // Calculate month range
+  var ry = appState.reportMonth.year;
+  var rm = appState.reportMonth.month;
+  var monthStart = new Date(ry, rm - 1, 1);
+  var monthEnd = new Date(ry, rm, 1);
+  
+  // ===== Section ①: 本月专家变动 =====
+  var newExperts = db.experts.filter(function(e) {
+    if (!e.createdAt) return false;
+    var d = new Date(e.createdAt);
+    return d >= monthStart && d < monthEnd;
+  });
+  var modifiedExperts = db.experts.filter(function(e) {
+    if (!e.updatedAt) return false;
+    var d = new Date(e.updatedAt);
+    if (d < monthStart || d >= monthEnd) return false;
+    // Exclude newly created (already counted above)
+    if (e.createdAt && new Date(e.createdAt) >= monthStart && new Date(e.createdAt) < monthEnd) return false;
+    return true;
+  });
+  var eliminatedExperts = db.experts.filter(function(e) {
+    if (!e.observationDate) return false;
+    var d = new Date(e.observationDate);
+    return d >= monthStart && d < monthEnd && (e.status === 'eliminated' || e.status === 'observation');
+  });
+  
+  panel.appendChild(renderReportSection('① 本月专家变动', [
+    { label: '新增', count: newExperts.length, color: '#10b981', items: newExperts.map(function(e) { return { name: e.name, detail: (e.fields && e.fields.length ? e.fields.join('/') : '未分类') + ' · ' + (e.company || '未知单位') }; }) },
+    { label: '调整', count: modifiedExperts.length, color: '#f59e0b', items: modifiedExperts.map(function(e) { return { name: e.name, detail: '信息已更新' }; }) },
+    { label: '观察/淘汰', count: eliminatedExperts.length, color: '#ef4444', items: eliminatedExperts.map(function(e) { return { name: e.name, detail: e.status === 'eliminated' ? '已淘汰' : '观察库' }; }) }
+  ]));
+  
+  // ===== Section ②: 本月合作项目变动 =====
+  var newProjects = [];
+  var modifiedProjects = [];
+  if (db.yiliProjects && Array.isArray(db.yiliProjects)) {
+    newProjects = db.yiliProjects.filter(function(p) {
+      if (!p.createdAt) return false;
+      var d = new Date(p.createdAt);
+      return d >= monthStart && d < monthEnd;
+    });
+    modifiedProjects = db.yiliProjects.filter(function(p) {
+      if (!p.updatedAt) return false;
+      var d = new Date(p.updatedAt);
+      if (d < monthStart || d >= monthEnd) return false;
+      if (p.createdAt && new Date(p.createdAt) >= monthStart && new Date(p.createdAt) < monthEnd) return false;
+      return true;
+    });
+  }
+  
+  panel.appendChild(renderReportSection('② 本月合作项目变动', [
+    { label: '新增', count: newProjects.length, color: '#10b981', items: newProjects.map(function(p) {
+      var expertName = p.expertId ? (db.experts.find(function(e) { return e.id === p.expertId; }) || {}).name : (p.pendingExpertName || '待关联');
+      return { name: p.title || '未命名项目', detail: expertName + (p.year ? ' · ' + p.year : '') };
+    }) },
+    { label: '修改', count: modifiedProjects.length, color: '#f59e0b', items: modifiedProjects.map(function(p) {
+      var expertName = p.expertId ? (db.experts.find(function(e) { return e.id === p.expertId; }) || {}).name : (p.pendingExpertName || '待关联');
+      return { name: p.title || '未命名项目', detail: expertName + ' · 信息已更新' };
+    }) }
+  ]));
+  
+  // ===== Section ③: 当前仪表盘快照 =====
+  var experts = db.experts.filter(function(e) { return e.status !== 'eliminated' && e.status !== 'observation'; });
+  var dist = getFieldDistribution(experts);
+  var avgProf = 0, avgInfl = 0, avgOverall = 0;
+  var scoredExperts = experts.filter(function(e) { return e.scores && e.scores.overall; });
+  if (scoredExperts.length > 0) {
+    avgProf = (scoredExperts.reduce(function(s, e) { return s + (e.scores.professional || 0); }, 0) / scoredExperts.length).toFixed(1);
+    avgInfl = (scoredExperts.reduce(function(s, e) { return s + (e.scores.influence || 0); }, 0) / scoredExperts.length).toFixed(1);
+    avgOverall = (scoredExperts.reduce(function(s, e) { return s + (e.scores.overall || 0); }, 0) / scoredExperts.length).toFixed(1);
+  }
+  
+  var snapCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  snapCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '③ 当前仪表盘快照（' + formatDate(new Date().toISOString()).substring(0, 10) + '）'));
+  
+  // Stats row
+  var statsRow = h('div', { style: { display:'flex', gap:'16px', flexWrap:'wrap', marginBottom:'16px' } });
+  statsRow.appendChild(renderStatBox('在职专家', experts.length, '#3b82f6'));
+  statsRow.appendChild(renderStatBox('平均专业度', avgProf, '#8b5cf6'));
+  statsRow.appendChild(renderStatBox('平均影响力', avgInfl, '#f59e0b'));
+  statsRow.appendChild(renderStatBox('平均综合评分', avgOverall, '#10b981'));
+  snapCard.appendChild(statsRow);
+  
+  // Mini bar chart for field distribution
+  if (dist.names.length > 0) {
+    var chartDiv = h('div', { style: { marginTop:'8px' } });
+    chartDiv.appendChild(h('div', { style: { fontSize:'12px', fontWeight:'600', marginBottom:'8px', color:'var(--text-secondary)' } }, '领域分布'));
+    var maxVal = Math.max.apply(null, dist.values);
+    dist.names.forEach(function(name, i) {
+      var barRow = h('div', { style: { display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' } });
+      barRow.appendChild(h('span', { style: { fontSize:'11px', minWidth:'80px', textAlign:'right', color:'var(--text-secondary)' } }, name));
+      var barBg = h('div', { style: { flex:1, height:'18px', background:'#f0f0f0', borderRadius:'4px', overflow:'hidden' } });
+      barBg.appendChild(h('div', { style: { width: (dist.values[i] / maxVal * 100) + '%', height:'100%', background: dist.colors[i], borderRadius:'4px', transition:'width 0.3s' } }));
+      barRow.appendChild(barBg);
+      barRow.appendChild(h('span', { style: { fontSize:'11px', minWidth:'24px', fontWeight:'600' } }, String(dist.values[i])));
+      chartDiv.appendChild(barRow);
+    });
+    snapCard.appendChild(chartDiv);
+  } else {
+    snapCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'12px 0' } }, '暂无专家数据'));
+  }
+  panel.appendChild(snapCard);
+  
+  // ===== Section ④: 系统使用情况 =====
+  var usageCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  usageCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '④ 系统使用情况'));
+  
+  var usageCols = h('div', { style: { display:'flex', gap:'20px', flexWrap:'wrap' } });
+  
+  // Admin info
+  var adminCol = h('div', { style: { flex:'1', minWidth:'200px' } });
+  adminCol.appendChild(h('div', { style: { fontSize:'12px', fontWeight:'600', marginBottom:'8px', color:'var(--text-secondary)' } }, '管理权限分布'));
+  var masterCount = db.subAdmins ? db.subAdmins.filter(function(a) { return a.role === 'master'; }).length : 1;
+  var subCount = db.subAdmins ? db.subAdmins.filter(function(a) { return a.role !== 'master'; }).length : 0;
+  adminCol.appendChild(renderUsageRow('主管理员', masterCount));
+  adminCol.appendChild(renderUsageRow('子管理员', subCount));
+  adminCol.appendChild(renderUsageRow('专家总数', db.experts.length));
+  adminCol.appendChild(renderUsageRow('合作项目总数', (db.yiliProjects || []).length));
+  usageCols.appendChild(adminCol);
+  
+  // Page views (placeholder - will be populated when counter is implemented)
+  var viewCol = h('div', { style: { flex:'1', minWidth:'200px' } });
+  viewCol.appendChild(h('div', { style: { fontSize:'12px', fontWeight:'600', marginBottom:'8px', color:'var(--text-secondary)' } }, '前端访问情况'));
+  var pageViews = loadPageViews(ry, rm);
+  viewCol.appendChild(renderUsageRow('本月访问', pageViews.monthly));
+  viewCol.appendChild(renderUsageRow('累计访问', pageViews.total));
+  viewCol.appendChild(h('div', { style: { fontSize:'11px', color:'var(--text-muted)', marginTop:'6px' } }, '注：访问计数基于本地记录，完整统计需后续部署'));
+  usageCols.appendChild(viewCol);
+  
+  usageCard.appendChild(usageCols);
+  panel.appendChild(usageCard);
+  
+  // ===== Section ⑤: 系统更新日志概要 =====
+  var logCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  logCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '⑤ 系统更新日志概要'));
+  
+  var monthLogs = VERSION_CHANGELOG.filter(function(entry) {
+    var d = new Date(entry.date);
+    return d >= monthStart && d < monthEnd;
+  });
+  
+  if (monthLogs.length === 0) {
+    logCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'8px 0' } }, '本月无更新记录'));
+  } else {
+    monthLogs.forEach(function(entry) {
+      var row = h('div', { style: { display:'flex', gap:'10px', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--border)' } });
+      row.appendChild(h('span', { style: { fontSize:'12px', fontWeight:'700', color:'var(--primary)', minWidth:'60px' } }, entry.version));
+      row.appendChild(h('span', { style: { fontSize:'11px', color:'var(--text-muted)', minWidth:'60px' } }, entry.date.substring(5)));
+      row.appendChild(h('span', { style: { fontSize:'12px', flex:1 } }, entry.summary));
+      row.appendChild(h('span', { style: { fontSize:'10px', color:'#888', background:'#f0f0f0', padding:'2px 8px', borderRadius:'8px' } }, entry.module));
+      logCard.appendChild(row);
+    });
+  }
+  
+  logCard.appendChild(h('a', {
+    href: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
+    target: '_blank',
+    style: { display:'inline-block', marginTop:'10px', fontSize:'11px', color:'var(--primary)', textDecoration:'none' }
+  }, '查看完整进度表 →'));
+  panel.appendChild(logCard);
+}
+
+// Helper: render a report section with stat cards + collapsible detail
+function renderReportSection(title, stats) {
+  var card = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  card.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, title));
+  
+  // Stat cards row
+  var statRow = h('div', { style: { display:'flex', gap:'12px', flexWrap:'wrap', marginBottom: stats.some(function(s) { return s.items.length > 0; }) ? '10px' : '0' } });
+  var hasDetail = false;
+  
+  stats.forEach(function(stat) {
+    var statBox = h('div', { style: { flex:'1', minWidth:'100px', textAlign:'center', padding:'10px', borderRadius:'8px', background:'#fff', border:'1px solid var(--border)' } });
+    statBox.appendChild(h('div', { style: { fontSize:'24px', fontWeight:'700', color: stat.color } }, String(stat.count)));
+    statBox.appendChild(h('div', { style: { fontSize:'11px', color:'var(--text-secondary)', marginTop:'2px' } }, stat.label));
+    statRow.appendChild(statBox);
+    if (stat.items.length > 0) hasDetail = true;
+  });
+  card.appendChild(statRow);
+  
+  // Collapsible detail
+  if (hasDetail) {
+    var detailId = 'detail-' + Math.random().toString(36).substring(2, 8);
+    var toggleBtn = h('button', {
+      className: 'btn btn-sm',
+      style: { background:'#f3f4f6', fontSize:'12px', width:'100%', marginTop:'4px' },
+      onclick: function() {
+        var detail = document.getElementById(detailId);
+        if (detail) {
+          if (detail.style.display === 'none') {
+            detail.style.display = 'block';
+            this.textContent = '收起明细 ▲';
+          } else {
+            detail.style.display = 'none';
+            this.textContent = '展开明细 ▼';
+          }
+        }
+      }
+    }, '展开明细 ▼');
+    card.appendChild(toggleBtn);
+    
+    var detail = h('div', { id: detailId, style: { display:'none', marginTop:'8px' } });
+    stats.forEach(function(stat) {
+      if (stat.items.length === 0) return;
+      detail.appendChild(h('div', { style: { fontSize:'11px', fontWeight:'600', color: stat.color, marginTop:'8px', marginBottom:'4px' } }, stat.label + '：'));
+      stat.items.forEach(function(item) {
+        detail.appendChild(h('div', { style: { fontSize:'12px', padding:'3px 0 3px 12px', borderLeft:'2px solid ' + stat.color, marginBottom:'2px' } },
+          h('span', { style: { fontWeight:'600' } }, item.name),
+          h('span', { style: { color:'var(--text-muted)', marginLeft:'6px' } }, item.detail)
+        ));
+      });
+    });
+    card.appendChild(detail);
+  }
+  
+  return card;
+}
+
+// Helper: render a stat box
+function renderStatBox(label, value, color) {
+  var box = h('div', { style: { textAlign:'center', padding:'12px 16px', borderRadius:'8px', background:'#fff', border:'1px solid var(--border)', minWidth:'100px' } });
+  box.appendChild(h('div', { style: { fontSize:'22px', fontWeight:'700', color: color } }, String(value)));
+  box.appendChild(h('div', { style: { fontSize:'11px', color:'var(--text-secondary)', marginTop:'2px' } }, label));
+  return box;
+}
+
+// Helper: render a usage row
+function renderUsageRow(label, value) {
+  return h('div', { style: { display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:'12px' } },
+    h('span', { style: { color:'var(--text-secondary)' } }, label),
+    h('span', { style: { fontWeight:'600' } }, String(value))
+  );
+}
+
+// Helper: load page views from localStorage (simple counter)
+function loadPageViews(year, month) {
+  try {
+    var key = 'yili_page_views';
+    var data = JSON.parse(localStorage.getItem(key) || '{}');
+    var monthKey = year + '-' + String(month).padStart(2, '0');
+    var monthly = data[monthKey] || 0;
+    var total = Object.values(data).reduce(function(s, v) { return s + v; }, 0);
+    return { monthly: monthly, total: total };
+  } catch(e) {
+    return { monthly: 0, total: 0 };
+  }
+}
+
+// Helper: increment page view (called on boot)
+function incrementPageView() {
+  try {
+    var key = 'yili_page_views';
+    var data = JSON.parse(localStorage.getItem(key) || '{}');
+    var now = new Date();
+    var monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    data[monthKey] = (data[monthKey] || 0) + 1;
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch(e) { /* silent */ }
 }
 
 document.addEventListener('DOMContentLoaded', boot);
