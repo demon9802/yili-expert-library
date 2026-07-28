@@ -398,7 +398,9 @@ async function getDB() {
     if (appData.experts.length > 0 || appData.fields.length > 0) {
       // Supabase 有数据 → 优先使用
       const raw = localStorage.getItem(STORAGE_KEY);
-      let localConfig = { ratingConfig: null, sortOptions: null, uiConfig: null, dashboardConfig: null, observationLibrary: [], permissions: null, fields: null };
+      // v5.8.5-fix: 白名单维护管理设置，防止 getDB() 重建 db 时丢弃管理员运行时属性
+      // 新增属性必须同时加入此白名单 + db 构造函数
+      let localConfig = { ratingConfig: null, sortOptions: null, uiConfig: null, dashboardConfig: null, observationLibrary: [], permissions: null, fields: null, mobileViewEnabled: null, defaultAreaCode: null };
       if (raw) {
         try {
           const l = JSON.parse(raw);
@@ -408,7 +410,9 @@ async function getDB() {
           localConfig.dashboardConfig = l.dashboardConfig;
           localConfig.observationLibrary = l.observationLibrary || [];
           localConfig.permissions = l.permissions;
-          localConfig.fields = l.fields; // 管理员修改的分类颜色
+          localConfig.fields = l.fields;
+          localConfig.mobileViewEnabled = l.mobileViewEnabled;
+          localConfig.defaultAreaCode = l.defaultAreaCode;
         } catch(e) {}
       }
       
@@ -533,6 +537,8 @@ async function getDB() {
         dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' },
         observationLibrary: localConfig.observationLibrary || [],
         permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
+        mobileViewEnabled: localConfig.mobileViewEnabled !== null ? localConfig.mobileViewEnabled : undefined, // 默认 undefined = 关闭
+        defaultAreaCode: localConfig.defaultAreaCode || '',
         categoryConfig: fields,
         totalExperts: finalExperts.length,
         totalFields: fields.length,
