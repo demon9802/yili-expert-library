@@ -2,6 +2,7 @@
 // v5.8.0+ 独立文件，编辑此文件即可更新月度报告中的更新日志
 // 格式：{ version, date (YYYY-MM-DD), summary, module }
 var VERSION_CHANGELOG = [
+  { version: 'v5.8.4', date: '2026-07-28', summary: '修复数据合并BUG（专家/项目丢失）+ 仪表盘去掉分布图 + 管理后台排序 + 月度报告修正', module: '紧急修复' },
   { version: 'v5.8.3', date: '2026-07-28', summary: '手机端开关（系统设置）+ 子管理员关闭分类管理权限', module: '权限设置' },
   { version: 'v5.8.2', date: '2026-07-28', summary: '全面升级Excel (.xlsx) 导入/导出 + CSV编码自动修复 + 模板升级为.xlsx', module: '基础架构' },
   { version: 'v5.8.1', date: '2026-07-27', summary: '月度报告导出PNG/PDF + 更新日志独立文件 + 测试模式迁入系统设置', module: '系统管理' },

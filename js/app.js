@@ -153,7 +153,7 @@ async function loadTestDB() {
   seedDb.ratingConfig = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG));
   seedDb.sortOptions = DEFAULT_SORT_OPTIONS;
   seedDb.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
-  seedDb.dashboardConfig = seedDb.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  seedDb.dashboardConfig = seedDb.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   seedDb.yiliProjects = seedDb.yiliProjects || [];
   seedDb.observationLibrary = [];
   seedDb.favorites = [];
@@ -462,37 +462,75 @@ async function getDB() {
         console.log('[getDB] Merged favorites: local=' + localFavs.length + ' supabase=' + appData.favorites.length + ' → merged=' + mergedFavorites.length);
       }
       
-      // 优先使用 localStorage 的专家数据（保留手动评分调整）
-      let finalExperts = appData.experts;
+      // v5.8.4-fix: 专家数据 UNION 合并（Supabase ∪ localStorage），localStorage 为权威
+      let finalExperts = appData.experts.slice();
       if (raw) {
         try {
           const localDB = JSON.parse(raw);
           if (localDB.experts && localDB.experts.length > 0) {
-            // 以 Supabase 专家为基准，用 localStorage 的专家数据覆盖（保留 subScores 等手动调整）
-            const localExpertMap = {};
-            localDB.experts.forEach(function(le) { localExpertMap[le.id || le.name] = le; });
+            // 1. 建立 Supabase 专家索引
+            const supabaseExpertMap = {};
+            appData.experts.forEach(function(se) { supabaseExpertMap[se.id || se.name] = se; });
+            // 2. 合并共同专家：localStorage 数据覆盖（保留手动评分调整）
             finalExperts = appData.experts.map(function(se) {
-              const local = localExpertMap[se.id || se.name];
-              if (local && local.subScores) {
-                // 保留本地手动调整的评分
+              const local = localDB.experts.find(function(le) { return (le.id || le.name) === (se.id || se.name); });
+              if (local) {
                 return Object.assign({}, se, { subScores: local.subScores, scores: local.scores });
               }
               return se;
             });
-            console.log('[getDB] 保留 localStorage 中的手动评分调整');
+            // 3. 追加 localStorage 中独有的专家（防止同步失败导致数据丢失）
+            var addedCount = 0;
+            localDB.experts.forEach(function(le) {
+              if (le && le.name && !supabaseExpertMap[le.id || le.name]) {
+                finalExperts.push(le);
+                addedCount++;
+              }
+            });
+            if (addedCount > 0) {
+              console.warn('[getDB] ⚠️ Supabase 缺失 ' + addedCount + ' 位专家，已从 localStorage 恢复');
+            }
           }
-        } catch(e) {}
+        } catch(e) { console.warn('[getDB] 专家合并异常:', e.message); }
       }
       
+      // v5.8.4-fix: 合作项目 UNION 合并（Supabase ∪ localStorage），localStorage 为权威
+      var finalProjects = appData.yiliProjects.slice();
+      if (raw) {
+        try {
+          var localPdb = JSON.parse(raw);
+          if (localPdb.yiliProjects && localPdb.yiliProjects.length > 0) {
+            var supabaseProjMap = {};
+            appData.yiliProjects.forEach(function(sp) { if (sp.id) supabaseProjMap[sp.id] = sp; });
+            var projAdded = 0;
+            // 合并共同项目：localStorage 覆盖
+            finalProjects = appData.yiliProjects.map(function(sp) {
+              var lp = localPdb.yiliProjects.find(function(p) { return p.id === sp.id || (p.title === sp.title && p.expertId === sp.expertId); });
+              return lp ? Object.assign({}, sp, lp) : sp;
+            });
+            // 追加 localStorage 独有项目
+            localPdb.yiliProjects.forEach(function(lp) {
+              if (lp && lp.id && !supabaseProjMap[lp.id]) {
+                finalProjects.push(lp);
+                projAdded++;
+              }
+            });
+            if (projAdded > 0) {
+              console.warn('[getDB] ⚠️ Supabase 缺失 ' + projAdded + ' 个合作项目，已从 localStorage 恢复');
+            }
+          }
+        } catch(e) { console.warn('[getDB] 项目合并异常:', e.message); }
+      }
+
       const db = {
         experts: finalExperts,
         fields: fields,
-        yiliProjects: appData.yiliProjects,
+        yiliProjects: finalProjects,
         favorites: mergedFavorites,
         ratingConfig: migrateRatingConfig(localConfig.ratingConfig || JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG))),
         sortOptions: localConfig.sortOptions || DEFAULT_SORT_OPTIONS,
         uiConfig: localConfig.uiConfig || JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)),
-        dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' },
+        dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' },
         observationLibrary: localConfig.observationLibrary || [],
         permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
         categoryConfig: fields,
@@ -538,7 +576,7 @@ function loadFromLocalOrFallback() {
   db.sortOptions = DEFAULT_SORT_OPTIONS;
   db.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
   db.categoryConfig = EXPERT_DATA.fields || [];
-  db.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  db.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   db.yiliProjects = [];
   db.observationLibrary = [];
   db.version = CURRENT_DB_VERSION;
@@ -551,7 +589,7 @@ function ensureMinimalConfig(db) {
   if (!db.ratingConfig) db.ratingConfig = JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG));
   if (!db.sortOptions) db.sortOptions = DEFAULT_SORT_OPTIONS;
   if (!db.uiConfig) db.uiConfig = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
-  if (!db.dashboardConfig) db.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  if (!db.dashboardConfig) db.dashboardConfig = { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   if (!db.observationLibrary) db.observationLibrary = [];
   if (!db.permissions) db.permissions = { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } };
   // v5.6.7: 确保现有领域的 creator 字段初始化
@@ -1044,7 +1082,7 @@ function renderFrontend() {
   const statsBar = h('div', { className: 'stats-bar' });
   
   // 领域人数分布：受管理后台 dashboardConfig.showCharts 控制
-  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'] };
+  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric'] };
   if (dc.showCharts.includes('fields')) {
   // 领域人数分布：带专家总数头部的整合图表卡片
   const chartCard = h('div', { className: 'stat-card stat-chart-card', style: { flex: '1', minWidth: '400px', padding: '16px 20px' } });
@@ -2621,7 +2659,7 @@ function renderHorizontalBarChart(containerId, displayLabels, fullLabels, data, 
 
 function showDashboard() {
   const db = appState.db;
-  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  const dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   const experts = db.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation');
   
   const overlay = h('div', { className: 'modal-overlay dashboard-modal', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
@@ -2655,20 +2693,10 @@ function showDashboard() {
       avgCard.appendChild(avgDisplay);
       grid.appendChild(avgCard);
     }
-    
-    // Score distribution doughnut chart
-    if (dc.showCharts.includes('scoreDist')) {
-      const distCard = h('div', { className: 'dashboard-card' });
-      distCard.appendChild(h('h4', {}, '综合评分专家数量占比（7分及以上）'));
-      const distChart = h('div', { className: 'chart-container' });
-      distChart.id = 'chart-dist';
-      distCard.appendChild(distChart);
-      grid.appendChild(distCard);
-    }
   }
   
   // 如果所有图表都被关闭，显示提示
-  if (!dc.showCharts.includes('fields') && !dc.showCharts.includes('scoreNumeric') && !dc.showCharts.includes('scoreDist')) {
+  if (!dc.showCharts.includes('fields') && !dc.showCharts.includes('scoreNumeric')) {
     grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px">📋 当前未启用任何图表模块<br><small style="font-size:12px">请联系管理员在后台「仪表盘」中开启展示模块</small></div>';
   }
   
@@ -2702,62 +2730,141 @@ function renderCharts(experts) {
       '<div class="score-numeric-item"><div class="label">综合评分</div><div class="value green">' + overallAvg + '</div><div class="sub">加权平均</div></div>' +
       '</div>';
   }
-  
-  // Score distribution - doughnut
-  const ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
-  const rangeCount = [0,0,0,0,0];
-  experts.forEach(e => {
-    const s = e.scores.overall;
-    if (s < 7.5) rangeCount[0]++;
-    else if (s < 8.0) rangeCount[1]++;
-    else if (s < 8.5) rangeCount[2]++;
-    else if (s < 9.0) rangeCount[3]++;
-    else rangeCount[4]++;
-  });
-  
-  renderDoughnutChart('chart-dist', ranges, rangeCount);
 }
 
 function renderBarChart(containerId, labels, data, colors, title) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
+  // v5.8.4: 读取 barChartType，支持柱状图(bar)和条状图(horizontalBar)
+  var db = appState.db || {};
+  var dashboardConfig = db.dashboardConfig || {};
+  var isHorizontal = dashboardConfig.barChartType === 'horizontalBar';
+  
   const maxVal = Math.max(...data, 1);
-  const chartHeight = Math.max(container.clientHeight - 50, 200);
   const chartWidth = Math.max(container.clientWidth, 500);
-  const barWidth = Math.min(60, (chartWidth - 80) / labels.length - 10);
-  const svgHeight = chartHeight + 40;
+  const chartHeight = Math.max(container.clientHeight - 50, 200);
   
-  let svg = '<svg width="100%" height="' + svgHeight + '" viewBox="0 0 ' + chartWidth + ' ' + svgHeight + '" style="overflow:visible">';
+  let svg;
   
-  // Y axis
-  svg += '<line x1="50" y1="10" x2="50" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
-  svg += '<line x1="50" y1="' + (chartHeight + 10) + '" x2="' + (chartWidth - 10) + '" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
+  if (isHorizontal) {
+    // ===== 横版条状图 =====
+    var barH = Math.min(30, (chartHeight - 40) / labels.length - 8);
+    var leftPad = 80;
+    var svgH = Math.max(chartHeight + 40, labels.length * (barH + 8) + 60);
+    
+    svg = '<svg width="100%" height="' + svgH + '" viewBox="0 0 ' + chartWidth + ' ' + svgH + '" style="overflow:visible">';
+    // grid lines
+    for (var gi = 0; gi <= 4; gi++) {
+      var gx = leftPad + (chartWidth - leftPad - 20) * gi / 4;
+      svg += '<line x1="' + gx + '" y1="20" x2="' + gx + '" y2="' + (svgH - 30) + '" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3"/>';
+      svg += '<text x="' + gx + '" y="16" text-anchor="middle" font-size="10" fill="#94a3b8">' + Math.round(maxVal * gi / 4) + '</text>';
+    }
+    
+    labels.forEach(function(label, i) {
+      var by = 28 + i * (barH + 8);
+      var bw = (data[i] / maxVal) * (chartWidth - leftPad - 30);
+      var shortLabel = label.length > 8 ? label.substring(0,8)+'…' : label;
+      
+      svg += '<text x="' + (leftPad - 8) + '" y="' + (by + barH/2 + 4) + '" text-anchor="end" font-size="11" fill="#64748b">' + shortLabel + '</text>';
+      svg += '<rect x="' + leftPad + '" y="' + by + '" width="' + Math.max(bw, 2) + '" height="' + barH + '" rx="4" fill="' + (colors[i] || '#3B82F6') + '" opacity="0.85"/>';
+      svg += '<text x="' + (leftPad + Math.max(bw, 2) + 6) + '" y="' + (by + barH/2 + 4) + '" font-size="12" font-weight="600" fill="#475569">' + data[i] + '</text>';
+    });
+    
+    svg += '</svg>';
+  } else {
+    // ===== 竖版柱状图 =====
+    var barWidth = Math.min(60, (chartWidth - 80) / labels.length - 10);
+    var svgHeight = chartHeight + 40;
+    
+    svg = '<svg width="100%" height="' + svgHeight + '" viewBox="0 0 ' + chartWidth + ' ' + svgHeight + '" style="overflow:visible">';
+    
+    // Y axis
+    svg += '<line x1="50" y1="10" x2="50" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
+    svg += '<line x1="50" y1="' + (chartHeight + 10) + '" x2="' + (chartWidth - 10) + '" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
+    
+    for (var yi = 0; yi <= 4; yi++) {
+      var vy = chartHeight + 10 - (chartHeight * yi / 4);
+      var vval = Math.round(maxVal * yi / 4);
+      svg += '<text x="45" y="' + (vy + 4) + '" text-anchor="end" font-size="11" fill="#94a3b8">' + vval + '</text>';
+      svg += '<line x1="50" y1="' + vy + '" x2="' + (chartWidth - 10) + '" y2="' + vy + '" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3"/>';
+    }
+    
+    labels.forEach(function(label, i) {
+      var bx = 60 + i * (chartWidth - 70) / labels.length;
+      var bh = Math.max(2, (data[i] / maxVal) * chartHeight);
+      var by = chartHeight + 10 - bh;
+      
+      svg += '<rect x="' + bx + '" y="' + by + '" width="' + barWidth + '" height="' + bh + '" rx="4" fill="' + (colors[i] || '#3B82F6') + '" opacity="0.85"/>';
+      svg += '<text x="' + (bx + barWidth/2) + '" y="' + Math.max(12, by - 6) + '" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">' + data[i] + '</text>';
+      
+      var labelText = label.length > 6 ? label.substring(0,6)+'…' : label;
+      svg += '<text x="' + (bx + barWidth/2) + '" y="' + (chartHeight + 30) + '" text-anchor="middle" font-size="10" fill="#64748b" transform="rotate(-20,' + (bx + barWidth/2) + ',' + (chartHeight + 30) + ')">' + labelText + '</text>';
+    });
+    
+    svg += '</svg>';
+  }
+
+  container.innerHTML = svg;
+}
+
+function renderBarChartForExport(containerId, labels, data, colors, isHorizontal) {
+  // v5.8.4: 导出专用柱状图渲染，显式传入水平/竖版模式
+  var container = document.getElementById(containerId);
+  if (!container) return;
   
-  // Y labels with proper padding
-  for (let i = 0; i <= 4; i++) {
-    const y = chartHeight + 10 - (chartHeight * i / 4);
-    const val = Math.round(maxVal * i / 4);
-    svg += '<text x="45" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#94a3b8">' + val + '</text>';
-    svg += '<line x1="50" y1="' + y + '" x2="' + (chartWidth - 10) + '" y2="' + y + '" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3"/>';
+  var maxVal = Math.max.apply(null, data.concat([1]));
+  var chartWidth = Math.max(container.clientWidth, 500);
+  var chartHeight = Math.max(container.clientHeight - 50, 200);
+  
+  var svg;
+  
+  if (isHorizontal) {
+    var barH = Math.min(30, (chartHeight - 40) / labels.length - 8);
+    var leftPad = 80;
+    var svgH = Math.max(chartHeight + 40, labels.length * (barH + 8) + 60);
+    
+    svg = '<svg width="100%" height="' + svgH + '" viewBox="0 0 ' + chartWidth + ' ' + svgH + '">';
+    for (var gi = 0; gi <= 4; gi++) {
+      var gx = leftPad + (chartWidth - leftPad - 20) * gi / 4;
+      svg += '<line x1="' + gx + '" y1="20" x2="' + gx + '" y2="' + (svgH - 30) + '" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3"/>';
+      svg += '<text x="' + gx + '" y="16" text-anchor="middle" font-size="10" fill="#94a3b8">' + Math.round(maxVal * gi / 4) + '</text>';
+    }
+    labels.forEach(function(label, i) {
+      var by = 28 + i * (barH + 8);
+      var bw = (data[i] / maxVal) * (chartWidth - leftPad - 30);
+      var shortLabel = label.length > 8 ? label.substring(0,8)+'…' : label;
+      svg += '<text x="' + (leftPad - 8) + '" y="' + (by + barH/2 + 4) + '" text-anchor="end" font-size="11" fill="#64748b">' + shortLabel + '</text>';
+      svg += '<rect x="' + leftPad + '" y="' + by + '" width="' + Math.max(bw, 2) + '" height="' + barH + '" rx="4" fill="' + (colors[i] || '#3B82F6') + '" opacity="0.85"/>';
+      svg += '<text x="' + (leftPad + Math.max(bw, 2) + 6) + '" y="' + (by + barH/2 + 4) + '" font-size="12" font-weight="600" fill="#475569">' + data[i] + '</text>';
+    });
+    svg += '</svg>';
+  } else {
+    var barWidth = Math.min(60, (chartWidth - 80) / labels.length - 10);
+    var svgHeight = chartHeight + 40;
+    
+    svg = '<svg width="100%" height="' + svgHeight + '" viewBox="0 0 ' + chartWidth + ' ' + svgHeight + '">';
+    svg += '<line x1="50" y1="10" x2="50" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
+    svg += '<line x1="50" y1="' + (chartHeight + 10) + '" x2="' + (chartWidth - 10) + '" y2="' + (chartHeight + 10) + '" stroke="#e2e8f0" stroke-width="1"/>';
+    
+    for (var yi = 0; yi <= 4; yi++) {
+      var vy = chartHeight + 10 - (chartHeight * yi / 4);
+      var vval = Math.round(maxVal * yi / 4);
+      svg += '<text x="45" y="' + (vy + 4) + '" text-anchor="end" font-size="11" fill="#94a3b8">' + vval + '</text>';
+      svg += '<line x1="50" y1="' + vy + '" x2="' + (chartWidth - 10) + '" y2="' + vy + '" stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3,3"/>';
+    }
+    labels.forEach(function(label, i) {
+      var bx = 60 + i * (chartWidth - 70) / labels.length;
+      var bh = Math.max(2, (data[i] / maxVal) * chartHeight);
+      var by = chartHeight + 10 - bh;
+      svg += '<rect x="' + bx + '" y="' + by + '" width="' + barWidth + '" height="' + bh + '" rx="4" fill="' + (colors[i] || '#3B82F6') + '" opacity="0.85"/>';
+      svg += '<text x="' + (bx + barWidth/2) + '" y="' + Math.max(12, by - 6) + '" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">' + data[i] + '</text>';
+      var labelText = label.length > 6 ? label.substring(0,6)+'…' : label;
+      svg += '<text x="' + (bx + barWidth/2) + '" y="' + (chartHeight + 30) + '" text-anchor="middle" font-size="10" fill="#64748b" transform="rotate(-20,' + (bx + barWidth/2) + ',' + (chartHeight + 30) + ')">' + labelText + '</text>';
+    });
+    svg += '</svg>';
   }
   
-  labels.forEach((label, i) => {
-    const x = 60 + i * (chartWidth - 70) / labels.length;
-    const h = Math.max(2, (data[i] / maxVal) * chartHeight);
-    const y = chartHeight + 10 - h;
-    
-    svg += '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + h + '" rx="4" fill="' + (colors[i] || '#3B82F6') + '" opacity="0.85"/>';
-    
-    // Value label above bar with enough space
-    svg += '<text x="' + (x + barWidth/2) + '" y="' + Math.max(12, y - 6) + '" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">' + data[i] + '</text>';
-    
-    // X label
-    const labelText = label.length > 6 ? label.substring(0,6)+'…' : label;
-    svg += '<text x="' + (x + barWidth/2) + '" y="' + (chartHeight + 30) + '" text-anchor="middle" font-size="10" fill="#64748b" transform="rotate(-20,' + (x + barWidth/2) + ',' + (chartHeight + 30) + ')">' + labelText + '</text>';
-  });
-  
-  svg += '</svg>';
   container.innerHTML = svg;
 }
 
@@ -3823,6 +3930,29 @@ function renderExpertsTab(panel) {
   
   panel.appendChild(filterRow);
   
+  // v5.8.4: 排序控件
+  if (!appState._adminExpertSort) appState._adminExpertSort = 'default';
+  var sortRow = h('div', { style: { display:'flex', gap:'8px', alignItems:'center', padding:'4px 0 8px', flexWrap:'wrap' } });
+  sortRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:'600' } }, '排序：'));
+  var expertSortOpts = [
+    { id: 'default', name: '默认（姓名）' },
+    { id: 'rating', name: '综合评分 ▼' },
+    { id: 'time', name: '录入时间 ▼' },
+    { id: 'name', name: '姓名 A-Z' }
+  ];
+  expertSortOpts.forEach(function(opt) {
+    var btn = h('button', {
+      className: 'btn btn-sm ' + (appState._adminExpertSort === opt.id ? 'btn-primary' : 'btn-secondary'),
+      style: { fontSize:'11px' },
+      onclick: function() {
+        appState._adminExpertSort = opt.id;
+        renderExpertsTab(document.getElementById('admin-panel'));
+      }
+    }, opt.name);
+    sortRow.appendChild(btn);
+  });
+  panel.appendChild(sortRow);
+  
   // Filter data
   let experts = db.experts;
   if (appState.adminSearchQuery) {
@@ -3838,6 +3968,16 @@ function renderExpertsTab(panel) {
   if (af.status) {
     experts = experts.filter(e => e.status === af.status || (af.status === 'observation' && (e.status === 'observation' || e.observationStatus)));
   }
+  
+  // v5.8.4: 排序
+  var es = appState._adminExpertSort || 'default';
+  if (es === 'rating') {
+    experts.sort(function(a,b) { return (b.scores.overall||0) - (a.scores.overall||0); });
+  } else if (es === 'time') {
+    experts.sort(function(a,b) { return new Date(b.createdAt||0) - new Date(a.createdAt||0); });
+  } else if (es === 'name') {
+    experts.sort(function(a,b) { return (a.name||'').localeCompare(b.name||'', 'zh'); });
+  } // default: no sort, keep original order
   
   // Table
   const tableWrapper = h('div', { className: 'table-scroll-wrapper' });
@@ -4009,6 +4149,29 @@ function renderProjectsTab(panel) {
 
   panel.appendChild(toolbar);
 
+  // v5.8.4: 排序控件
+  if (!appState._adminProjectSort) appState._adminProjectSort = 'default';
+  var projSortRow = h('div', { style: { display:'flex', gap:'8px', alignItems:'center', padding:'4px 0 8px', flexWrap:'wrap' } });
+  projSortRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-secondary)', fontWeight:'600' } }, '排序：'));
+  var projSortOpts = [
+    { id: 'default', name: '默认（年份▼）' },
+    { id: 'name', name: '项目名称 A-Z' },
+    { id: 'year', name: '年份 ▼' },
+    { id: 'month', name: '月份（年分组）' }
+  ];
+  projSortOpts.forEach(function(opt) {
+    var btn = h('button', {
+      className: 'btn btn-sm ' + (appState._adminProjectSort === opt.id ? 'btn-primary' : 'btn-secondary'),
+      style: { fontSize:'11px' },
+      onclick: function() {
+        appState._adminProjectSort = opt.id;
+        renderProjectsTab(document.getElementById('admin-panel'));
+      }
+    }, opt.name);
+    projSortRow.appendChild(btn);
+  });
+  panel.appendChild(projSortRow);
+
   // Filter projects
   let filtered = [...db.yiliProjects];
   if (pf.year) filtered = filtered.filter(p => String(p.year) === pf.year);
@@ -4024,8 +4187,26 @@ function renderProjectsTab(panel) {
     const q = pf.search.toLowerCase();
     filtered = filtered.filter(p => (p.title || '').toLowerCase().includes(q));
   }
-  // Sort by year desc, then by id
-  filtered.sort((a,b) => b.year - a.year || a.id.localeCompare(b.id));
+  // v5.8.4: 动态排序
+  var ps = appState._adminProjectSort || 'default';
+  if (ps === 'name') {
+    filtered.sort(function(a,b) { return (a.title||'').localeCompare(b.title||'', 'zh'); });
+  } else if (ps === 'year') {
+    filtered.sort(function(a,b) { return b.year - a.year || a.id.localeCompare(b.id); });
+  } else if (ps === 'month') {
+    // 年分组（不跨年排序），每年内按月份升序，未关联月份的前置
+    filtered.sort(function(a,b) {
+      if (a.year !== b.year) return b.year - a.year;
+      var ma = a.month || 0, mb = b.month || 0;
+      if (ma === 0 && mb === 0) return (a.title||'').localeCompare(b.title||'', 'zh');
+      if (ma === 0) return -1;
+      if (mb === 0) return 1;
+      return ma - mb;
+    });
+  } else {
+    // default: year desc, then id
+    filtered.sort(function(a,b) { return b.year - a.year || a.id.localeCompare(b.id); });
+  }
 
   // Table
   const tableWrapper = h('div', { style: { overflowX:'auto', marginTop:'12px' } });
@@ -6652,9 +6833,8 @@ function renderDashboardTab(panel) {
   panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '展示模块设置'));
   
   const moduleSettings = [
-    { id: 'fields', name: '领域分布情况', desc: '柱状图展示各适用领域的专家数量分布' },
-    { id: 'scoreNumeric', name: '各项评分平均分', desc: '数值卡片展示专业度、影响力、综合评分的加权平均分' },
-    { id: 'scoreDist', name: '综合评分专家数量占比', desc: '环形图展示7分及以上专家在各分值区间的数量占比' }
+    { id: 'fields', name: '领域分布情况', desc: '柱状图/条状图展示各适用领域的专家数量分布' },
+    { id: 'scoreNumeric', name: '各项评分平均分', desc: '数值卡片展示专业度、影响力、综合评分的加权平均分' }
   ];
   
   if (isMaster) {
@@ -6752,14 +6932,6 @@ function renderDashboardTab(panel) {
     previewGrid.appendChild(sc);
   }
   
-  if (dc.showCharts.includes('scoreDist')) {
-    const dc2 = h('div', { className: 'dashboard-card' });
-    dc2.appendChild(h('h4', {}, '综合评分占比'));
-    const dd = h('div', { className: 'chart-container', id: 'admin-chart-dist' });
-    dc2.appendChild(dd);
-    previewGrid.appendChild(dc2);
-  }
-  
   panel.appendChild(previewGrid);
   
   setTimeout(() => {
@@ -6780,31 +6952,16 @@ function renderDashboardTab(panel) {
         '<div class="score-numeric-item"><div class="label">综合评分</div><div class="value green">' + overallAvg + '</div></div>' +
         '</div>';
     }
-    
-    const distContainer = document.getElementById('admin-chart-dist');
-    if (distContainer) {
-      const ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
-      const rangeCount = [0,0,0,0,0];
-      experts.forEach(e => {
-        const s = e.scores.overall;
-        if (s < 7.5) rangeCount[0]++;
-        else if (s < 8.0) rangeCount[1]++;
-        else if (s < 8.5) rangeCount[2]++;
-        else if (s < 9.0) rangeCount[3]++;
-        else rangeCount[4]++;
-      });
-      renderDoughnutChart('admin-chart-dist', ranges, rangeCount);
-    }
   }, 100);
 }
 
 // ===== 仪表盘导出为图片（Canvas 渲染 → PNG 直接下载） =====
 function exportDashboardImage() {
   var db = appState.db;
-  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   var experts = db.experts.filter(function(e) { return e.status !== 'eliminated'; });
   
-  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric' || c === 'scoreDist'; });
+  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric'; });
   if (enabledCharts.length === 0) {
     toast('当前未启用任何图表模块，请先在仪表盘「展示模块设置」中开启', 'warning');
     return;
@@ -6813,20 +6970,17 @@ function exportDashboardImage() {
   // Calculate canvas height based on enabled charts
   var hasFields = enabledCharts.indexOf('fields') >= 0;
   var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
-  var hasDist = enabledCharts.indexOf('scoreDist') >= 0;
   
   var chartSections = 0;
   if (hasFields) chartSections++;
   if (hasNumeric) chartSections++;
-  if (hasDist) chartSections++;
   
   var titleH = 60;
   var barChartH = hasFields ? 340 : 0;
   var numericH = hasNumeric ? 140 : 0;
-  var distH = hasDist ? 320 : 0;
   var gap = 20;
   var canvasW = 800;
-  var canvasH = titleH + barChartH + numericH + distH + (chartSections + 1) * gap;
+  var canvasH = titleH + barChartH + numericH + (chartSections + 1) * gap;
   
   var canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -6881,29 +7035,6 @@ function exportDashboardImage() {
     
     drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, 40, currentY, canvasW - 80, numericH - 40);
     currentY += numericH;
-  }
-  
-  // ---- Score distribution doughnut ----
-  if (hasDist) {
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('综合评分专家数量占比', 40, currentY + 20);
-    currentY += 30;
-    
-    var ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
-    var rangeCount = [0,0,0,0,0];
-    experts.forEach(function(e) {
-      var s = e.scores.overall;
-      if (s < 7.5) rangeCount[0]++;
-      else if (s < 8.0) rangeCount[1]++;
-      else if (s < 8.5) rangeCount[2]++;
-      else if (s < 9.0) rangeCount[3]++;
-      else rangeCount[4]++;
-    });
-    
-    drawDoughnutChartOnCanvas(ctx, ranges, rangeCount, 40, currentY, canvasW - 80, distH - 40);
-    currentY += distH;
   }
   
   // Download as PNG
@@ -7110,10 +7241,10 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke) {
 // ===== 仪表盘导出为PDF（Canvas → JPEG → PDF 直接下载） =====
 function exportDashboardPDF() {
   var db = appState.db;
-  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric', 'scoreDist'], barChartType: 'bar' };
+  var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   var experts = db.experts.filter(function(e) { return e.status !== 'eliminated'; });
   
-  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric' || c === 'scoreDist'; });
+  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric'; });
   if (enabledCharts.length === 0) {
     toast('当前未启用任何图表模块，请先在仪表盘「展示模块设置」中开启', 'warning');
     return;
@@ -7121,16 +7252,14 @@ function exportDashboardPDF() {
   
   var hasFields = enabledCharts.indexOf('fields') >= 0;
   var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
-  var hasDist = enabledCharts.indexOf('scoreDist') >= 0;
   
-  var chartSections = (hasFields ? 1 : 0) + (hasNumeric ? 1 : 0) + (hasDist ? 1 : 0);
+  var chartSections = (hasFields ? 1 : 0) + (hasNumeric ? 1 : 0);
   var titleH = 60;
   var barChartH = hasFields ? 340 : 0;
   var numericH = hasNumeric ? 140 : 0;
-  var distH = hasDist ? 320 : 0;
   var gap = 20;
   var canvasW = 800;
-  var canvasH = titleH + barChartH + numericH + distH + (chartSections + 1) * gap;
+  var canvasH = titleH + barChartH + numericH + (chartSections + 1) * gap;
   
   var canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -7177,26 +7306,6 @@ function exportDashboardPDF() {
     var overallAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.overall; }, 0) / experts.length).toFixed(1) : '0';
     drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, 40, currentY, canvasW - 80, numericH - 40);
     currentY += numericH;
-  }
-  
-  if (hasDist) {
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('综合评分专家数量占比', 40, currentY + 20);
-    currentY += 30;
-    var ranges = ['7.0-7.5分', '7.5-8.0分', '8.0-8.5分', '8.5-9.0分', '9.0分以上'];
-    var rangeCount = [0,0,0,0,0];
-    experts.forEach(function(e) {
-      var s = e.scores.overall;
-      if (s < 7.5) rangeCount[0]++;
-      else if (s < 8.0) rangeCount[1]++;
-      else if (s < 8.5) rangeCount[2]++;
-      else if (s < 9.0) rangeCount[3]++;
-      else rangeCount[4]++;
-    });
-    drawDoughnutChartOnCanvas(ctx, ranges, rangeCount, 40, currentY, canvasW - 80, distH - 40);
-    currentY += distH;
   }
   
   // Use JPEG for PDF (smaller, DCTDecode compatible)
@@ -8512,7 +8621,7 @@ async function boot() {
     (function migrateSubAdminCategory() {
       try {
         var migrated = false;
-        var users = db.permissions && db.permissions.users;
+        var users = appState.db.permissions && appState.db.permissions.users;
         if (users && users.length > 0) {
           users.forEach(function(u) {
             if (u.permissions && u.permissions.categoryManage === true) {
@@ -8521,7 +8630,7 @@ async function boot() {
             }
           });
         }
-        if (migrated) saveDB(db);
+        if (migrated) saveDB(appState.db);
       } catch(e) { console.warn('Sub-admin category migration skipped:', e.message); }
     })();
     
@@ -8642,7 +8751,11 @@ function renderMonthlyReportTab(panel) {
       if (!p.updatedAt) return false;
       var d = new Date(p.updatedAt);
       if (d < monthStart || d >= monthEnd) return false;
-      if (p.createdAt && new Date(p.createdAt) >= monthStart && new Date(p.createdAt) < monthEnd) return false;
+      // 排除本月新创建的（只看 createdAt，缺失 createdAt 视为老项目）
+      if (p.createdAt) {
+        var cd = new Date(p.createdAt);
+        if (cd >= monthStart && cd < monthEnd) return false;
+      }
       return true;
     });
   }
@@ -8819,7 +8932,11 @@ function buildMonthlyReportCanvas() {
       if (!p.updatedAt) return false;
       var d = new Date(p.updatedAt);
       if (d < monthStart || d >= monthEnd) return false;
-      if (p.createdAt && new Date(p.createdAt) >= monthStart && new Date(p.createdAt) < monthEnd) return false;
+      // 排除本月新创建的（缺失 createdAt 视为老项目，归入修改）
+      if (p.createdAt) {
+        var cd = new Date(p.createdAt);
+        if (cd >= monthStart && cd < monthEnd) return false;
+      }
       return true;
     });
   }
