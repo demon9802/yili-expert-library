@@ -2,6 +2,7 @@
 // v5.8.0+ 独立文件，编辑此文件即可更新月度报告中的更新日志
 // 格式：{ version, date (YYYY-MM-DD), summary, module }
 var VERSION_CHANGELOG = [
+  { version: 'v5.8.7', date: '2026-07-28', summary: '修复合作项目分类（编辑归入修改）+ 月度报告柱状图 + 恢复分值分布环形图 + 移除图表形式选择器', module: '紧急修复' },
   { version: 'v5.8.6', date: '2026-07-28', summary: '重构 getDB() 白名单为扩散法：新增属性自动保留，根除配置丢失隐患', module: '基础架构' },
   { version: 'v5.8.5', date: '2026-07-28', summary: '修复 getDB() 白名单缺陷：管理员设置（手机端开关等）不再被启动重建覆盖', module: '紧急修复' },
   { version: 'v5.8.4', date: '2026-07-28', summary: '修复数据合并BUG（专家/项目丢失）+ 仪表盘去掉分布图 + 管理后台排序 + 月度报告修正', module: '紧急修复' },

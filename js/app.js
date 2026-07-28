@@ -2682,6 +2682,16 @@ function showDashboard() {
     grid.appendChild(fieldCard);
   }
   
+  // Score distribution doughnut chart
+  if (db.ratingConfig.showScores !== false && dc.showCharts.includes('scoreDist')) {
+    const distCard = h('div', { className: 'dashboard-card' });
+    distCard.appendChild(h('h4', {}, '分值分布'));
+    const distChart = h('div', { className: 'chart-container', style: 'height:220px' });
+    distChart.id = 'chart-score-dist';
+    distCard.appendChild(distChart);
+    grid.appendChild(distCard);
+  }
+  
   // Score charts — 受 showCharts + showScores 双重控制
   if (db.ratingConfig.showScores !== false) {
     // Average scores numeric display
@@ -2695,7 +2705,7 @@ function showDashboard() {
   }
   
   // 如果所有图表都被关闭，显示提示
-  if (!dc.showCharts.includes('fields') && !dc.showCharts.includes('scoreNumeric')) {
+  if (!dc.showCharts.includes('fields') && !dc.showCharts.includes('scoreDist') && !dc.showCharts.includes('scoreNumeric')) {
     grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px">📋 当前未启用任何图表模块<br><small style="font-size:12px">请联系管理员在后台「仪表盘」中开启展示模块</small></div>';
   }
   
@@ -2715,6 +2725,12 @@ function renderCharts(experts) {
   const { names: fieldNames, values: fieldValues, colors: fieldColors } = getFieldDistribution(experts);
   
   renderBarChart('chart-fields', fieldNames, fieldValues, fieldColors, '领域分布');
+  
+  // Score distribution doughnut
+  const dc = db.dashboardConfig || {};
+  if (dc.showCharts && dc.showCharts.includes('scoreDist')) {
+    renderScoreDistChart('chart-score-dist', experts);
+  }
   
   // Average scores - numeric display
   const profAvg = (experts.reduce((s,e) => s + e.scores.professional, 0) / experts.length).toFixed(1);
@@ -2928,6 +2944,21 @@ function renderDoughnutChart(containerId, labels, data) {
   
   svg += '</svg>';
   container.innerHTML = svg;
+}
+
+function renderScoreDistChart(containerId, experts) {
+  const scored = experts.filter(e => e.scores && e.scores.overall > 0);
+  const buckets = [
+    { label: '9-10分（优秀）', min: 9, max: 10 },
+    { label: '8-9分（良好）', min: 8, max: 9 },
+    { label: '7-8分（合格）', min: 7, max: 8 },
+    { label: '<7分（待提升）', min: 0, max: 7 }
+  ];
+  const counts = buckets.map(b => scored.filter(e => e.scores.overall >= b.min && e.scores.overall < b.max).length);
+  // 处理满10分的情况（max=10时包含等于）
+  counts[0] = scored.filter(e => e.scores.overall >= 9).length;
+  const labels = buckets.map(b => b.label);
+  renderDoughnutChart(containerId, labels, counts);
 }
 
 // ===== ADMIN LOGIN (v4.0 — Supabase Auth) =====
@@ -6832,7 +6863,8 @@ function renderDashboardTab(panel) {
   panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '展示模块设置'));
   
   const moduleSettings = [
-    { id: 'fields', name: '领域分布情况', desc: '柱状图/条状图展示各适用领域的专家数量分布' },
+    { id: 'fields', name: '领域分布情况', desc: '柱状图展示各适用领域的专家数量分布' },
+    { id: 'scoreDist', name: '分值分布', desc: '环形图展示专家综合评分的分布情况' },
     { id: 'scoreNumeric', name: '各项评分平均分', desc: '数值卡片展示专业度、影响力、综合评分的加权平均分' }
   ];
   
@@ -6874,25 +6906,6 @@ function renderDashboardTab(panel) {
     });
     panel.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', textAlign:'right' } }, '展示模块开关仅主管理员可修改'));
   }
-  
-  // Bar chart type selector for fields distribution
-  panel.appendChild(h('h4', { style:{ margin:'16px 0 8px', fontSize:'14px' } }, '领域分布图表形式'));
-  const chartTypeRow = h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap' } });
-  ['bar', 'horizontalBar'].forEach(type => {
-    const btn = h('button', {
-      className: 'btn ' + (dc.barChartType === type ? 'btn-primary' : 'btn-secondary') + ' btn-sm',
-      onclick: () => {
-        dc.barChartType = type;
-        saveDB(db);
-        renderDashboardTab(panel);
-        toast('图表形式已更新', 'success');
-      }
-    }, type === 'bar' ? '📊 柱状图' : '📊 条状图');
-    chartTypeRow.appendChild(btn);
-  });
-  panel.appendChild(chartTypeRow);
-  
-  panel.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px' } }, '环形图和数值展示为固定形式，无需切换。'));
   
   // Data export
   panel.appendChild(h('h4', { style:{ margin:'20px 0 8px', fontSize:'14px' } }, '数据统计导出'));
@@ -6960,7 +6973,7 @@ function exportDashboardImage() {
   var dc = db.dashboardConfig || { showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' };
   var experts = db.experts.filter(function(e) { return e.status !== 'eliminated'; });
   
-  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric'; });
+  var enabledCharts = dc.showCharts.filter(function(c) { return c === 'fields' || c === 'scoreNumeric' || c === 'scoreDist'; });
   if (enabledCharts.length === 0) {
     toast('当前未启用任何图表模块，请先在仪表盘「展示模块设置」中开启', 'warning');
     return;
@@ -6968,18 +6981,21 @@ function exportDashboardImage() {
   
   // Calculate canvas height based on enabled charts
   var hasFields = enabledCharts.indexOf('fields') >= 0;
+  var hasScoreDist = enabledCharts.indexOf('scoreDist') >= 0;
   var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
   
   var chartSections = 0;
   if (hasFields) chartSections++;
+  if (hasScoreDist) chartSections++;
   if (hasNumeric) chartSections++;
   
   var titleH = 60;
   var barChartH = hasFields ? 340 : 0;
+  var doughnutH = hasScoreDist ? 280 : 0;
   var numericH = hasNumeric ? 140 : 0;
   var gap = 20;
   var canvasW = 800;
-  var canvasH = titleH + barChartH + numericH + (chartSections + 1) * gap;
+  var canvasH = titleH + barChartH + doughnutH + numericH + (chartSections + 1) * gap;
   
   var canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -7018,6 +7034,27 @@ function exportDashboardImage() {
     
     drawBarChartOnCanvas(ctx, labels, data, colorsArr, 40, currentY, canvasW - 80, barChartH - 40);
     currentY += barChartH;
+  }
+  
+  // ---- Score distribution doughnut ----
+  if (hasScoreDist) {
+    var scoredExperts = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
+    var distLabels = ['9-10分（优秀）', '8-9分（良好）', '7-8分（合格）', '<7分（待提升）'];
+    var distData = [
+      scoredExperts.filter(function(e) { return e.scores.overall >= 9; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 8 && e.scores.overall < 9; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 7 && e.scores.overall < 8; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall < 7; }).length
+    ];
+    
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('分值分布', 40, currentY + 20);
+    currentY += 30;
+    
+    drawDoughnutChartOnCanvas(ctx, distLabels, distData, 40, currentY, canvasW - 80, doughnutH - 40);
+    currentY += doughnutH;
   }
   
   // ---- Score numeric cards ----
@@ -8792,23 +8829,27 @@ function renderMonthlyReportTab(panel) {
   statsRow.appendChild(renderStatBox('平均综合评分', avgOverall, '#10b981'));
   snapCard.appendChild(statsRow);
   
-  // Mini bar chart for field distribution
+  // Field distribution bar chart (vertical)
   if (dist.names.length > 0) {
-    var chartDiv = h('div', { style: { marginTop:'8px' } });
-    chartDiv.appendChild(h('div', { style: { fontSize:'12px', fontWeight:'600', marginBottom:'8px', color:'var(--text-secondary)' } }, '领域分布'));
-    var maxVal = Math.max.apply(null, dist.values);
-    dist.names.forEach(function(name, i) {
-      var barRow = h('div', { style: { display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' } });
-      barRow.appendChild(h('span', { style: { fontSize:'11px', minWidth:'80px', textAlign:'right', color:'var(--text-secondary)' } }, name));
-      var barBg = h('div', { style: { flex:1, height:'18px', background:'#f0f0f0', borderRadius:'4px', overflow:'hidden' } });
-      barBg.appendChild(h('div', { style: { width: (dist.values[i] / maxVal * 100) + '%', height:'100%', background: dist.colors[i], borderRadius:'4px', transition:'width 0.3s' } }));
-      barRow.appendChild(barBg);
-      barRow.appendChild(h('span', { style: { fontSize:'11px', minWidth:'24px', fontWeight:'600' } }, String(dist.values[i])));
-      chartDiv.appendChild(barRow);
-    });
-    snapCard.appendChild(chartDiv);
+    var fieldChartDiv = h('div', { style: { marginTop:'8px', height:'260px' } });
+    fieldChartDiv.id = 'report-field-chart';
+    snapCard.appendChild(fieldChartDiv);
+    setTimeout(function() {
+      renderBarChartForExport('report-field-chart', dist.names, dist.values, dist.colors, false);
+    }, 50);
   } else {
     snapCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'12px 0' } }, '暂无专家数据'));
+  }
+  
+  // Score distribution doughnut
+  var scoredExps = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
+  if (scoredExps.length > 0) {
+    var scoreDistDiv = h('div', { style: { marginTop:'16px', height:'220px' } });
+    scoreDistDiv.id = 'report-score-dist';
+    snapCard.appendChild(scoreDistDiv);
+    setTimeout(function() {
+      renderScoreDistChart('report-score-dist', experts);
+    }, 50);
   }
   panel.appendChild(snapCard);
   
@@ -8961,8 +9002,9 @@ function buildMonthlyReportCanvas() {
   var titleH = 50;
   var sec1H = 80 + Math.max(newExperts.length, modifiedExperts.length, eliminatedExperts.length, 1) * 22;
   var sec2H = 80 + Math.max(newProjects.length, modifiedProjects.length, 1) * 22;
-  var barChartH = 40 + dist.names.length * 24;
-  var sec3H = 110 + barChartH;
+  var barChartH = 280;
+  var scoreDistH = scoredExperts.length > 0 ? 220 : 0;
+  var sec3H = 110 + barChartH + scoreDistH;
   var sec4H = 120;
   var sec5H = 60 + monthLogs.length * 28;
   var H = titleH + sec1H + sec2H + sec3H + sec4H + sec5H + sectionGap * 6 + 40;
@@ -9092,27 +9134,28 @@ function buildMonthlyReportCanvas() {
   drawStatBox('综合评分', avgOverall, '#10b981', leftPad + 375);
   y += 56;
   
-  // Bar chart
+  // Vertical bar chart
   if (dist.names.length > 0) {
     drawTextRow('领域分布：', leftPad, y + 14);
     y += 22;
-    var maxVal = Math.max.apply(null, dist.values);
-    dist.names.forEach(function(name, i) {
-      var barW = (dist.values[i] / maxVal) * 300;
-      ctx.fillStyle = '#F1F5F9';
-      ctx.fillRect(leftPad + 80, y, 300, 18);
-      ctx.fillStyle = dist.colors[i];
-      ctx.fillRect(leftPad + 80, y, barW, 18);
-      ctx.fillStyle = '#334155';
-      ctx.font = '11px -apple-system, "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(name, leftPad + 75, y + 15);
-      ctx.textAlign = 'left';
-      ctx.fillText(String(dist.values[i]), leftPad + 385, y + 15);
-      y += 22;
-    });
+    drawBarChartOnCanvas(ctx, dist.names, dist.values, dist.colors, leftPad, y, W - leftPad * 2, barChartH - 40);
+    y += barChartH - 30;
   }
-  y += 4;
+  
+  // Score distribution doughnut
+  if (scoredExperts.length > 0) {
+    drawTextRow('分值分布：', leftPad, y + 14);
+    y += 22;
+    var sDistLabels = ['9-10分（优秀）', '8-9分（良好）', '7-8分（合格）', '<7分（待提升）'];
+    var sDistData = [
+      scoredExperts.filter(function(e) { return e.scores.overall >= 9; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 8 && e.scores.overall < 9; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 7 && e.scores.overall < 8; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall < 7; }).length
+    ];
+    drawDoughnutChartOnCanvas(ctx, sDistLabels, sDistData, leftPad, y, W - leftPad * 2, scoreDistH - 30);
+    y += scoreDistH;
+  }
   y += sectionGap;
   
   // ---- Section 4: System usage ----

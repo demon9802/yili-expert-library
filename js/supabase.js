@@ -410,12 +410,27 @@ async function updateProject(id, project) {
 // upsert = insert if not exists, update if exists (on conflict: id)
 async function upsertProject(project) {
   if (!supabase) throw new Error('Supabase unavailable');
+  
+  // v5.8.7-fix: 先查后写，UPDATE 时不传 created_at，防止覆盖数据库原值
+  const { count, error: countError } = await supabase.from('projects').select('*', { count: 'exact', head: true }).eq('id', project.id);
+  if (countError) throw countError;
+  
   const row = projectToRow(project);
   if (!row.created_by) row.created_by = currentUser?.email || '主管理员';
   row.updated_at = new Date().toISOString();
-  const { data, error } = await supabase.from('projects').upsert(row, { onConflict: 'id' }).select().single();
-  if (error) throw error;
-  return rowToProject(data);
+  
+  if (count > 0) {
+    // 已有项目 → UPDATE（不传 created_at）
+    delete row.created_at;
+    const { data, error } = await supabase.from('projects').update(row).eq('id', project.id).select().single();
+    if (error) throw error;
+    return rowToProject(data);
+  } else {
+    // 新项目 → INSERT
+    const { data, error } = await supabase.from('projects').insert(row).select().single();
+    if (error) throw error;
+    return rowToProject(data);
+  }
 }
 
 async function deleteProject(id) {
@@ -599,7 +614,7 @@ function rowToProject(row) {
 }
 
 function projectToRow(project) {
-  return {
+  const row = {
     id: project.id,
     title: project.title,
     expert_id: project.expertId,
@@ -610,9 +625,13 @@ function projectToRow(project) {
     description: project.desc || '',
     visible: project.visible !== false,
     created_by: project.createdBy || '主管理员',
-    created_at: project.createdAt || new Date().toISOString(),
     updated_at: project.updatedAt || new Date().toISOString()
   };
+  // v5.8.7-fix: 只在 createdAt 存在时传入 created_at，防止 UPDATE 时覆盖数据库原值
+  if (project.createdAt) {
+    row.created_at = project.createdAt;
+  }
+  return row;
 }
 
 function rowToField(row) {
