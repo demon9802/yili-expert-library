@@ -763,12 +763,15 @@ function toggleMobileMode() {
 }
 
 function initMobileMode() {
+  // v5.8.3: 管理员可在系统设置中关闭手机端视图
+  var db = appState.db;
+  if (db && db.mobileViewEnabled === false) return; // 管理员关闭了手机端
   var saved = null;
   try { saved = localStorage.getItem('yili_mobile_mode'); } catch(e) {}
   if (saved === '1') {
     document.body.classList.add('mobile-mode');
   } else if (saved === null) {
-    // 首次访问：自动检测屏幕宽度
+    // 首次访问：自动检测屏幕宽度（仅当管理员未显式关闭时）
     if (window.innerWidth < 768) {
       document.body.classList.add('mobile-mode');
       try { localStorage.setItem('yili_mobile_mode', '1'); } catch(e) {}
@@ -996,12 +999,15 @@ function renderFrontend() {
     onclick: () => showDashboard()
   }, '📊 数据仪表盘'));
 
-  // v5.6.9: 手机版切换按钮
-  var isMobile = document.body.classList.contains('mobile-mode');
-  headerActions.appendChild(h('button', {
-    className: 'btn btn-sm mobile-toggle-btn' + (isMobile ? ' active' : ''),
-    onclick: function() { toggleMobileMode(); }
-  }, isMobile ? '💻 桌面版' : '📱 手机版'));
+  // v5.6.9: 手机版切换按钮（v5.8.3: 仅当管理员启用手机端视图时显示）
+  var mobileEnabled = !(appState.db && appState.db.mobileViewEnabled === false);
+  if (mobileEnabled) {
+    var isMobile = document.body.classList.contains('mobile-mode');
+    headerActions.appendChild(h('button', {
+      className: 'btn btn-sm mobile-toggle-btn' + (isMobile ? ' active' : ''),
+      onclick: function() { toggleMobileMode(); }
+    }, isMobile ? '💻 桌面版' : '📱 手机版'));
+  }
 
   // 管理员入口按钮
   headerActions.appendChild(h('button', {
@@ -3578,7 +3584,7 @@ function getDefaultSubPermissions() {
   return {
     expertView: true, expertAdd: true, expertEdit: true, expertDelete: false,
     expertImport: true, expertExport: true, expertScore: true,
-    categoryManage: true,
+    categoryManage: false, // v5.8.3: 子管理员默认关闭分类管理
     ratingManage: true, dashboardManage: true, observationManage: true,
     projectsManage: true, docsManage: false,
     sortManage: false, permissionManage: false, systemSettings: false
@@ -3627,12 +3633,15 @@ function renderAdmin() {
     }
   }, '← 返回前端'));
   
-  // v5.6.9: 手机版切换按钮（管理后台）
-  var isMobileAdmin = document.body.classList.contains('mobile-mode');
-  headerActions.appendChild(h('button', {
-    className: 'btn btn-sm mobile-toggle-btn' + (isMobileAdmin ? ' active' : ''),
-    onclick: function() { toggleMobileMode(); }
-  }, isMobileAdmin ? '💻 桌面版' : '📱 手机版'));
+  // v5.6.9: 手机版切换按钮（管理后台，v5.8.3: 仅当管理员启用手机端视图时显示）
+  var mobileEnabled = !(appState.db && appState.db.mobileViewEnabled === false);
+  if (mobileEnabled) {
+    var isMobileAdmin = document.body.classList.contains('mobile-mode');
+    headerActions.appendChild(h('button', {
+      className: 'btn btn-sm mobile-toggle-btn' + (isMobileAdmin ? ' active' : ''),
+      onclick: function() { toggleMobileMode(); }
+    }, isMobileAdmin ? '💻 桌面版' : '📱 手机版'));
+  }
   
   // 子管理员可修改自己的密码
   if (!isMaster) {
@@ -8006,6 +8015,36 @@ function renderSettingsTab(panel) {
   colorRow.appendChild(schemeGrid);
   uiCard.appendChild(colorRow);
   
+  // v5.8.3: 手机端视图开关
+  var mobileViewRow = h('div', { style:{ marginBottom:'14px' } });
+  mobileViewRow.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600', marginBottom:'8px' } }, '📱 手机端视图'));
+  var mobileViewEnabled = db.mobileViewEnabled !== false; // 默认为 false（关闭）
+  var mobileLabel = h('label', { style:{ display:'flex', alignItems:'center', gap:'10px', cursor:'pointer' } });
+  var mobileCheckbox = h('input', {
+    type: 'checkbox',
+    checked: mobileViewEnabled,
+    style: { width:'18px', height:'18px', cursor:'pointer' },
+    onchange: function() {
+      db.mobileViewEnabled = this.checked;
+      saveDB(db);
+      if (this.checked) {
+        // 启用：允许 auto-detect，刷新页面后生效
+        try { localStorage.removeItem('yili_mobile_mode'); } catch(e) {}
+        toast('手机端视图已开启，刷新页面后生效（手机访问将自动适配）', 'success');
+      } else {
+        // 关闭：移除手机端 class，清除缓存
+        document.body.classList.remove('mobile-mode');
+        try { localStorage.setItem('yili_mobile_mode', '0'); } catch(e) {}
+        toast('手机端视图已关闭，所有设备将显示桌面版界面', 'success');
+      }
+    }
+  });
+  mobileLabel.appendChild(mobileCheckbox);
+  mobileLabel.appendChild(h('span', { style:{ fontSize:'13px', color:'var(--text)' } }, '启用手机端适配（关闭后所有设备强制显示桌面版）'));
+  mobileViewRow.appendChild(mobileLabel);
+  mobileViewRow.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', marginLeft:'28px' } }, '手机端适配仍在细化中，建议确认后再开启'));
+  uiCard.appendChild(mobileViewRow);
+  
   // Save & preview button
   const uiBtns = h('div', { style:{ display:'flex', gap:'8px' } });
   uiBtns.appendChild(h('button', {
@@ -8468,6 +8507,23 @@ async function boot() {
     
     // Step 4.5: sync observation status with latest scores
     autoSyncObservationGlobal();
+    
+    // Step 4.55: v5.8.3 迁移——关闭所有已有子管理员的分类管理权限
+    (function migrateSubAdminCategory() {
+      try {
+        var migrated = false;
+        var users = db.permissions && db.permissions.users;
+        if (users && users.length > 0) {
+          users.forEach(function(u) {
+            if (u.permissions && u.permissions.categoryManage === true) {
+              u.permissions.categoryManage = false;
+              migrated = true;
+            }
+          });
+        }
+        if (migrated) saveDB(db);
+      } catch(e) { console.warn('Sub-admin category migration skipped:', e.message); }
+    })();
     
     // Step 4.6: increment page view counter (v5.8)
     incrementPageView();
