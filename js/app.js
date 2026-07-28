@@ -274,7 +274,7 @@ const COLOR_SCHEMES = {
   dark:    { name: '暗夜黑', primary: '#111827', primaryLight: '#1F2937', accent: '#6366F1' }
 };
 
-const CURRENT_DB_VERSION = 13;
+const CURRENT_DB_VERSION = 14;
 
 // ===== UI Config Management =====
 function applyUiConfig(uic) {
@@ -398,33 +398,22 @@ async function getDB() {
     if (appData.experts.length > 0 || appData.fields.length > 0) {
       // Supabase 有数据 → 优先使用
       const raw = localStorage.getItem(STORAGE_KEY);
-      // v5.8.5-fix: 白名单维护管理设置，防止 getDB() 重建 db 时丢弃管理员运行时属性
-      // 新增属性必须同时加入此白名单 + db 构造函数
-      let localConfig = { ratingConfig: null, sortOptions: null, uiConfig: null, dashboardConfig: null, observationLibrary: [], permissions: null, fields: null, mobileViewEnabled: null, defaultAreaCode: null };
+      // v5.8.6-refactor: 扩散法 — 以 localStorage 全量为基底，Supabase 仅覆盖核心数据
+      // 新增任何 db 属性自动保留，无需维护白名单。派生属性（version/updateTime 等）显式覆盖
+      let localDB = {};
       if (raw) {
-        try {
-          const l = JSON.parse(raw);
-          localConfig.ratingConfig = l.ratingConfig;
-          localConfig.sortOptions = l.sortOptions;
-          localConfig.uiConfig = l.uiConfig;
-          localConfig.dashboardConfig = l.dashboardConfig;
-          localConfig.observationLibrary = l.observationLibrary || [];
-          localConfig.permissions = l.permissions;
-          localConfig.fields = l.fields;
-          localConfig.mobileViewEnabled = l.mobileViewEnabled;
-          localConfig.defaultAreaCode = l.defaultAreaCode;
-        } catch(e) {}
+        try { localDB = JSON.parse(raw) || {}; } catch(e) {}
       }
       
       // 合并字段：Supabase 提供字段列表，localStorage 提供颜色覆盖
       // 修复 v4.0 初始阶段管理员修改未同步到 Supabase 导致刷新后颜色丢失
       // V5.7.0-hotfix: 改为并集合并 —— localStorage 独有字段不再被丢弃
       let fields = [];
-      if (localConfig.fields && localConfig.fields.length > 0) {
+      if (localDB.fields && localDB.fields.length > 0) {
         const supabaseFieldMap = {};
         appData.fields.forEach(function(f) { if (f && f.name) supabaseFieldMap[f.name] = true; });
         const localFieldMap = {};
-        localConfig.fields.forEach(function(f) { if (f && f.name) localFieldMap[f.name] = f; });
+        localDB.fields.forEach(function(f) { if (f && f.name) localFieldMap[f.name] = f; });
         // 1. 以 Supabase 为基准，合并 localStorage 的颜色覆盖
         fields = appData.fields.map(function(f) {
           const local = localFieldMap[f.name];
@@ -441,7 +430,7 @@ async function getDB() {
           return f;
         });
         // 2. 追加 localStorage 中独有的字段（防止同步失败导致新增字段丢失）
-        localConfig.fields.forEach(function(f) {
+        localDB.fields.forEach(function(f) {
           if (f && f.name && !supabaseFieldMap[f.name]) {
             fields.push(f);
             console.log('[getDB] 保留 localStorage 独有字段:', f.name);
@@ -526,19 +515,23 @@ async function getDB() {
         } catch(e) { console.warn('[getDB] 项目合并异常:', e.message); }
       }
 
+      // v5.8.6-refactor: 扩散法 — ...localDB 保留所有配置，Supabase 仅覆盖核心数据
       const db = {
+        ...localDB,
         experts: finalExperts,
         fields: fields,
         yiliProjects: finalProjects,
         favorites: mergedFavorites,
-        ratingConfig: migrateRatingConfig(localConfig.ratingConfig || JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG))),
-        sortOptions: localConfig.sortOptions || DEFAULT_SORT_OPTIONS,
-        uiConfig: localConfig.uiConfig || JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)),
-        dashboardConfig: localConfig.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' },
-        observationLibrary: localConfig.observationLibrary || [],
-        permissions: localConfig.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
-        mobileViewEnabled: localConfig.mobileViewEnabled !== null ? localConfig.mobileViewEnabled : undefined, // 默认 undefined = 关闭
-        defaultAreaCode: localConfig.defaultAreaCode || '',
+        // 配置类：localDB 优先（已有默认值兜底，migrateRatingConfig 处理评分迁移）
+        ratingConfig: migrateRatingConfig(localDB.ratingConfig || JSON.parse(JSON.stringify(DEFAULT_RATING_CONFIG))),
+        sortOptions: localDB.sortOptions || DEFAULT_SORT_OPTIONS,
+        uiConfig: localDB.uiConfig || JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG)),
+        dashboardConfig: localDB.dashboardConfig || { chartType: 'doughnut', showCharts: ['fields', 'scoreNumeric'], barChartType: 'bar' },
+        observationLibrary: localDB.observationLibrary || [],
+        permissions: localDB.permissions || await fetchPermissions() || { adminPassword: 'yili2026', users: [], shareSettings: { linkActive: true, requireLogin: true } },
+        mobileViewEnabled: localDB.mobileViewEnabled !== undefined ? localDB.mobileViewEnabled : undefined,
+        defaultAreaCode: localDB.defaultAreaCode || '',
+        // 派生属性（必须显式覆盖，防止携带 localStorage 旧值）
         categoryConfig: fields,
         totalExperts: finalExperts.length,
         totalFields: fields.length,
