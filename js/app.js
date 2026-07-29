@@ -6011,9 +6011,9 @@ function downloadImportTemplate() {
     '用 ■标题：描述 格式分行填写，详细介绍专家优势',
     '可选，1-3条，每行一条；显示在专家卡片上的简要优势亮点（如：供应链管理专家，10年从业经历）',
     '最高学历或学位信息',
-    '请填写：【职称/荣誉头衔】、【社会职务】、【履职资历】三项，用全角分号；分隔',
+    '请填写：【职称/荣誉头衔】xxx【社会职务】yyy【履职资历】zzz —— 用【小标题】分节，靠【】系统自动切分；不需要加分号',
     '可选，1-3条，每行一条；显示在专家卡片上的简要资历说明（如：智篆商业智库专家）',
-    '请填写：【核心课程】、【服务经历】两项，用全角分号；分隔',
+    '请填写：【核心课程】xxx【服务经历】yyy —— 用【小标题】分节，靠【】系统自动切分；不需要加分号',
     '主要联系人或对接人姓名',
     '手机/邮箱/微信等联系方式',
     '内部推荐该专家的人员姓名',
@@ -6023,9 +6023,9 @@ function downloadImportTemplate() {
     '张教授', 'AI, 战略规划',
     '■数字化转型：曾主导多个大型企业数字化转型项目\n■行业研究：在智能制造领域有深入研究\n■方法论：擅长将理论框架与实战结合',
     '数字化转型领域专家\n15年企业管理实战经验', '博士',
-    '【职称/荣誉头衔】教授、博导；【社会职务】中国人工智能学会理事；【履职资历】曾任某集团首席数字官',
+    '【职称/荣誉头衔】教授、博导【社会职务】中国人工智能学会理事【履职资历】曾任某集团首席数字官',
     '智篆商业智库专家\n某集团前首席数字官',
-    '【核心课程】数字化转型战略与实践、AI赋能企业创新；【服务经历】曾为伊利、华为等企业提供培训咨询',
+    '【核心课程】数字化转型战略与实践、AI赋能企业创新【服务经历】曾为伊利、华为等企业提供培训咨询',
     '李经理', '📞13800138000', '王主任', '是'
   ];
 
@@ -8850,12 +8850,9 @@ function renderMonthlyReportTab(panel) {
   var snapCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
   snapCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '③ 当前仪表盘快照（' + formatDate(new Date().toISOString()).substring(0, 10) + '）'));
   
-  // Stats row
+  // Stats row: only "在职专家" — avg score cards moved to doughnut chart right side
   var statsRow = h('div', { style: { display:'flex', gap:'16px', flexWrap:'wrap', marginBottom:'16px' } });
   statsRow.appendChild(renderStatBox('在职专家', experts.length, '#3b82f6'));
-  statsRow.appendChild(renderStatBox('平均专业度', avgProf, '#8b5cf6'));
-  statsRow.appendChild(renderStatBox('平均影响力', avgInfl, '#f59e0b'));
-  statsRow.appendChild(renderStatBox('平均综合评分', avgOverall, '#10b981'));
   snapCard.appendChild(statsRow);
   
   // Field distribution bar chart (full width, matches frontend)
@@ -8876,17 +8873,18 @@ function renderMonthlyReportTab(panel) {
     var scoreAvgProf = (scoredExps.reduce(function(s,e) { return s + (e.scores.professional || 0); }, 0) / scoredExps.length).toFixed(1);
     var scoreAvgInfl = (scoredExps.reduce(function(s,e) { return s + (e.scores.influence || 0); }, 0) / scoredExps.length).toFixed(1);
     var scoreAvgOverall = (scoredExps.reduce(function(s,e) { return s + (e.scores.overall || 0); }, 0) / scoredExps.length).toFixed(1);
-    
+
     var scoreRow = h('div', { style: { display:'flex', gap:'20px', marginTop:'16px', alignItems:'center', flexWrap:'wrap' } });
-    
+
     // Left: doughnut chart
     var scoreDistDiv = h('div', { style: { flex:'1 1 380px', minWidth:'300px', height:'260px' } });
     scoreDistDiv.id = 'report-score-dist';
     scoreRow.appendChild(scoreDistDiv);
-    
+
     // Right: score numeric cards (matching frontend score-numeric-grid)
+    // v5.8.8: 三个评分方块放在环形图右侧，与前端 score-numeric-grid 完全一致
     var scoreNumericDiv = h('div', { style: { flex:'0 0 auto', minWidth:'180px', display:'flex', flexDirection:'column', gap:'10px' } });
-    scoreNumericDiv.innerHTML = 
+    scoreNumericDiv.innerHTML =
       '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
         '<div style="font-size:11px;color:#64748b;margin-bottom:4px">专业度</div>' +
         '<div style="font-size:22px;font-weight:700;color:#3B82F6">' + scoreAvgProf + '</div>' +
@@ -8903,7 +8901,7 @@ function renderMonthlyReportTab(panel) {
         '<div style="font-size:10px;color:#94a3b8">加权平均</div>' +
       '</div>';
     scoreRow.appendChild(scoreNumericDiv);
-    
+
     snapCard.appendChild(scoreRow);
     setTimeout(function() {
       renderScoreDistChart('report-score-dist', experts);
@@ -9185,12 +9183,10 @@ function buildMonthlyReportCanvas() {
   y += sectionGap;
   
   // ---- Section 3: Dashboard snapshot ----
+  // v5.8.8: 仅保留「在职专家」方块；三个平均分方块下移到下方环形图右侧
   drawSectionTitle('③ 当前仪表盘快照（' + formatDate(new Date().toISOString()).substring(0, 10) + '）');
   drawStatBox('在职专家', experts.length, '#3b82f6', leftPad);
-  drawStatBox('专业度', avgProf, '#8b5cf6', leftPad + 125);
-  drawStatBox('影响力', avgInfl, '#f59e0b', leftPad + 250);
-  drawStatBox('综合评分', avgOverall, '#10b981', leftPad + 375);
-  y += 56;
+  y += 50;
   
   // Vertical bar chart
   if (dist.names.length > 0) {
