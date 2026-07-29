@@ -2894,7 +2894,7 @@ function renderDoughnutChart(containerId, labels, data) {
   
   let svg = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="overflow:visible">';
   
-  const cx = w * 0.38, cy = h * 0.48, r = Math.min(w * 0.22, 90);
+  const cx = w * 0.33, cy = h * 0.48, r = Math.min(w * 0.21, 85);
   const innerR = r * 0.55;
   let startAngle = -Math.PI / 2;
   
@@ -2932,14 +2932,19 @@ function renderDoughnutChart(containerId, labels, data) {
   svg += '<text x="' + cx + '" y="' + (cy - 6) + '" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">' + total + '</text>';
   svg += '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>';
   
-  // Legend
-  const legendX = w * 0.62;
+  // Legend (two-line layout per item to prevent text overlap)
+  const legendX = w * 0.55;
+  const itemH = 44;
+  const legendStartY = (h - data.filter(v => v > 0).length * itemH) / 2;
+  let li = 0;
   data.forEach((val, i) => {
-    const ly = 16 + i * 32;
+    if (val === 0) return;
+    const ly = legendStartY + li * itemH;
     const pct = total > 0 ? (val/total*100).toFixed(1) : 0;
-    svg += '<rect x="' + legendX + '" y="' + ly + '" width="14" height="14" rx="3" fill="' + colors[i] + '"/>';
-    svg += '<text x="' + (legendX + 20) + '" y="' + (ly + 12) + '" font-size="12" fill="#475569">' + labels[i] + '</text>';
-    svg += '<text x="' + (legendX + 145) + '" y="' + (ly + 12) + '" font-size="12" font-weight="600" fill="#1e293b" text-anchor="end">' + val + '人 (' + pct + '%)</text>';
+    svg += '<rect x="' + legendX + '" y="' + (ly + 1) + '" width="14" height="14" rx="3" fill="' + colors[i] + '"/>';
+    svg += '<text x="' + (legendX + 20) + '" y="' + (ly + 12) + '" font-size="13" fill="#334155">' + labels[i] + '</text>';
+    svg += '<text x="' + (legendX + 20) + '" y="' + (ly + 32) + '" font-size="12" font-weight="600" fill="#1e293b">' + val + '人 (' + pct + '%)</text>';
+    li++;
   });
   
   svg += '</svg>';
@@ -5130,7 +5135,7 @@ function showExpertForm(expert) {
     const pairs = [];
     const parts = text.split(/【([^】]+)】/);
     for (let i = 1; i < parts.length; i += 2) {
-      pairs.push({ subtitle: parts[i].trim(), content: (parts[i+1] || '').trim() });
+      pairs.push({ subtitle: parts[i].trim(), content: (parts[i+1] || '').replace(/[;；]\s*$/, '').trim() });
     }
     if (pairs.length === 0 && text.trim()) {
       pairs.push({ subtitle: '', content: text.trim() });
@@ -6273,6 +6278,8 @@ function showImportDialog() {
         contactType: detectContactType(ne.contactInfo || ''),
         referrer: ne.referrer || '',
         isSupplier: ne.isSupplier || false,
+        advDisplay: ne.advDisplay || '',
+        qualDisplay: ne.qualDisplay || '',
         scores: ne.scores || { professional: 5, influence: 5, overall: 5 },
         status: 'active',
         createdAt: new Date().toISOString(),
@@ -6886,6 +6893,7 @@ function renderDashboardTab(panel) {
             dc.showCharts = dc.showCharts.filter(c => c !== ms.id);
           }
           saveDB(db);
+          renderDashboardTab(panel); // 即时刷新预览
           toast(ms.name + '已' + (e.target.checked ? '显示' : '隐藏'), 'success');
         }
       });
@@ -6936,6 +6944,14 @@ function renderDashboardTab(panel) {
     previewGrid.appendChild(fc);
   }
   
+  if (dc.showCharts.includes('scoreDist')) {
+    const sdc = h('div', { className: 'dashboard-card' });
+    sdc.appendChild(h('h4', {}, '分值分布'));
+    const sdd = h('div', { className: 'chart-container', style: 'height:280px', id: 'admin-chart-score-dist' });
+    sdc.appendChild(sdd);
+    previewGrid.appendChild(sdc);
+  }
+  
   if (dc.showCharts.includes('scoreNumeric')) {
     const sc = h('div', { className: 'dashboard-card' });
     sc.appendChild(h('h4', {}, '各项评分平均分'));
@@ -6951,6 +6967,11 @@ function renderDashboardTab(panel) {
     if (fieldChartContainer) {
       var dist = getFieldDistribution(experts);
       renderBarChart('admin-chart-fields', dist.names, dist.values, dist.colors);
+    }
+    
+    const scoreDistContainer = document.getElementById('admin-chart-score-dist');
+    if (scoreDistContainer) {
+      renderScoreDistChart('admin-chart-score-dist', experts);
     }
     
     const numericContainer = document.getElementById('admin-chart-numeric');
@@ -6979,23 +7000,20 @@ function exportDashboardImage() {
     return;
   }
   
-  // Calculate canvas height based on enabled charts
+  // Calculate canvas height — side-by-side layout for score charts (matching frontend 2-column grid)
   var hasFields = enabledCharts.indexOf('fields') >= 0;
   var hasScoreDist = enabledCharts.indexOf('scoreDist') >= 0;
   var hasNumeric = enabledCharts.indexOf('scoreNumeric') >= 0;
   
-  var chartSections = 0;
-  if (hasFields) chartSections++;
-  if (hasScoreDist) chartSections++;
-  if (hasNumeric) chartSections++;
-  
   var titleH = 60;
   var barChartH = hasFields ? 340 : 0;
+  // Score row: doughnut + numeric side by side, use the taller height
   var doughnutH = hasScoreDist ? 280 : 0;
-  var numericH = hasNumeric ? 140 : 0;
+  var numericH = hasNumeric ? 180 : 0;
+  var scoreRowH = Math.max(doughnutH, numericH);
   var gap = 20;
   var canvasW = 800;
-  var canvasH = titleH + barChartH + doughnutH + numericH + (chartSections + 1) * gap;
+  var canvasH = titleH + barChartH + scoreRowH + gap * 3;
   
   var canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -7036,8 +7054,8 @@ function exportDashboardImage() {
     currentY += barChartH;
   }
   
-  // ---- Score distribution doughnut ----
-  if (hasScoreDist) {
+  // ---- Score distribution doughnut + Score numeric cards (side by side, matching frontend 2-col grid) ----
+  if (hasScoreDist || hasNumeric) {
     var scoredExperts = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
     var distLabels = ['9-10分（优秀）', '8-9分（良好）', '7-8分（合格）', '<7分（待提升）'];
     var distData = [
@@ -7047,30 +7065,31 @@ function exportDashboardImage() {
       scoredExperts.filter(function(e) { return e.scores.overall < 7; }).length
     ];
     
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('分值分布', 40, currentY + 20);
-    currentY += 30;
+    var halfW = (canvasW - 80 - 24) / 2; // two columns with gap
+    var leftX = 40;
+    var rightX = 40 + halfW + 24;
     
-    drawDoughnutChartOnCanvas(ctx, distLabels, distData, 40, currentY, canvasW - 80, doughnutH - 40);
-    currentY += doughnutH;
-  }
-  
-  // ---- Score numeric cards ----
-  if (hasNumeric) {
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('各项评分平均分', 40, currentY + 20);
-    currentY += 30;
+    if (hasScoreDist) {
+      ctx.fillStyle = '#1E293B';
+      ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('分值分布', leftX, currentY + 20);
+      drawDoughnutChartOnCanvas(ctx, distLabels, distData, leftX, currentY + 30, halfW, scoreRowH - 40);
+    }
     
-    var profAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.professional; }, 0) / experts.length).toFixed(1) : '0';
-    var inflAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.influence; }, 0) / experts.length).toFixed(1) : '0';
-    var overallAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.overall; }, 0) / experts.length).toFixed(1) : '0';
+    if (hasNumeric) {
+      var profAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.professional; }, 0) / experts.length).toFixed(1) : '0';
+      var inflAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.influence; }, 0) / experts.length).toFixed(1) : '0';
+      var overallAvg = experts.length ? (experts.reduce(function(s,e) { return s + e.scores.overall; }, 0) / experts.length).toFixed(1) : '0';
+      
+      ctx.fillStyle = '#1E293B';
+      ctx.font = 'bold 16px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('各项评分平均分', rightX, currentY + 20);
+      drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, rightX, currentY + 40, halfW, scoreRowH - 60);
+    }
     
-    drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, 40, currentY, canvasW - 80, numericH - 40);
-    currentY += numericH;
+    currentY += scoreRowH;
   }
   
   // Download as PNG
@@ -7196,14 +7215,19 @@ function drawDoughnutChartOnCanvas(ctx, labels, data, x, y, w, h) {
   var total = data.reduce(function(a,b) { return a+b; }, 0);
   if (total === 0) return;
   
-  var cx = x + w * 0.35;
+  var cx = x + w * 0.33;
   var cy = y + h / 2;
-  var r = Math.min(w * 0.22, 100);
+  var r = Math.min(w * 0.20, 85);
   var innerR = r * 0.55;
   
   var startAngle = -Math.PI / 2;
-  var legendX = x + w * 0.62;
-  var legendY = cy - (data.length * 20) / 2;
+  var legendX = x + w * 0.55;
+  
+  // Count non-zero items for vertical centering
+  var nzCount = data.filter(function(d) { return d > 0; }).length;
+  var itemH = 42;
+  var legendStartY = cy - (nzCount * itemH) / 2;
+  var li = 0;
   
   for (var i = 0; i < data.length; i++) {
     if (data[i] === 0) continue;
@@ -7243,16 +7267,20 @@ function drawDoughnutChartOnCanvas(ctx, labels, data, x, y, w, h) {
     ctx.font = '11px -apple-system, "Microsoft YaHei", sans-serif';
     ctx.fillText('专家总数', cx, cy + 14);
     
-    // Legend
-    var ly = legendY + i * 22;
+    // Legend (two-line per item)
+    var ly2 = legendStartY + li * itemH;
     ctx.fillStyle = colors[i];
-    ctx.fillRect(legendX, ly - 5, 12, 12);
+    ctx.fillRect(legendX, ly2 + 1, 14, 14);
     ctx.fillStyle = '#334155';
-    ctx.font = '12px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.font = '13px -apple-system, "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(labels[i] + ' (' + data[i] + '位)', legendX + 18, ly + 1);
+    ctx.textBaseline = 'top';
+    ctx.fillText(labels[i], legendX + 20, ly2 + 1);
+    ctx.fillStyle = '#1E293B';
+    ctx.font = 'bold 12px -apple-system, "Microsoft YaHei", sans-serif';
+    ctx.fillText(data[i] + '人 (' + pct + '%)', legendX + 20, ly2 + 20);
     
+    li++;
     startAngle = endAngle;
   }
 }
@@ -8829,7 +8857,7 @@ function renderMonthlyReportTab(panel) {
   statsRow.appendChild(renderStatBox('平均综合评分', avgOverall, '#10b981'));
   snapCard.appendChild(statsRow);
   
-  // Field distribution bar chart (vertical)
+  // Field distribution bar chart (full width, matches frontend)
   if (dist.names.length > 0) {
     var fieldChartDiv = h('div', { style: { marginTop:'8px', height:'260px' } });
     fieldChartDiv.id = 'report-field-chart';
@@ -8841,10 +8869,10 @@ function renderMonthlyReportTab(panel) {
     snapCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'12px 0' } }, '暂无专家数据'));
   }
   
-  // Score distribution doughnut
+  // Score distribution doughnut (side-by-side layout mimicking frontend dashboard-grid)
   var scoredExps = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
   if (scoredExps.length > 0) {
-    var scoreDistDiv = h('div', { style: { marginTop:'16px', height:'220px' } });
+    var scoreDistDiv = h('div', { style: { marginTop:'16px', height:'280px', maxWidth:'520px' } });
     scoreDistDiv.id = 'report-score-dist';
     snapCard.appendChild(scoreDistDiv);
     setTimeout(function() {
