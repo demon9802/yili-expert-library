@@ -539,6 +539,16 @@ async function getDB() {
         updateTime: new Date().toISOString()
       };
       
+      // v5.8.8.2-migration: 自动清理 qualifications / courses 尾部全角分号（兼容旧导入数据）
+      finalExperts.forEach(function(e) {
+        if (e.qualifications && /[;；]\s*$/.test(e.qualifications)) {
+          e.qualifications = e.qualifications.replace(/[;；]\s*$/gm, '');
+        }
+        if (e.courses && /[;；]\s*$/.test(e.courses)) {
+          e.courses = e.courses.replace(/[;；]\s*$/gm, '');
+        }
+      });
+
       // 缓存到 localStorage 作为离线备份
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
       return db;
@@ -2452,7 +2462,9 @@ function formatRichText(text) {
     if (i % 2 === 1) {
       result += '<div class="detail-sub-heading">' + part.replace(/\//g, '<span style="white-space:nowrap">&#8203;/&#8203;</span>') + '</div>';
     } else {
-      result += '<div class="detail-sub-content">' + cleanContent(part) + '</div>';
+      // v5.8.8.2: 清理【】内容块尾部的全角分号（兼容旧数据）
+      var cleanPart = part.replace(/[;；]\s*$/, '');
+      result += '<div class="detail-sub-content">' + cleanContent(cleanPart) + '</div>';
     }
   }
   if (result === '') {
@@ -8850,10 +8862,7 @@ function renderMonthlyReportTab(panel) {
   var snapCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
   snapCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '③ 当前仪表盘快照（' + formatDate(new Date().toISOString()).substring(0, 10) + '）'));
   
-  // Stats row: only "在职专家" — avg score cards moved to doughnut chart right side
-  var statsRow = h('div', { style: { display:'flex', gap:'16px', flexWrap:'wrap', marginBottom:'16px' } });
-  statsRow.appendChild(renderStatBox('在职专家', experts.length, '#3b82f6'));
-  snapCard.appendChild(statsRow);
+  // v5.8.8.2: 所有评分块移到下方与环形图并排横向分布
   
   // Field distribution bar chart (full width, matches frontend)
   if (dist.names.length > 0) {
@@ -8881,25 +8890,21 @@ function renderMonthlyReportTab(panel) {
     scoreDistDiv.id = 'report-score-dist';
     scoreRow.appendChild(scoreDistDiv);
 
-    // Right: score numeric cards (matching frontend score-numeric-grid)
-    // v5.8.8: 三个评分方块放在环形图右侧，与前端 score-numeric-grid 完全一致
-    var scoreNumericDiv = h('div', { style: { flex:'0 0 auto', minWidth:'180px', display:'flex', flexDirection:'column', gap:'10px' } });
-    scoreNumericDiv.innerHTML =
-      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
-        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">专业度</div>' +
-        '<div style="font-size:22px;font-weight:700;color:#3B82F6">' + scoreAvgProf + '</div>' +
-        '<div style="font-size:10px;color:#94a3b8">满分10分</div>' +
-      '</div>' +
-      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
-        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">影响力</div>' +
-        '<div style="font-size:22px;font-weight:700;color:#F59E0B">' + scoreAvgInfl + '</div>' +
-        '<div style="font-size:10px;color:#94a3b8">满分10分</div>' +
-      '</div>' +
-      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
-        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">综合评分</div>' +
-        '<div style="font-size:22px;font-weight:700;color:#10B981">' + scoreAvgOverall + '</div>' +
-        '<div style="font-size:10px;color:#94a3b8">加权平均</div>' +
+    // Right: 4 score cards horizontally (matching frontend side-by-side layout)
+    // v5.8.8.2: 在职专家+3个评分方块全部移到环形图右侧，横向并排分布
+    var scoreNumericDiv = h('div', { style: { flex:'0 0 auto', minWidth:'200px', display:'flex', flexDirection:'row', gap:'10px', alignItems:'center' } });
+    function makeScoreCard(label, value, color, sub) {
+      return '<div style="text-align:center;padding:10px 8px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;flex:1;min-width:70px">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">' + label + '</div>' +
+        '<div style="font-size:22px;font-weight:700;color:' + color + '">' + value + '</div>' +
+        (sub ? '<div style="font-size:10px;color:#94a3b8">' + sub + '</div>' : '') +
       '</div>';
+    }
+    scoreNumericDiv.innerHTML =
+      makeScoreCard('在职专家', experts.length, '#3b82f6', '位专家') +
+      makeScoreCard('专业度', scoreAvgProf, '#3B82F6', '满分10分') +
+      makeScoreCard('影响力', scoreAvgInfl, '#F59E0B', '满分10分') +
+      makeScoreCard('综合评分', scoreAvgOverall, '#10B981', '加权平均');
     scoreRow.appendChild(scoreNumericDiv);
 
     snapCard.appendChild(scoreRow);
@@ -9060,7 +9065,7 @@ function buildMonthlyReportCanvas() {
   var sec2H = 80 + Math.max(newProjects.length, modifiedProjects.length, 1) * 22;
   var barChartH = 280;
   var scoreDistH = scoredExperts.length > 0 ? 220 : 0;
-  var sec3H = 110 + barChartH + scoreDistH;
+  var sec3H = 60 + barChartH + scoreDistH;
   var sec4H = 120;
   var sec5H = 60 + monthLogs.length * 28;
   var H = titleH + sec1H + sec2H + sec3H + sec4H + sec5H + sectionGap * 6 + 40;
@@ -9183,11 +9188,9 @@ function buildMonthlyReportCanvas() {
   y += sectionGap;
   
   // ---- Section 3: Dashboard snapshot ----
-  // v5.8.8: 仅保留「在职专家」方块；三个平均分方块下移到下方环形图右侧
+  // v5.8.8.2: 所有评分块移到环形图右侧横向并排分布
   drawSectionTitle('③ 当前仪表盘快照（' + formatDate(new Date().toISOString()).substring(0, 10) + '）');
-  drawStatBox('在职专家', experts.length, '#3b82f6', leftPad);
-  y += 50;
-  
+
   // Vertical bar chart
   if (dist.names.length > 0) {
     drawTextRow('领域分布：', leftPad, y + 14);
@@ -9211,22 +9214,28 @@ function buildMonthlyReportCanvas() {
     var doughnutW = (W - leftPad * 2) * 0.55;
     drawDoughnutChartOnCanvas(ctx, sDistLabels, sDistData, leftPad, y, doughnutW, scoreDistH - 30);
     
-    // Score numeric cards on right
+    // Score numeric cards on right (4 cards horizontally: 在职专家 + 3 averages)
     var cardX = leftPad + doughnutW + 15;
-    var cardW = W - leftPad - cardX;
-    var cardH = (scoreDistH - 30 - 16) / 3;
-    var cardColors = ['#3B82F6', '#F59E0B', '#10B981'];
-    var cardLabels = ['专业度', '影响力', '综合评分'];
-    var cardValues = [avgProf, avgInfl, avgOverall];
-    var cardSubs = ['满分10分', '满分10分', '加权平均'];
-    
-    for (var ci = 0; ci < 3; ci++) {
-      var cy2 = y + ci * (cardH + 8);
+    var cardAreaW = W - leftPad - cardX;
+    var cardCount = 4;
+    var cardGap = 8;
+    var cardW = (cardAreaW - (cardCount - 1) * cardGap) / cardCount;
+    var cardH = scoreDistH - 30;
+    var allCards = [
+      { label: '在职专家', value: String(experts.length), color: '#3b82f6', sub: '位专家' },
+      { label: '专业度', value: avgProf, color: '#3B82F6', sub: '满分10分' },
+      { label: '影响力', value: avgInfl, color: '#F59E0B', sub: '满分10分' },
+      { label: '综合评分', value: avgOverall, color: '#10B981', sub: '加权平均' }
+    ];
+
+    for (var ci = 0; ci < cardCount; ci++) {
+      var cx = cardX + ci * (cardW + cardGap);
+      var c = allCards[ci];
       // Card background
       ctx.fillStyle = '#f8fafc';
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 1;
-      roundRect(ctx, cardX, cy2, cardW, cardH, 4);
+      roundRect(ctx, cx, y, cardW, cardH, 4);
       ctx.fill();
       ctx.stroke();
       // Label
@@ -9234,15 +9243,15 @@ function buildMonthlyReportCanvas() {
       ctx.font = '10px -apple-system, "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(cardLabels[ci], cardX + cardW/2, cy2 + 6);
+      ctx.fillText(c.label, cx + cardW/2, y + 10);
       // Value
-      ctx.fillStyle = cardColors[ci];
+      ctx.fillStyle = c.color;
       ctx.font = 'bold 20px -apple-system, "Microsoft YaHei", sans-serif';
-      ctx.fillText(cardValues[ci], cardX + cardW/2, cy2 + 22);
+      ctx.fillText(c.value, cx + cardW/2, y + 30);
       // Sub
       ctx.fillStyle = '#94a3b8';
       ctx.font = '9px -apple-system, "Microsoft YaHei", sans-serif';
-      ctx.fillText(cardSubs[ci], cardX + cardW/2, cy2 + 44);
+      ctx.fillText(c.sub, cx + cardW/2, y + 54);
     }
     
     y += scoreDistH;

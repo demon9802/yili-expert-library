@@ -2,6 +2,7 @@
 // v5.8.0+ 独立文件，编辑此文件即可更新月度报告中的更新日志
 // 格式：{ version, date (YYYY-MM-DD), summary, module }
 var VERSION_CHANGELOG = [
+  { version: 'v5.8.8.2', date: '2026-07-29', summary: '修复前端详情分号显示（formatRichText+数据迁移）+ 月报仪表盘4卡横向并排（在职专家/专业度/影响力/综合评分）', module: '紧急修复' },
   { version: 'v5.8.8', date: '2026-07-29', summary: '批量导入修复(advDisplay/qualDisplay/分号清理) + 环形图图例双行布局 + 仪表盘/月报侧并排布局 + 管理后台分值分布全景恢复 + 批量导入审计(项目名称匹配/数据清理) + 月度报告评分卡右置', module: '紧急修复' },
   { version: 'v5.8.7', date: '2026-07-28', summary: '修复合作项目分类（编辑归入修改）+ 月度报告柱状图 + 恢复分值分布环形图 + 移除图表形式选择器', module: '紧急修复' },
   { version: 'v5.8.6', date: '2026-07-28', summary: '重构 getDB() 白名单为扩散法：新增属性自动保留，根除配置丢失隐患', module: '基础架构' },
