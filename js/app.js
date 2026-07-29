@@ -4512,7 +4512,8 @@ function showProjectImportDialog() {
       var expertId = null;
       var pendingExpertName = '';
       if (np.expertName && np.expertName !== '待入库讲师') {
-        var match = db.experts.find(function(e) { return e.name === np.expertName; });
+        var searchName = np.expertName.trim();
+        var match = db.experts.find(function(e) { return e.name === searchName || e.name.indexOf(searchName) === 0; });
         if (match) {
           expertId = match.id;
         } else {
@@ -6271,8 +6272,8 @@ function showImportDialog() {
         fields: Array.isArray(ne.fields) ? ne.fields : (ne.fields ? ne.fields.split(/[,，]/).map(f => f.trim()).filter(Boolean) : []),
         education: ne.education || '',
         advantages: Array.isArray(ne.advantages) ? ne.advantages : parseAdvantages(ne.advantages || ''),
-        qualifications: ne.qualifications || '',
-        courses: ne.courses || '',
+        qualifications: (ne.qualifications || '').replace(/[;；]\s*$/gm, ''), // v5.8.8: 批量导入清除行尾分号
+        courses: (ne.courses || '').replace(/[;；]\s*$/gm, ''), // v5.8.8: 批量导入清除行尾分号
         contactPerson: ne.contactPerson || '',
         contactInfo: ne.contactInfo || '',
         contactType: detectContactType(ne.contactInfo || ''),
@@ -8869,12 +8870,41 @@ function renderMonthlyReportTab(panel) {
     snapCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'12px 0' } }, '暂无专家数据'));
   }
   
-  // Score distribution doughnut (side-by-side layout mimicking frontend dashboard-grid)
+  // Score distribution doughnut + numeric cards (side-by-side matching frontend dashboard-grid)
   var scoredExps = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
   if (scoredExps.length > 0) {
-    var scoreDistDiv = h('div', { style: { marginTop:'16px', height:'280px', maxWidth:'520px' } });
+    var scoreAvgProf = (scoredExps.reduce(function(s,e) { return s + (e.scores.professional || 0); }, 0) / scoredExps.length).toFixed(1);
+    var scoreAvgInfl = (scoredExps.reduce(function(s,e) { return s + (e.scores.influence || 0); }, 0) / scoredExps.length).toFixed(1);
+    var scoreAvgOverall = (scoredExps.reduce(function(s,e) { return s + (e.scores.overall || 0); }, 0) / scoredExps.length).toFixed(1);
+    
+    var scoreRow = h('div', { style: { display:'flex', gap:'20px', marginTop:'16px', alignItems:'center', flexWrap:'wrap' } });
+    
+    // Left: doughnut chart
+    var scoreDistDiv = h('div', { style: { flex:'1 1 380px', minWidth:'300px', height:'260px' } });
     scoreDistDiv.id = 'report-score-dist';
-    snapCard.appendChild(scoreDistDiv);
+    scoreRow.appendChild(scoreDistDiv);
+    
+    // Right: score numeric cards (matching frontend score-numeric-grid)
+    var scoreNumericDiv = h('div', { style: { flex:'0 0 auto', minWidth:'180px', display:'flex', flexDirection:'column', gap:'10px' } });
+    scoreNumericDiv.innerHTML = 
+      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">专业度</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#3B82F6">' + scoreAvgProf + '</div>' +
+        '<div style="font-size:10px;color:#94a3b8">满分10分</div>' +
+      '</div>' +
+      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">影响力</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#F59E0B">' + scoreAvgInfl + '</div>' +
+        '<div style="font-size:10px;color:#94a3b8">满分10分</div>' +
+      '</div>' +
+      '<div style="text-align:center;padding:10px 14px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc">' +
+        '<div style="font-size:11px;color:#64748b;margin-bottom:4px">综合评分</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#10B981">' + scoreAvgOverall + '</div>' +
+        '<div style="font-size:10px;color:#94a3b8">加权平均</div>' +
+      '</div>';
+    scoreRow.appendChild(scoreNumericDiv);
+    
+    snapCard.appendChild(scoreRow);
     setTimeout(function() {
       renderScoreDistChart('report-score-dist', experts);
     }, 50);
@@ -9170,9 +9200,9 @@ function buildMonthlyReportCanvas() {
     y += barChartH - 30;
   }
   
-  // Score distribution doughnut
+  // Score distribution doughnut + numeric cards (side-by-side)
   if (scoredExperts.length > 0) {
-    drawTextRow('分值分布：', leftPad, y + 14);
+    drawTextRow('专家评分分布：', leftPad, y + 14);
     y += 22;
     var sDistLabels = ['9-10分（优秀）', '8-9分（良好）', '7-8分（合格）', '<7分（待提升）'];
     var sDistData = [
@@ -9181,7 +9211,44 @@ function buildMonthlyReportCanvas() {
       scoredExperts.filter(function(e) { return e.scores.overall >= 7 && e.scores.overall < 8; }).length,
       scoredExperts.filter(function(e) { return e.scores.overall < 7; }).length
     ];
-    drawDoughnutChartOnCanvas(ctx, sDistLabels, sDistData, leftPad, y, W - leftPad * 2, scoreDistH - 30);
+    // Doughnut on left (60% width), score cards on right
+    var doughnutW = (W - leftPad * 2) * 0.55;
+    drawDoughnutChartOnCanvas(ctx, sDistLabels, sDistData, leftPad, y, doughnutW, scoreDistH - 30);
+    
+    // Score numeric cards on right
+    var cardX = leftPad + doughnutW + 15;
+    var cardW = W - leftPad - cardX;
+    var cardH = (scoreDistH - 30 - 16) / 3;
+    var cardColors = ['#3B82F6', '#F59E0B', '#10B981'];
+    var cardLabels = ['专业度', '影响力', '综合评分'];
+    var cardValues = [avgProf, avgInfl, avgOverall];
+    var cardSubs = ['满分10分', '满分10分', '加权平均'];
+    
+    for (var ci = 0; ci < 3; ci++) {
+      var cy2 = y + ci * (cardH + 8);
+      // Card background
+      ctx.fillStyle = '#f8fafc';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      roundRect(ctx, cardX, cy2, cardW, cardH, 4);
+      ctx.fill();
+      ctx.stroke();
+      // Label
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(cardLabels[ci], cardX + cardW/2, cy2 + 6);
+      // Value
+      ctx.fillStyle = cardColors[ci];
+      ctx.font = 'bold 20px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.fillText(cardValues[ci], cardX + cardW/2, cy2 + 22);
+      // Sub
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px -apple-system, "Microsoft YaHei", sans-serif';
+      ctx.fillText(cardSubs[ci], cardX + cardW/2, cy2 + 44);
+    }
+    
     y += scoreDistH;
   }
   y += sectionGap;
