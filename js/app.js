@@ -6519,18 +6519,10 @@ function renderRatingsTab(panel) {
         }
       });
       dimNameCol.appendChild(nameInp);
-
-      // 可编辑的主维度描述
-      const descInp = h('input', {
-        type: 'text', value: dim.desc || '',
-        placeholder: '点击添加维度描述...',
-        style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' },
-        onchange: (e) => { dim.desc = e.target.value.trim(); saveDB(db); renderRatingsTab(panel); toast('维度描述已更新', 'success'); }
-      });
-      dimNameCol.appendChild(descInp);
+      // [v5.8.8.3] 评估方向(desc)输入框已移除，不再显示/编辑
     } else {
       dimNameCol.appendChild(h('div', { style:{ fontWeight:'700', fontSize:'14px', color: dimColor } }, dim.name));
-      if (dim.desc) dimNameCol.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px' } }, dim.desc));
+      // [v5.8.8.3] 子管理员也不再显示评估方向(desc)
     }
     dimHeader.appendChild(dimNameCol);
 
