@@ -984,6 +984,50 @@ function h(tag, attrs={}, ...children) {
   return el;
 }
 
+// ===== v5.8.9 评分规则说明浮窗（前端"?"，简洁版 = 版本④） =====
+// 文案以 评分规则-④前端展示评分细则-v5.8.9.md 为准；权重从 ratingConfig 读取，确保与计算逻辑同步。
+function openScoringHelp() {
+  const cfg = (db && db.ratingConfig) || DEFAULT_RATING_CONFIG;
+  const profDim = cfg.dimensions.find(d => d.id === 'professional') || {};
+  const inflDim = cfg.dimensions.find(d => d.id === 'influence') || {};
+  const profW = Math.round((profDim.weight || 0.6) * 100);
+  const inflW = Math.round((inflDim.weight || 0.4) * 100);
+  const html = `
+    <div class="sh-head">
+      <div class="sh-title">评分规则说明</div>
+      <div class="sh-ver">v5.8.9 · 10分制</div>
+    </div>
+    <div class="sh-body">
+      <h4 class="sh-h">综合评分怎么算？</h4>
+      <p class="sh-formula">综合分 = <b>专业度 × ${profW}%</b> + <b>影响力 × ${inflW}%</b></p>
+      <ul class="sh-list">
+        <li><b>专业度</b>：学历与学术背景 · 行业资质与认证 · 专业成果与经验</li>
+        <li><b>影响力</b>：社会荣誉与奖项 · 职称 / 管理履历与行业地位</li>
+      </ul>
+      <p class="sh-note">每个子项均为 <b>0–10 分</b>，由 ①主锚点（定基础分）+ ②次要角度（封顶 +0.5）+ ③额外加分（封顶 +1.0）相加而成。</p>
+
+      <h4 class="sh-h">分数含义（速览）</h4>
+      <table class="sh-table">
+        <tr><td class="sh-range r-top">9–10</td><td>顶尖（清北博士、两院院士、世界500强掌舵人）</td></tr>
+        <tr><td class="sh-range r-hi">8–8.9</td><td>优秀（985硕士、省部级荣誉、行业百强高管）</td></tr>
+        <tr><td class="sh-range r-mid">6–7.9</td><td>良好 / 中等</td></tr>
+        <tr><td class="sh-range r-miss">5</td><td>信息不足（未公开 / 模糊，统一计 5 分）</td></tr>
+        <tr><td class="sh-range r-low">&lt;5</td><td>相对较弱</td></tr>
+      </table>
+
+      <h4 class="sh-h">两点说明</h4>
+      <ul class="sh-list">
+        <li>信息缺失<b>统一计 5 分</b>，不空置、不占优。</li>
+        <li>综合分 <b>低于 7 分不进入"观察库"</b>——只展示信息较完整、实力较明确的专家。</li>
+      </ul>
+    </div>
+    <div class="sh-foot">具体打分标准请联系对应管理员</div>
+  `;
+  const overlay = h('div', { className: 'scoring-help-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
+  overlay.appendChild(h('div', { className: 'scoring-help-modal', innerHTML: html }));
+  document.body.appendChild(overlay);
+}
+
 // ===== v4.1 测试模式横幅 =====
 function renderTestBanner() {
   // Remove existing banner if any
@@ -2314,7 +2358,10 @@ function showExpertDetail(expert) {
   
   if (cfg.showScores !== false) {
   const scoreSection = h('div', { className: 'detail-section' });
-  scoreSection.appendChild(h('div', { className: 'detail-section-title' }, '评分信息'));
+  scoreSection.appendChild(h('div', { className: 'detail-section-title score-title-row' },
+    '评分信息',
+    h('button', { className: 'score-help-btn', type: 'button', title: '评分规则说明（点击查看）', onclick: openScoringHelp }, '?')
+  ));
   
   // Three scores at same level
   const scoreRow = h('div', { className: 'detail-score-row' });
