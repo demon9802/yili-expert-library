@@ -987,7 +987,7 @@ function h(tag, attrs={}, ...children) {
 // ===== v5.8.9 评分规则说明浮窗（前端"?"，简洁版 = 版本④） =====
 // 文案以 评分规则-④前端展示评分细则-v5.8.9.md 为准；权重从 ratingConfig 读取，确保与计算逻辑同步。
 function openScoringHelp() {
-  const cfg = (db && db.ratingConfig) || DEFAULT_RATING_CONFIG;
+  const cfg = (appState && appState.db && appState.db.ratingConfig) || DEFAULT_RATING_CONFIG;
   const profDim = cfg.dimensions.find(d => d.id === 'professional') || {};
   const inflDim = cfg.dimensions.find(d => d.id === 'influence') || {};
   const profW = Math.round((profDim.weight || 0.6) * 100);
@@ -6628,7 +6628,7 @@ function renderRatingsTab(panel) {
 
   // 评分说明提示
   configSec.appendChild(h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
-    '💡 信息缺失（该维度完全无信息）统一默认6分；信息模糊（有信息但不精确）保守降档1-2分；完整信息按标准评分。自动评分仅供参考，管理员可手动调整每个子维度的分值。'
+    '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员可手动调整每个子维度的分值。'
   ));
 
   // 遍历每个主维度
@@ -6952,6 +6952,89 @@ function renderRatingsTab(panel) {
       onclick: () => { appState.adminTab = 'observation'; renderAdmin(); }
     }, '🔍 前往观察库处理'));
     panel.appendChild(warnBox);
+  }
+
+  // ===== ⑤ 完整评分规则文档（仅主管理员，版本②）=====
+  if (isMaster) {
+    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
+    const docHeader = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' } });
+    docHeader.appendChild(h('h4', { style: { margin:0, fontSize:'14px', color:'var(--primary)' } }, '⑤ 完整评分规则文档（v5.8.9 · 主管理员版）'));
+    const toggleBtn = h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+      const body = docSec.querySelector('.scoring-doc-body');
+      const icon = toggleBtn.querySelector('.toggle-icon');
+      if (body.style.display === 'none') { body.style.display = ''; icon.textContent = '▼ 收起'; }
+      else { body.style.display = 'none'; icon.textContent = '▶ 展开'; }
+    } }, h('span', { className:'toggle-icon' }, '▼ 收起'));
+    docHeader.appendChild(toggleBtn);
+    docSec.appendChild(docHeader);
+
+    const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'13px', lineHeight:'1.7', color:'var(--text)' } });
+
+    // Version ② content - full scoring rules document
+    const profW = Math.round((profDim?.weight || 0.6) * 100);
+    const inflW = Math.round((inflDim?.weight || 0.4) * 100);
+    docBody.innerHTML = `
+      <div style="margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#EEF2FF,#F5F3FF); border-radius:8px; border-left:4px solid #6366F1;">
+        <strong>综合评分公式</strong>：综合分 = <b>专业度 × ${profW}%</b> + <b>影响力 × ${inflW}%</b><br>
+        <span style="font-size:12px; color:var(--text-muted)">专业度下设3个子维度（学历 / 行业资质 / 专业成果），影响力下设2个（社会荣誉 / 职称行业地位）。每个子维度 0–10 分。</span>
+      </div>
+
+      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">📐 三层评分结构（每子维度通用）</h5>
+      <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:12px;">
+        <tr style="background:#EFF6FF;"><td style="padding:6px 10px; border:1px solid #BFDBFE; font-weight:700; width:80px;">① 主锚点</td><td style="padding:6px 10px; border:1px solid #BFDBFE;">取最高档定基础分（不累计）。如学历取最高学历×院校矩阵、认证取最高层级等</td></tr>
+        <tr style="background:#F0FDF4;"><td style="padding:6px 10px; border:1px solid #BBF7D0; font-weight:700;">② 次要角度</td><td style="padding:6px 10px; border:1px solid #BBF7D0;">院校实力/领域广度/持续性等微调，<b>封顶 +0.5</b></td></tr>
+        <tr style="background:#FFFbeb;"><td style="padding:6px 10px; border:1px solid #FDE68A; font-weight:700;">③ 额外加分</td><td style="padding:6px 10px; border:1px solid #FDE68A;">多学位/稀缺认证/高影响力成果等奖励分，<b>封顶 +1.0</b>（动态封顶=10−base−维度2）</td></tr>
+      </table>
+
+      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">📊 五子维度赋分速查</h5>
+      <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:12px;">
+        <tr style="background:#DBEAFE;"><th style="padding:5px 8px; border:1px solid #93C5FD; text-align:left;">子维度</th><th style="padding:5px 8px; border:1px solid #93C5FD;">顶点分</th><th style="padding:5px 8px; border:1px solid #93C5FD;">缺失</th><th style="padding:5px 8px; border:1px solid #93C5FD;">关键分层</th></tr>
+        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">① 学历与学术背景</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.5</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">学历(博士9.5/硕士8.5/本科8) × 院校(T0-T4)；专升本≤5；专科3-4</td></tr>
+        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">② 行业资质与认证</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">A0国际顶级9 / A1国家级执业8 / A2行业厂商6 / A3培训通用4</td></tr>
+        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">③ 专业成果与经验</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">学术(A0-A3) vs 企业(B0-B3) 取高；博士后+0.5归此</td></tr>
+        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">④ 社会荣誉与奖项</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">H0国家级9 / H1省部级7.5 / H2地市/学会6 / H3县级4；院士+1</td></tr>
+        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">⑤ 职称/行业地位</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.5</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">J0-J3 × C0-C2 矩阵(顶点J0×C0=9.5)；从业≥10年+0.3</td></tr>
+      </table>
+
+      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">⚙️ 全局规则</h5>
+      <ul style="margin:0; padding-left:18px; font-size:12px;">
+        <li><b>信息缺失统一 5 分</b>（五维度一致），不空置不占优</li>
+        <li><b>子维度硬封顶 10 分</b>（sum 后截断）</li>
+        <li><b>综合分 &lt; 7 不进入观察库</b>——只展示信息完整、实力明确的专家</li>
+        <li>成就类维度（资质/成果/荣誉/职称）1-3 分档位：<b>待定</b>（方案X 问题地档 vs 方案Y 地面4）</li>
+      </ul>
+
+      <div style="margin-top:10px; padding:8px 12px; background:#F1F5F9; border-radius:6px; font-size:11px; color:var(--text-muted);">
+        📌 本文档为 v5.8.9 评分规则完整说明（版本②·主管理员版）。前端用户见"?"浮窗（版本④），后台录入标准见版本③。
+      </div>
+    `;
+    docSec.appendChild(docBody);
+    panel.appendChild(docSec);
+  }
+
+  // ===== 子管理员：简洁评分规则快速参考（与前端"?"浮窗一致 = 版本④）=====
+  if (!isMaster) {
+    const quickRef = h('div', { style: { background:'#F0F7FF', padding:'14px 16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BFDBFE' } });
+    quickRef.appendChild(h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' } },
+      h('span', { style:{ fontWeight:'600', fontSize:'13px', color:'#1D4ED8' } }, '📖 评分规则快速参考'),
+      h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: openScoringHelp }, '查看详情弹窗 →')
+    ));
+    quickRef.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text)', lineHeight:'1.7' } },
+      '综合分 = <b>专业度 × '+profW+'%</b> + <b>影响力 × '+inflW+'%</b> | ',
+      '每个子项 0–10 分 = ①主锚点 + ②微调(+0.5封顶) + ③加分(+1.0封顶) | ',
+      '缺失统一 <b>5 分</b> | 综合 &lt;<b> 7 不展示</b>'
+    ));
+    // Quick score meaning table for sub-admin
+    const qTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px', marginTop:'8px' } });
+    [['9–10','顶尖'],['8–8.9','优秀'],['6–7.9','良好/中等'],['5','信息不足'],['<5','较弱']].forEach(([r,m]) => {
+      const tr = h('tr');
+      const rTd = h('td', { style:{ padding:'3px 6px', border:'1px solid #E2E8F0', fontWeight:'600', textAlign:'center', width:'50px',
+        background: r==='9–10'?'#DBEAFE': r.startsWith('8')?'#D1FAE5': r.startsWith('6')?'#FEF3C7': r==='5'?'#F1F5F9':'#FEE2E2' } }, r);
+      const mTd = h('td', { style:{ padding:'3px 6px', border:'1px solid #E2E8F0' } }, m);
+      tr.appendChild(rTd); tr.appendChild(mTd); qTable.appendChild(tr);
+    });
+    quickRef.appendChild(qTable);
+    panel.appendChild(quickRef);
   }
 }
 
