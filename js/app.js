@@ -6954,93 +6954,221 @@ function renderRatingsTab(panel) {
     panel.appendChild(warnBox);
   }
 
-  // ===== ⑤ 完整评分规则文档（仅主管理员，版本②）=====
+  // ===== ⑤ 测算验证文档（仅主管理员：详细赋分细则 + 计算逻辑 + 测试案例）=====
   if (isMaster) {
-    // 重新获取维度引用（profDim/inflDim 在 renderRatingTable 内部函数中，此处不可达）
     const _profDim = cfg.dimensions.find(d => d.id === 'professional');
     const _inflDim = cfg.dimensions.find(d => d.id === 'influence');
     const profW = Math.round((_profDim?.weight || 0.6) * 100);
     const inflW = Math.round((_inflDim?.weight || 0.4) * 100);
 
-    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-    const docHeader = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' } });
-    docHeader.appendChild(h('h4', { style: { margin:0, fontSize:'14px', color:'var(--primary)' } }, '⑤ 完整评分规则文档（v5.8.9 · 主管理员版）'));
-    const toggleBtn = h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
-      const body = docSec.querySelector('.scoring-doc-body');
-      const icon = toggleBtn.querySelector('.toggle-icon');
-      if (body.style.display === 'none') { body.style.display = ''; icon.textContent = '▼ 收起'; }
-      else { body.style.display = 'none'; icon.textContent = '▶ 展开'; }
-    } }, h('span', { className:'toggle-icon' }, '▼ 收起'));
-    docHeader.appendChild(toggleBtn);
-    docSec.appendChild(docHeader);
+    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'2px solid #6366F1' } });
+    docSec.appendChild(h('h4', { style: { margin:'0 0 12px', fontSize:'15px', color:'#4338CA', borderBottom:'2px solid #E0E7FF', paddingBottom:'8px' } }, '⑤ 评分测算验证文档（v5.8.9 · 赋分细则与计算逻辑）'));
 
-    const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'13px', lineHeight:'1.7', color:'var(--text)' } });
+    const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'12px', lineHeight:'1.7', color:'var(--text)' } });
 
-    // Version ② content - full scoring rules document
     docBody.innerHTML = `
-      <div style="margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#EEF2FF,#F5F3FF); border-radius:8px; border-left:4px solid #6366F1;">
-        <strong>综合评分公式</strong>：综合分 = <b>专业度 × ${profW}%</b> + <b>影响力 × ${inflW}%</b><br>
-        <span style="font-size:12px; color:var(--text-muted)">专业度下设3个子维度（学历 / 行业资质 / 专业成果），影响力下设2个（社会荣誉 / 职称行业地位）。每个子维度 0–10 分。</span>
+      <!-- ===== 第一部分：计算公式与逻辑 ===== -->
+      <div style="margin-bottom:16px; padding:12px 14px; background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border-radius:8px; border-left:4px solid #4338CA;">
+        <strong style="font-size:14px; color:#312E81;">📐 核心计算公式（代码 recalcExpertFromSubscores 逻辑）</strong>
+        <div style="margin-top:8px; font-family:monospace; font-size:11.5px; background:#fff; padding:10px; border-radius:6px; line-height:1.9;">
+          <b>Step 1</b> — 子维度分值获取：<br>
+          &nbsp;&nbsp;score = (用户输入值 === undefined/null) ? <b style="color:#DC2626">missingScore(5)</b> : 用户输入值<br>
+          &nbsp;&nbsp;score = <b>Math.max(0, Math.min(score, cap=10))</b> — 硬截断 [0, 10]<br><br>
+          <b>Step 2</b> — 大维度加权求和：<br>
+          &nbsp;&nbsp;<b>专业度</b> = 学历×0.35 + 资质×0.30 + 成果×0.35 &nbsp;(权重之和=1.0)<br>
+          &nbsp;&nbsp;<b>影响力</b> = 荣誉×0.35 + 职称×0.65 &nbsp;(权重之和=1.0)<br><br>
+          <b>Step 3</b> — 综合分：<br>
+          &nbsp;&nbsp;<b>综合</b> = 专业度 × ${profW}% + 影响力 × ${inflW}%<br><br>
+          <b>Step 4</b> — 全部保留1位小数：Math.round(x × 10) / 10
+        </div>
       </div>
 
-      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">📐 三层评分结构（每子维度通用）</h5>
-      <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:12px;">
-        <tr style="background:#EFF6FF;"><td style="padding:6px 10px; border:1px solid #BFDBFE; font-weight:700; width:80px;">① 主锚点</td><td style="padding:6px 10px; border:1px solid #BFDBFE;">取最高档定基础分（不累计）。如学历取最高学历×院校矩阵、认证取最高层级等</td></tr>
-        <tr style="background:#F0FDF4;"><td style="padding:6px 10px; border:1px solid #BBF7D0; font-weight:700;">② 次要角度</td><td style="padding:6px 10px; border:1px solid #BBF7D0;">院校实力/领域广度/持续性等微调，<b>封顶 +0.5</b></td></tr>
-        <tr style="background:#FFFbeb;"><td style="padding:6px 10px; border:1px solid #FDE68A; font-weight:700;">③ 额外加分</td><td style="padding:6px 10px; border:1px solid #FDE68A;">多学位/稀缺认证/高影响力成果等奖励分，<b>封顶 +1.0</b>（动态封顶=10−base−维度2）</td></tr>
-      </table>
+      <!-- ===== 第二部分：五子维度完整赋分矩阵 ===== -->
+      <h5 style="color:#312E81; margin:14px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">📊 五子维度完整赋分矩阵（来自 DEFAULT_RATING_CONFIG.scoring）</h5>
 
-      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">📊 五子维度赋分速查</h5>
-      <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:12px;">
-        <tr style="background:#DBEAFE;"><th style="padding:5px 8px; border:1px solid #93C5FD; text-align:left;">子维度</th><th style="padding:5px 8px; border:1px solid #93C5FD;">顶点分</th><th style="padding:5px 8px; border:1px solid #93C5FD;">缺失</th><th style="padding:5px 8px; border:1px solid #93C5FD;">关键分层</th></tr>
-        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">① 学历与学术背景</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.5</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">学历(博士9.5/硕士8.5/本科8) × 院校(T0-T4)；专升本≤5；专科3-4</td></tr>
-        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">② 行业资质与认证</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">A0国际顶级9 / A1国家级执业8 / A2行业厂商6 / A3培训通用4</td></tr>
-        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">③ 专业成果与经验</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">学术(A0-A3) vs 企业(B0-B3) 取高；博士后+0.5归此</td></tr>
-        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">④ 社会荣誉与奖项</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">H0国家级9 / H1省部级7.5 / H2地市/学会6 / H3县级4；院士+1</td></tr>
-        <tr><td style="padding:5px 8px; border:1px solid #E2E8F0;">⑤ 职称/行业地位</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center; font-weight:600;">9.5</td><td style="padding:5px 8px; border:1px solid #E2E8F0; text-align:center;">5.0</td><td style="padding:5px 8px; border:1px solid #E2E8F0; font-size:11px;">J0-J3 × C0-C2 矩阵(顶点J0×C0=9.5)；从业≥10年+0.3</td></tr>
-      </table>
+      <!-- 学历 -->
+      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #3B82F6;">
+        <b style="color:#1D4ED8;">① 学历与学术背景</b> <span style="color:#6B7280;font-size:11px;">（权重35% | 封顶10 | 缺失5.0）</span>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;">
+          <tr style="background:#DBEAFE;"><th style="padding:4px 6px;border:1px solid #93C5FD;text-align:left;">维度1·主锚（学历层次）</th><th style="padding:4px 6px;border:1px solid #93C5FD;text-align:center;width:50px;">base</th><th style="padding:4px 6px;border:1px solid #93C5FD;text-align:left;">维度2·院校T矩阵偏移</th></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">博士</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;color:#1D4ED8;">9.5</td><td rowspan="5" style="padding:4px 6px;border:1px solid #E2E8F0;font-size:10.5px;">
+            T0 全球顶尖(清北/QS前50): <b>+0</b><br>
+            T1 国内985/双一流: <b>-0.5</b><br>
+            T2 国内211/双一流学科: <b>-1.0</b><br>
+            T3 普通院校: <b>-1.5</b><br>
+            T4 其他/无法核实: <b>-2.5</b><br>
+            <span style="color:#6B7280">院系微调 ±0.3,封顶±0.5</span>
+          </td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">硕士</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;">8.5</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">本科</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;">8.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">专升本</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;color:#DC2626;">≤5.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">专科</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;">3~4</td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:10.5px;color:#6B7280;">
+          维度3加分(封顶+1.0): 第二学位≥第一院校+0.3 | 跨学科+0.3 | 第三学位+0.2 | 动态封顶=10−base−维2
+        </div>
+      </div>
 
-      <h5 style="color:#1D4ED8; margin:12px 0 6px; font-size:13px;">⚙️ 全局规则</h5>
-      <ul style="margin:0; padding-left:18px; font-size:12px;">
-        <li><b>信息缺失统一 5 分</b>（五维度一致），不空置不占优</li>
-        <li><b>子维度硬封顶 10 分</b>（sum 后截断）</li>
-        <li><b>综合分 &lt; 7 不进入观察库</b>——只展示信息完整、实力明确的专家</li>
-        <li>成就类维度（资质/成果/荣誉/职称）1-3 分档位：<b>待定</b>（方案X 问题地档 vs 方案Y 地面4）</li>
+      <!-- 行业资质 -->
+      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #10B981;">
+        <b style="color:#059669;">② 行业资质与认证</b> <span style="color:#6B7280;font-size:11px;">（权重30% | 封顶10 | 缺失5.0）</span>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;">
+          <tr style="background:#D1FAE5;"><th style="padding:4px 6px;border:1px solid #6EE7B7;text-align:left;">维度1·主锚（认证层级，取最高不累计）</th><th style="padding:4px 6px;border:1px solid #6EE7B7;text-align:center;width:50px;">base</th></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">A0 国际权威(CFA/CPA/ACCA/国家级执业)</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;color:#059669;">9.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">A1 国家级执业/行业权威</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;">8.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">A2 行业厂商(华为/微软等)</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;">6.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">A3 培训/通用认证</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;">4.0</td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:10.5px;color:#6B7280;">
+          维度2广度(封顶+0.5): ≥2领域+0.3 | ≥3领域+0.5 | 
+          维度3稀缺(封顶+1.0): 双A0/A1+0.5 | PMP国际管理+0.5 | 强相关稀缺+0.5
+        </div>
+      </div>
+
+      <!-- 专业成果 -->
+      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #F59E0B;">
+        <b style="color:#D97706;">③ 专业成果与经验</b> <span style="color:#6B7280;font-size:11px;">（权重35% | 封顶10 | 缺失5.0）</span>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;">
+          <tr style="background:#FEF3C7;"><th style="padding:4px 6px;border:1px solid #FCD34D;text-align:left;">维度1·双路径取高</th><th style="padding:4px 6px;border:1px solid #FCD34D;text-align:center;width:50px;">base</th></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;"><b>学术路径:</b> A0顶刊/著作专利 | A1 SCI/EI核心 | A2普通论文 | A3仅演讲</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;"><b>9.0 / 8.0 / 6.0 / 4.0</b></td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;"><b>企业路径:</b> B0战略级/国家级 | B1省级/行业级 | B2参与级 | B3一般服务</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;"><b>9.0 / 8.0 / 6.0 / 4.0</b></td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:10.5px;color:#6B7280;">
+          维度2持续性(封顶+0.5): H-index≥15或授课≥50场+0.3 | H-index≥25或授课≥100场+0.5 |
+          维度3影响力(封顶+1.0): 顶刊高被引+0.5 | 牵头国标行标+0.5 | 博士后科研+0.5
+        </div>
+      </div>
+
+      <!-- 社会荣誉 -->
+      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #EF4444;">
+        <b style="color:#DC2626;">④ 社会荣誉与奖项</b> <span style="color:#6B7280;font-size:11px;">（权重35% | 封顶10 | 缺失5.0）</span>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;">
+          <tr style="background:#FEE2E2;"><th style="padding:4px 6px;border:1px solid #FECACA;text-align:left;">维度1·主锚（行政级别，取最高不累计）</th><th style="padding:4px 6px;border:1px solid #FECACA;text-align:center;width:50px;">base</th></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">H0 国家级荣誉/称号</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;color:#DC2626;">9.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">H1 省部级荣誉/称号</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;">7.5</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">H2 地市级/国家级学会</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;">6.0</td></tr>
+          <tr><td style="padding:4px 6px;border:1px solid #E2E8F0;">H3 县级/一般协会</td><td style="padding:4px 6px;border:1px solid #E2E8F0;text-align:center;">4.0</td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:10.5px;color:#6B7280;">
+          维度2同级别广度(封顶+0.5): ≥2项+0.3 | ≥3项+0.5 |
+          维度3顶尖人才(封顶+1.0): 两院院士<b>+1.0</b> | 国家级人才计划/国际榜单+0.5
+        </div>
+      </div>
+
+      <!-- 职称行业地位 -->
+      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #8B5CF6;">
+        <b style="color:#7C3AED;">⑤ 职称、管理履历与行业地位</b> <span style="color:#6B7280;font-size:11px;">（权重65% | 封顶10 | 缺失5.0）</span>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;">
+          <tr style="background:#EDE9FE;"><th style="padding:4px 6px;border:1px solid #C4B5FD;text-align:left;" colspan="3">维度1·J×C 矩阵（职级 × 机构）</th></tr>
+          <tr style="background:#F5F3FF;"><th style="padding:3px 6px;border:1px solid #DDD6FE;text-align:right;">职级 \\ 机构</th><th style="padding:3px 6px;border:1px solid #DDD6FE;text-align:center;">C0 世界500强/央企/上市</th><th style="padding:3px 6px;border:1px solid #DDD6FE;text-align:center;">C1 行业百强/大厂</th><th style="padding:3px 6px;border:1px solid #DDD6FE;text-align:center;">C2 普通企业</th></tr>
+          <tr><td style="padding:3px 6px;border:1px solid #E2E8F0;font-weight:600;background:#FAFAFA;">J0 教授/CEO/创始人</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:700;color:#7C3AED;">9.5</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">9.0</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">8.5</td></tr>
+          <tr><td style="padding:3px 6px;border:1px solid #E2E8F0;font-weight:600;background:#FAFAFA;">J1 副教授/VP/合伙人</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;font-weight:600;">8.5</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">8.0</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">7.5</td></tr>
+          <tr><td style="padding:3px 6px;border:1px solid #E2E8F0;font-weight:600;background:#FAFAFA;">J2 经理/高工/主管</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">7.0</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">6.5</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">6.0</td></tr>
+          <tr><td style="padding:3px 6px;border:1px solid #E2E8F0;font-weight:600;background:#FAFAFA;">J3 无职称/基层</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">5.5</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">5.0</td><td style="padding:3px 6px;border:1px solid #E2E8F0;text-align:center;">4.5</td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:10.5px;color:#6B7280;">
+          维度2履历厚度(封顶+0.5): 从业≥10年+0.3 | ≥15年或跨行业+0.5 |
+          维度3标志性职位(封顶+1.0): 一级学会常务理事/早期创始团队(A轮前)+0.5 | 主导企业变革+0.3
+        </div>
+      </div>
+
+      <!-- ===== 第三部分：关键测试案例 ===== -->
+      <h5 style="color:#312E81; margin:16px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">🧪 关键测试案例（验算赋分逻辑正确性）</h5>
+
+      <div style="padding:10px; background:#FEF2F2; border-radius:6px; border:1px solid #FECACA; margin-bottom:10px;">
+        <b style="color:#991B1B;">案例A：全缺失专家（所有子维度均为空）</b>
+        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：5个维度全部 undefined → 每个子维度 → missingScore=<b>5.0</b><br>
+          专业度 = 5×0.35 + 5×0.30 + 5×0.35 = <b>5.0</b><br>
+          影响力 = 5×0.35 + 5×0.65 = <b>5.0</b><br>
+          综合 = 5.0×${profW}% + 5.0×${inflW}% = <b>5.0</b><br>
+          <span style="color:#991B1B;">✅ 验证：缺失统一5分，不占优不拉低。综合=5.0 &lt; 7 → 不进观察库。</span>
+        </div>
+      </div>
+
+      <div style="padding:10px; background:#F0FDF4; border-radius:6px; border:1px solid #BBF7D0; margin-bottom:10px;">
+        <b style="color:#166534;">案例B：顶级专家（各维度接近满分）</b>
+        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：学历=9.5(博士T0) | 资质=9.0(A0) | 成果=9.0(A0) | 荣誉=9.0(H0+院士+1=10封顶) | 职称=9.5(J0×C0)<br>
+          专业度 = 9.5×0.35 + 9.0×0.30 + 9.0×0.35 = 3.325 + 2.7 + 3.15 = <b>9.175→9.2</b><br>
+          影响力 = 10×0.35 + 9.5×0.65 = 3.5 + 6.175 = <b>9.675→9.7</b><br>
+          综合 = 9.2×${profW}% + 9.7×${inflW}% = <b style="color:#166534;">≈9.4</b><br>
+          <span style="color:#166534;">✅ 验证：院士荣誉封顶10后影响力更高；综合接近满分。</span>
+        </div>
+      </div>
+
+      <div style="padding:10px; background:#EFF6FF; border-radius:6px; border:1px solid #BFDBFE; margin-bottom:10px;">
+        <b style="color:#1E40AF;">案例C：混合缺失（部分维度有值、部分缺失）</b>
+        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：学历=8.5(硕士T1) | 资质=<b>缺失→5.0</b> | 成果=6.0(A2) | 荣誉=<b>缺失→5.0</b> | 职称=7.0(J2×C0)<br>
+          专业度 = 8.5×0.35 + 5.0×0.30 + 6.0×0.35 = 2.975 + 1.5 + 2.1 = <b>6.575→6.6</b><br>
+          影响力 = 5.0×0.35 + 7.0×0.65 = 1.75 + 4.55 = <b>6.3</b><br>
+          综合 = 6.6×${profW}% + 6.3×${inflW}% = <b style="color:#1E40AF;">≈6.45→6.5</b><br>
+          <span style="color:#1E40AF;">⚠️ 验证：综合=6.5 &lt; 7 → 不进入观察库。缺失项拉低整体但未过度惩罚。</span>
+        </div>
+      </div>
+
+      <div style="padding:10px; background:#FFFbeb; border-radius:6px; border:1px solid #FDE68A; margin-bottom:10px;">
+        <b style="color:#92400E;">案例D：边界值——子维度超10分硬截断</b>
+        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：某子维度手动输入 12 → Math.min(12, 10) = <b style="color:#92400E;">10.0（硬截断）</b><br>
+          输入：某子维度手动输入 -2 → Math.max(-2, 0) = <b style="color:#92400E;">0.0（硬截断）</b><br>
+          <span style="color:#92400E;">✅ 验证：cap=10 硬截断生效，不会出现异常分数。</span>
+        </div>
+      </div>
+
+      <!-- ===== 第四部分：全局规则速查 ===== -->
+      <h5 style="color:#312E81; margin:16px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">⚙️ 全局规则汇总</h5>
+      <ul style="margin:0;padding-left:18px;font-size:11.5px;line-height:1.9;">
+        <li><b>信息缺失统一 5 分</b>（五维度一致），通过 missingScore 配置项控制</li>
+        <li><b>子维度硬封顶 10 分</b>（Math.max(0, Math.min(val, cap))），cap 可配置</li>
+        <li><b>综合分 &lt; 7 不进入观察库</b>——前端只展示信息完整、实力明确的专家</li>
+        <li><b>主锚点原则</b>：同一子维度的多个条件取最高档（不累计），上海落户同款逻辑</li>
+        <li><b>动态封顶</b>：维度3加分上限 = 10 − base − 维度2得分，防止溢出</li>
+        <li><b>成就类1-3分档位</b>：资质/成果/荣誉/职称的低分段（1-3分）<b>待定</b>（方案X vs 方案Y）</li>
+        <li><b>configVersion: 3</b>（v5.8.9 重构版本号，用于 migrateRatingConfig 自动升级检测）</li>
       </ul>
-
-      <div style="margin-top:10px; padding:8px 12px; background:#F1F5F9; border-radius:6px; font-size:11px; color:var(--text-muted);">
-        📌 本文档为 v5.8.9 评分规则完整说明（版本②·主管理员版）。前端用户见"?"浮窗（版本④），后台录入标准见版本③。
-      </div>
     `;
     docSec.appendChild(docBody);
     panel.appendChild(docSec);
   }
 
-  // ===== 子管理员：简洁评分规则快速参考（与前端"?"浮窗一致 = 版本④）=====
+  // ===== 子管理员：实操调分指南（面向不了解评分体系的人）=====
   if (!isMaster) {
-    const _pDim = cfg.dimensions.find(d => d.id === 'professional');
-    const _iDim = cfg.dimensions.find(d => d.id === 'influence');
-    const _pw = Math.round((_pDim?.weight || 0.6) * 100);
-    const _iw = Math.round((_iDim?.weight || 0.4) * 100);
-    const quickRef = h('div', { style: { background:'#F0F7FF', padding:'14px 16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BFDBFE' } });
-    quickRef.appendChild(h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' } },
-      h('span', { style:{ fontWeight:'600', fontSize:'13px', color:'#1D4ED8' } }, '📖 评分规则快速参考'),
-      h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: openScoringHelp }, '查看详情弹窗 →')
-    ));
-    const quickText = h('div', { style:{ fontSize:'12px', color:'var(--text)', lineHeight:'1.7' } });
-    quickText.innerHTML = '综合分 = <b>专业度 × '+_pw+'%</b> + <b>影响力 × '+_iw+'%</b> | 每个子项 0–10 分 = ①主锚点 + ②微调(+0.5封顶) + ③加分(+1.0封顶) | 缺失统一 <b>5 分</b> | 综合 &lt;<b> 7 不展示</b>';
-    quickRef.appendChild(quickText);
-    // Quick score meaning table for sub-admin
-    const qTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px', marginTop:'8px' } });
-    [['9–10','顶尖'],['8–8.9','优秀'],['6–7.9','良好/中等'],['5','信息不足'],['<5','较弱']].forEach(([r,m]) => {
-      const tr = h('tr');
-      const rTd = h('td', { style:{ padding:'3px 6px', border:'1px solid #E2E8F0', fontWeight:'600', textAlign:'center', width:'50px',
-        background: r==='9–10'?'#DBEAFE': r.startsWith('8')?'#D1FAE5': r.startsWith('6')?'#FEF3C7': r==='5'?'#F1F5F9':'#FEE2E2' } }, r);
-      const mTd = h('td', { style:{ padding:'3px 6px', border:'1px solid #E2E8F0' } }, m);
-      tr.appendChild(rTd); tr.appendChild(mTd); qTable.appendChild(tr);
+    const guide = h('div', { style:{ background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BBF7D0' } });
+    guide.appendChild(h('h4', { style:{ margin:'0 0 10px', fontSize:'14px', color:'#166534' } }, '📋 调分操作指南'));
+
+    // ✅ 能做的
+    const canDo = h('div', { style:{ marginBottom:'12px' } });
+    canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
+    const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    ['在下方专家列表中，直接修改每个子维度的分数输入框（0–10 分）','修改后综合分自动重新计算，无需手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
+      canList.appendChild(h('li', {}, t));
     });
-    quickRef.appendChild(qTable);
-    panel.appendChild(quickRef);
+    canDo.appendChild(canList);
+    guide.appendChild(canDo);
+
+    // ⚠️ 注意
+    const note = h('div', { style:{ marginBottom:'12px' } });
+    note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
+    const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    noteList.appendChild(h('li', {}, '某个维度信息缺失时，该维度默认 5 分（中性值，不拉高也不压低）'));
+    noteList.appendChild(h('li', {}, '综合分低于 7 分的专家会自动进入观察库，不会在前端展示'));
+    noteList.appendChild(h('li', {}, '每个子维度最高 10 分，超过会自动截断'));
+    note.appendChild(noteList);
+    guide.appendChild(note);
+
+    // 💡 调分建议
+    const tip = h('div', {});
+    tip.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#1D4ED8', marginBottom:'6px' } }, '💡 什么时候需要手动调分？'));
+    const tipList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应维度的数字即可'));
+    tipList.appendChild(h('li', {}, '有新的资质/成果信息未录入 → 先补充信息再重置为自动评分'));
+    tipList.appendChild(h('li', {}, '不确定怎么打分 → 保持自动评分不变，或联系主管理员确认'));
+    tip.appendChild(tipList);
+    guide.appendChild(tip);
+
+    panel.appendChild(guide);
   }
 }
 
