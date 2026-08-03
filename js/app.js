@@ -6626,10 +6626,10 @@ function renderRatingsTab(panel) {
     ));
   }
 
-  // 评分说明提示
-  configSec.appendChild(h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } },
-    '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员可手动调整每个子维度的分值。'
-  ));
+  // 评分说明提示（用 innerHTML 支持加粗标记）
+  const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
+  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员可手动调整每个子维度的分值。';
+  configSec.appendChild(hintDiv);
 
   // 遍历每个主维度
   cfg.dimensions.forEach((dim, dimIdx) => {
@@ -6956,6 +6956,12 @@ function renderRatingsTab(panel) {
 
   // ===== ⑤ 完整评分规则文档（仅主管理员，版本②）=====
   if (isMaster) {
+    // 重新获取维度引用（profDim/inflDim 在 renderRatingTable 内部函数中，此处不可达）
+    const _profDim = cfg.dimensions.find(d => d.id === 'professional');
+    const _inflDim = cfg.dimensions.find(d => d.id === 'influence');
+    const profW = Math.round((_profDim?.weight || 0.6) * 100);
+    const inflW = Math.round((_inflDim?.weight || 0.4) * 100);
+
     const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
     const docHeader = h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px' } });
     docHeader.appendChild(h('h4', { style: { margin:0, fontSize:'14px', color:'var(--primary)' } }, '⑤ 完整评分规则文档（v5.8.9 · 主管理员版）'));
@@ -6971,8 +6977,6 @@ function renderRatingsTab(panel) {
     const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'13px', lineHeight:'1.7', color:'var(--text)' } });
 
     // Version ② content - full scoring rules document
-    const profW = Math.round((profDim?.weight || 0.6) * 100);
-    const inflW = Math.round((inflDim?.weight || 0.4) * 100);
     docBody.innerHTML = `
       <div style="margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#EEF2FF,#F5F3FF); border-radius:8px; border-left:4px solid #6366F1;">
         <strong>综合评分公式</strong>：综合分 = <b>专业度 × ${profW}%</b> + <b>影响力 × ${inflW}%</b><br>
@@ -7014,16 +7018,18 @@ function renderRatingsTab(panel) {
 
   // ===== 子管理员：简洁评分规则快速参考（与前端"?"浮窗一致 = 版本④）=====
   if (!isMaster) {
+    const _pDim = cfg.dimensions.find(d => d.id === 'professional');
+    const _iDim = cfg.dimensions.find(d => d.id === 'influence');
+    const _pw = Math.round((_pDim?.weight || 0.6) * 100);
+    const _iw = Math.round((_iDim?.weight || 0.4) * 100);
     const quickRef = h('div', { style: { background:'#F0F7FF', padding:'14px 16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BFDBFE' } });
     quickRef.appendChild(h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' } },
       h('span', { style:{ fontWeight:'600', fontSize:'13px', color:'#1D4ED8' } }, '📖 评分规则快速参考'),
       h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: openScoringHelp }, '查看详情弹窗 →')
     ));
-    quickRef.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text)', lineHeight:'1.7' } },
-      '综合分 = <b>专业度 × '+profW+'%</b> + <b>影响力 × '+inflW+'%</b> | ',
-      '每个子项 0–10 分 = ①主锚点 + ②微调(+0.5封顶) + ③加分(+1.0封顶) | ',
-      '缺失统一 <b>5 分</b> | 综合 &lt;<b> 7 不展示</b>'
-    ));
+    const quickText = h('div', { style:{ fontSize:'12px', color:'var(--text)', lineHeight:'1.7' } });
+    quickText.innerHTML = '综合分 = <b>专业度 × '+_pw+'%</b> + <b>影响力 × '+_iw+'%</b> | 每个子项 0–10 分 = ①主锚点 + ②微调(+0.5封顶) + ③加分(+1.0封顶) | 缺失统一 <b>5 分</b> | 综合 &lt;<b> 7 不展示</b>';
+    quickRef.appendChild(quickText);
     // Quick score meaning table for sub-admin
     const qTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px', marginTop:'8px' } });
     [['9–10','顶尖'],['8–8.9','优秀'],['6–7.9','良好/中等'],['5','信息不足'],['<5','较弱']].forEach(([r,m]) => {
