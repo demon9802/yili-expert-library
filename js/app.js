@@ -228,24 +228,98 @@ async function toggleFavorite(expertId) {
 
 // Default ratingConfig with sub-dimensions
 const DEFAULT_RATING_CONFIG = {
-  configVersion: 2, // v5.6.4: 更新赋分标准（信息缺失默认分、学历评分、行业资质）
+  configVersion: 3, // v5.8.9: 评分规则10分制重构（缺失5.0/硬封顶10/权重60-40/五子维度新标准）
+  missingScore: 5, // 信息缺失(为空/未公开/模糊)统一默认分，五维度一致
+  cap: 10,         // 子维度得分硬封顶
   dimensions: [
     {
-      id: 'professional', name: '专业度', weight: 0.5,
+      id: 'professional', name: '专业度', weight: 0.6,
       desc: '评估专家的学历背景、行业资质及专业成果',
       subDimensions: [
-        { name: '学历与学术背景', weight: 0.35, maxScore: 10, criteria: '9分：博士/博士后/教授 | 8分：硕士/研究生/MBA | 7分：本科/学士 | 4分：专科及以下 | 6分：信息缺失/模糊' },
-        { name: '行业资质与认证', weight: 0.30, maxScore: 10, criteria: '9分：权威认证(CPA/CFA/PMP/律师等) | 8分：行业资质证书 | 7分：行业与社会头衔 | 6分：培训进修经历 | 6分：信息缺失/模糊' },
-        { name: '专业成果与经验', weight: 0.35, maxScore: 10, criteria: '9分：著作/论文/专利/公开演讲 | 8分：企业授课/主持项目 | 7分：企业服务经验 | 6分：信息缺失/模糊' }
+        {
+          name: '学历与学术背景', weight: 0.35, maxScore: 10, missingScore: 5, cap: 10,
+          criteria: '维度1主锚=学历层次×院校T0-T4矩阵定base；维度2=院校实力+院系权威±0.3(封顶±0.5)；维度3=多学位/跨学科复合+0.3~1.0(封顶+1.0)。缺失固定5.0。1-10全覆盖。',
+          scoring: {
+            type: 'matrix',
+            dimension1: { label: '学历层次（主锚·行）', levels: { '博士': 9.5, '硕士': 8.5, '本科': 8.0, '专升本': 5.0, '专科': 4.0, '高中/中专': 2.5, '初中': 2.0, '小学及以下': 1.0, '信息缺失': 5.0 } },
+            dimension2: {
+              label: '院校实力（主锚·列 T0-T4）+ 院系权威微调',
+              tiers: { 'T0 全球顶尖(含清北/QS·THE·ARWU前50等)': 0.0, 'T1 国内顶尖(985/双一流)': -0.5, 'T2 国内重点(211/双一流学科)': -1.0, 'T3 普通院校': -1.5, 'T4 其他/无法核实': -2.5 },
+              deptAuthority: '院系权威微调 ±0.3，封顶 ±0.5（A+学科+0.3 / 继续教育学院-0.3）'
+            },
+            dimension3: {
+              label: '学位权威性（额外加分·封顶+1.0）',
+              rules: [
+                { cond: '第二有效学位（院校层级≥第一学位）', add: 0.3 },
+                { cond: '第二学位为跨学科/复合型', add: 0.3 },
+                { cond: '第三有效学位（同条件）', add: 0.2 }
+              ],
+              cap: 1.0, dynamicCapNote: '动态封顶 = 10 - base - 维度2'
+            },
+            note: 'base=学历基线+院校tier偏移；专升本上限5.0（T0-T1=5.0，T2-T4=4.5）；水硕T4-0.5；自考本科=本科T4=6.0；专科3.0-4.0（优质4.0/普通3.5/成人自考3.0）。博士后不计入学历（归专业成果·科研经历）。'
+          }
+        },
+        {
+          name: '行业资质与认证', weight: 0.30, maxScore: 10, missingScore: 5, cap: 10,
+          criteria: '维度1主锚=认证层级 A0国际顶级9 / A1国家级执业8 / A2行业厂商6 / A3培训通用4；维度2=跨领域广度+0.3~0.5(封顶+0.5)；维度3=稀缺/强相关加分+0.5~1.0(封顶+1.0，PMP等国际管理认证归此)。缺失固定5.0。',
+          scoring: {
+            type: 'tier',
+            lowTierPending: true,
+            dimension1: { label: '认证层级（主锚）', tiers: { 'A0 国际权威认证(如CFA/CPA/ACCA/国家级执业资格)': 9.0, 'A1 国家级执业/行业权威认证': 8.0, 'A2 行业厂商认证(华为/微软等)': 6.0, 'A3 培训/通用认证': 4.0, '信息缺失': 5.0 } },
+            dimension2: { label: '跨领域广度', rules: [ { cond: '≥2个不相关领域有效认证', add: 0.3 }, { cond: '≥3个不相关领域有效认证', add: 0.5 } ], cap: 0.5 },
+            dimension3: { label: '稀缺/强相关（额外加分·封顶+1.0）', rules: [ { cond: '双A0/A1级认证', add: 0.5 }, { cond: 'PMP等国际管理认证(授课技能项)', add: 0.5 }, { cond: '与主领域强相关且稀缺', add: 0.5 } ], cap: 1.0, dynamicCapNote: '动态封顶 = 10 - base - 维度2' },
+            note: '主锚取最高不累计；成就类维度1-3档位待定（当前地面4.0）。'
+          }
+        },
+        {
+          name: '专业成果与经验', weight: 0.35, maxScore: 10, missingScore: 5, cap: 10,
+          criteria: '维度1主锚=学术路径(A0顶刊9/A1 SCI 8/A2普通6/A3仅演讲4) 与 企业路径(B0战略9/B1省级8/B2参与6/B3一般4) 取高不累计；维度2=持续性/数量+0.3~0.5(封顶+0.5)；维度3=高影响力+0.5~1.0(封顶+1.0，含正规博士后科研经历+0.5)。缺失固定5.0。',
+          scoring: {
+            type: 'dual-path',
+            lowTierPending: true,
+            dimension1: {
+              label: '学术路径 vs 企业路径（取高不累计）',
+              academic: { 'A0 顶刊/高被引/著作专利': 9.0, 'A1 SCI/EI/核心论文': 8.0, 'A2 普通论文/课题': 6.0, 'A3 仅公开演讲': 4.0 },
+              enterprise: { 'B0 战略级主持/国家级项目': 9.0, 'B1 省级/行业级项目': 8.0, 'B2 参与级项目': 6.0, 'B3 一般服务': 4.0 }
+            },
+            dimension2: { label: '持续性/数量', rules: [ { cond: 'H-index≥15 或 授课≥50场', add: 0.3 }, { cond: 'H-index≥25 或 授课≥100场', add: 0.5 } ], cap: 0.5 },
+            dimension3: { label: '高影响力（额外加分·封顶+1.0）', rules: [ { cond: '顶刊/高被引论文', add: 0.5 }, { cond: '牵头国标/行标', add: 0.5 }, { cond: '正规博士后科研经历', add: 0.5 } ], cap: 1.0, dynamicCapNote: '动态封顶 = 10 - base - 维度2' },
+            note: 'base取整数(9/8/6/4)；学术A0与企业B0同9.0；博士后科研经历归此维度(重量参照院士)。'
+          }
+        }
       ]
     },
     {
-      id: 'influence', name: '影响力', weight: 0.5,
+      id: 'influence', name: '影响力', weight: 0.4,
       desc: '评估专家的社会荣誉、职称头衔、管理履历及任职机构权威性',
       subDimensions: [
-        { name: '社会荣誉与奖项', weight: 0.35, maxScore: 10, criteria: '9分：省部级以上奖项/荣誉称号/十大百强 | 8分：协会/学会任职 | 7分：行业认可/媒体报道 | 6分：信息缺失/模糊' },
-        { name: '职称、管理履历与行业地位', weight: 0.65, maxScore: 10,
-          criteria: '9分：教授/研究员/院士/首席/CEO/总裁/创始人/董事长（世界500强/央企/上市公司） | 8分：总监/VP/合伙人/副教授（行业百强/大厂） | 7分：经理/高级工程师/主管（普通企业） | 6分：信息缺失/模糊 | 注：任职机构权威性加权——世界500强/央企/上市公司+1分，行业百强/大厂+0.5分'
+        {
+          name: '社会荣誉与奖项', weight: 0.35, maxScore: 10, missingScore: 5, cap: 10,
+          criteria: '维度1主锚=行政级别 H0国家级9 / H1省部级7.5 / H2地市或国家级学会6 / H3县级4，取最高不累计；维度2=同级别广度+0.3~0.5(封顶+0.5)；维度3=顶尖人才+0.5~1.0(封顶+1.0，院士+1.0，行业榜单按发布方权威性归H2/可上调H1)。缺失固定5.0。',
+          scoring: {
+            type: 'tier',
+            lowTierPending: true,
+            dimension1: { label: '行政级别（主锚·取最高不累计）', tiers: { 'H0 国家级荣誉/称号': 9.0, 'H1 省部级荣誉/称号': 7.5, 'H2 地市级/国家级学会': 6.0, 'H3 县级/一般协会': 4.0, '信息缺失': 5.0 } },
+            dimension2: { label: '同级别广度', rules: [ { cond: '同级别荣誉≥2项', add: 0.3 }, { cond: '同级别荣誉≥3项', add: 0.5 } ], cap: 0.5 },
+            dimension3: { label: '顶尖人才（额外加分·封顶+1.0）', rules: [ { cond: '两院院士', add: 1.0 }, { cond: '国家级人才计划/国际权威榜单(按发布方权威性可上调H1)', add: 0.5 } ], cap: 1.0, dynamicCapNote: '动态封顶 = 10 - base - 维度2' },
+            note: '沿用上海落户"同一项符合多种条件按最高分不累计"原则；行业榜单水分较大，按发布方权威性定档。'
+          }
+        },
+        {
+          name: '职称、管理履历与行业地位', weight: 0.65, maxScore: 10, missingScore: 5, cap: 10,
+          criteria: '维度1主锚=职级J0-J3 × 机构C0-C2矩阵(顶点J0×C0=9.5)；维度2=履历厚度+0.3~0.5(封顶+0.5)；维度3=标志性职位/变革主导+0.5~1.0(封顶+1.0，早期创始团队定A轮前)。缺失固定5.0。',
+          scoring: {
+            type: 'matrix',
+            lowTierPending: true,
+            dimension1: {
+              label: '职级（行 J0-J3）× 机构（列 C0-C2）',
+              jobLevels: { 'J0 教授/院士/首席/CEO总裁创始人董事长': 9.5, 'J1 副教授/总监/VP/合伙人': 8.5, 'J2 经理/高工/主管': 7.0, 'J3 无职称/基层': 5.5 },
+              orgs: { 'C0 世界500强/央企/上市公司': 0.0, 'C1 行业百强/大厂': -0.5, 'C2 普通企业': -1.0 }
+            },
+            dimension2: { label: '履历厚度', rules: [ { cond: '从业≥10年', add: 0.3 }, { cond: '从业≥15年 或 跨行业经历', add: 0.5 } ], cap: 0.5 },
+            dimension3: { label: '标志性职位/变革主导（额外加分·封顶+1.0）', rules: [ { cond: '国标委/一级学会常务理事/早期创始团队(A轮前)', add: 0.5 }, { cond: '主导企业变革/变革落地', add: 0.3 } ], cap: 1.0, dynamicCapNote: '动态封顶 = 10 - base - 维度2' },
+            note: '顶点J0×C0=9.5保留封顶余量（更强者可在维度3继续加成）；C0暂含规模较小上市公司；初创界定为A轮前。'
+          }
         }
       ]
     }
@@ -310,8 +384,11 @@ function migrateRatingConfig(cfg) {
         if (dim.subDimensions && dim.subDimensions.length > 0) {
           dim.subDimensions.forEach(sd => {
             const defaultSD = defaultDim.subDimensions.find(ds => ds.name === sd.name);
-            if (defaultSD && defaultSD.criteria) {
-              sd.criteria = defaultSD.criteria;
+            if (defaultSD) {
+              if (defaultSD.criteria) sd.criteria = defaultSD.criteria;
+              if (defaultSD.scoring) sd.scoring = JSON.parse(JSON.stringify(defaultSD.scoring));
+              if (defaultSD.missingScore !== undefined) sd.missingScore = defaultSD.missingScore;
+              if (defaultSD.cap !== undefined) sd.cap = defaultSD.cap;
             }
           });
         } else {
@@ -334,7 +411,14 @@ function migrateRatingConfig(cfg) {
       dim.subDimensions.forEach(sd => {
         if (!sd.criteria) {
           const defaultSD = defaultDim && defaultDim.subDimensions ? defaultDim.subDimensions.find(ds => ds.name === sd.name) : null;
-          sd.criteria = defaultSD ? defaultSD.criteria : ('6-9分：按资质等级评定 | 6分：信息缺失/模糊（默认中值）');
+          if (defaultSD) {
+            sd.criteria = defaultSD.criteria;
+            if (defaultSD.scoring) sd.scoring = JSON.parse(JSON.stringify(defaultSD.scoring));
+            if (defaultSD.missingScore !== undefined) sd.missingScore = defaultSD.missingScore;
+            if (defaultSD.cap !== undefined) sd.cap = defaultSD.cap;
+          } else {
+            sd.criteria = '6-9分：按资质等级评定 | 5分：信息缺失/模糊（默认中值）';
+          }
         }
       });
     }
@@ -723,19 +807,23 @@ function hasPermission(action) {
 
 function recalcExpertFromSubscores(e) {
   const cfg = appState.db.ratingConfig;
+  const cap = cfg.cap || 10;
   const profDim = cfg.dimensions.find(d => d.id === 'professional');
   const inflDim = cfg.dimensions.find(d => d.id === 'influence');
   let prof = 0, infl = 0;
+  const getSub = (sd, val) => {
+    let v = val;
+    if (v === undefined || v === null) v = sd.missingScore !== undefined ? sd.missingScore : (cfg.missingScore !== undefined ? cfg.missingScore : 6);
+    return Math.min(cap, Math.max(0, v));
+  };
   if (e.subScores && e.subScores.professional && profDim && profDim.subDimensions) {
     profDim.subDimensions.forEach(sd => {
-      const v = e.subScores.professional[sd.name];
-      prof += (v !== undefined ? v : 6) * sd.weight;
+      prof += getSub(sd, e.subScores.professional[sd.name]) * sd.weight;
     });
   }
   if (e.subScores && e.subScores.influence && inflDim && inflDim.subDimensions) {
     inflDim.subDimensions.forEach(sd => {
-      const v = e.subScores.influence[sd.name];
-      infl += (v !== undefined ? v : 6) * sd.weight;
+      infl += getSub(sd, e.subScores.influence[sd.name]) * sd.weight;
     });
   }
   e.scores.professional = Math.round(prof * 10) / 10;
@@ -5778,7 +5866,7 @@ function aiScoreExpert(expert) {
       expert.subScores.professional = {};
       profDims.subDimensions.forEach(sd => {
         const nameTxt = sd.name.toLowerCase();
-        let score = 6; // 信息缺失/模糊默认6分（原5分）
+        let score = 5; // 信息缺失/模糊默认5分（v5.8.9起统一为5）
         // High-score keywords (9+)
         if (/学历|学术|博士|博士后|phd|硕士|研究生|master|本科|学士|学位|教育|professor/i.test(nameTxt)) {
           if (/博士|博士后|phd|教授|研究员/i.test(txt)) score = 9;
@@ -5810,7 +5898,7 @@ function aiScoreExpert(expert) {
       const authorityBonus = getCompanyAuthorityBonus(txt);
       inflDims.subDimensions.forEach(sd => {
         const nameTxt = sd.name.toLowerCase();
-        let score = 6; // 信息缺失/模糊默认6分（原5分）
+        let score = 5; // 信息缺失/模糊默认5分（v5.8.9起统一为5）
         if (/荣誉|奖项|奖|称号|表彰|殊荣|十大|百强|社会/i.test(nameTxt)) {
           if (/奖|荣誉|称号|表彰|十大|百强/i.test(txt)) score = 9;
           else if (/协会|学会|理事|委员|专家/i.test(txt)) score = 8;

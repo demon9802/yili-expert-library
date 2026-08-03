@@ -2,6 +2,7 @@
 // v5.8.0+ 独立文件，编辑此文件即可更新月度报告中的更新日志
 // 格式：{ version, date (YYYY-MM-DD), summary, module }
 var VERSION_CHANGELOG = [
+  { version: 'v5.8.9', date: '2026-08-03', summary: '评分规则10分制重构部署：维度权重60/40、信息缺失统一5.0、子维度硬封顶10、五子维度新标准（学历矩阵T0-T4/资质A0-A3/成果双路径/荣誉H0-H3/职称J×C矩阵）结构化进ratingConfig，configVersion升3', module: '评分系统' },
   { version: 'v5.8.8.2-migration-test', date: '2026-07-30', summary: '迁移流程验证：个人账号→企业团队账号切换后，编辑→commit→push→EdgeOne 自动部署链路联调测试', module: '迁移测试' },
   { version: 'v5.8.8.2', date: '2026-07-29', summary: '修复前端详情分号显示（formatRichText+数据迁移）+ 月报仪表盘4卡横向并排（在职专家/专业度/影响力/综合评分）', module: '紧急修复' },
   { version: 'v5.8.8', date: '2026-07-29', summary: '批量导入修复(advDisplay/qualDisplay/分号清理) + 环形图图例双行布局 + 仪表盘/月报侧并排布局 + 管理后台分值分布全景恢复 + 批量导入审计(项目名称匹配/数据清理) + 月度报告评分卡右置', module: '紧急修复' },
