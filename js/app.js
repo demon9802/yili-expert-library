@@ -8706,6 +8706,13 @@ function renderSettingsTab(panel) {
       desc: '所有功能需求的优先级、排期、完成状态追踪',
       url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
       label: '打开进度表'
+    },
+    {
+      icon: '📐',
+      title: '评分规则·详细内部版（五子维度赋分与测算 v5.8.9）',
+      desc: '内部留底：五个子维度完整赋分矩阵 + 计算引擎 + 4 个测算案例 + 代码字段映射；用于核对赋分逻辑、检验测算结果',
+      url: 'https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-internal-v5.8.9.md',
+      label: '打开详细文档'
     }
   ];
   dataDocsList.forEach(function(doc) {
