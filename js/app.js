@@ -325,7 +325,7 @@ const DEFAULT_RATING_CONFIG = {
     }
   ],
   aiScoringEnabled: true,
-  showScores: false
+  showScores: true   // 默认开启前端评分展示（测试环境不再需手动勾选）
 };
 
 const DEFAULT_SORT_OPTIONS = [
@@ -6614,10 +6614,45 @@ function renderRatingsTab(panel) {
     return;
   }
 
+  // ===== 子管理员：① 调分操作指南（放在最前面，先告诉怎么用再看规则）=====
+  if (!isMaster) {
+    const guide = h('div', { style:{ background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BBF7D0' } });
+    guide.appendChild(h('h4', { style:{ margin:'0 0 10px', fontSize:'14px', color:'#166534' } }, '① 调分操作指南'));
+
+    const canDo = h('div', { style:{ marginBottom:'12px' } });
+    canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
+    const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    ['在下方专家列表中，直接修改每个子维度的分数输入框（0–10 分）','修改后综合分自动重新计算，无需手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
+      canList.appendChild(h('li', {}, t));
+    });
+    canDo.appendChild(canList);
+    guide.appendChild(canDo);
+
+    const note = h('div', { style:{ marginBottom:'12px' } });
+    note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
+    const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    noteList.appendChild(h('li', {}, '某个维度信息缺失时，该维度默认 5 分（中性值，不拉高也不压低）'));
+    noteList.appendChild(h('li', {}, '综合分低于 7 分的专家会自动进入观察库，不会在前端展示'));
+    noteList.appendChild(h('li', {}, '每个子维度最高 10 分，超过会自动截断'));
+    note.appendChild(noteList);
+    guide.appendChild(note);
+
+    const tip = h('div', {});
+    tip.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#1D4ED8', marginBottom:'6px' } }, '💡 什么时候需要手动调分？'));
+    const tipList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
+    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应维度的数字即可'));
+    tipList.appendChild(h('li', {}, '有新的资质/成果信息未录入 → 先补充信息再重置为自动评分'));
+    tipList.appendChild(h('li', {}, '不确定怎么打分 → 保持自动评分不变，或联系主管理员确认'));
+    tip.appendChild(tipList);
+    guide.appendChild(tip);
+
+    panel.appendChild(guide);
+  }
+
   // ===== ② 评分体系配置（合并评分细则 + 赋分标准可编辑）=====
   // 主管理员：完整编辑界面 | 子管理员：只读细则说明
   const configSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-  const configTitle = isMaster ? '② 评分体系配置（维度 & 赋分标准）' : '① 评分细则说明';
+  const configTitle = isMaster ? '② 评分体系配置（维度 & 赋分标准）' : '② 评分细则说明';
   configSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, configTitle));
 
   if (!isMaster) {
@@ -6929,32 +6964,8 @@ function renderRatingsTab(panel) {
   }
   setTimeout(() => renderRatingTable(), 50);
 
-  // ===== 评分预警区（所有管理员，已整合观察库）=====
-  const warnIdx = isMaster ? '④' : '③';
-  panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警'));
-
-  // Use global autoSyncObservation
-  autoSyncObservationGlobal();
-
-  const obsThreshold = 7;
-  const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
-
-  // 简化：只保留高亮跳转框，统计和处理统一在观察库Tab
-  if (lowExperts.length === 0) {
-    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
-  } else {
-    const warnBox = h('div', { style:{ padding:'20px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', textAlign:'center' } });
-    warnBox.appendChild(h('div', { style:{ fontSize:'16px', fontWeight:'700', color:'#92400e', marginBottom:'8px' } }, '⚠️ 共 ' + lowExperts.length + ' 位专家综合评分低于7分'));
-    warnBox.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'14px' } }, '以上专家已自动同步至观察库，请前往观察库Tab进行查看和处理'));
-    warnBox.appendChild(h('button', {
-      className: 'btn btn-primary',
-      style: { background:'#d97706', color:'white', fontSize:'13px', padding:'8px 24px' },
-      onclick: () => { appState.adminTab = 'observation'; renderAdmin(); }
-    }, '🔍 前往观察库处理'));
-    panel.appendChild(warnBox);
-  }
-
-  // ===== ⑤ 测算验证文档（仅主管理员：详细赋分细则 + 计算逻辑 + 测试案例）=====
+  // ===== ⑤ 评分规则与测算验证（仅主管理员：快速规则 + 赋分逻辑 + 详细文档入口）=====
+  // 设计意图：⑤ = 快速了解规则、核对赋分逻辑、辅助调分决策；完整留底靠嵌入文档链接
   if (isMaster) {
     const _profDim = cfg.dimensions.find(d => d.id === 'professional');
     const _inflDim = cfg.dimensions.find(d => d.id === 'influence');
@@ -6962,11 +6973,21 @@ function renderRatingsTab(panel) {
     const inflW = Math.round((_inflDim?.weight || 0.4) * 100);
 
     const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-    docSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, '⑤ 评分测算验证文档（v5.8.9 · 赋分细则与计算逻辑）'));
+    docSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, '⑤ 评分规则与测算验证（v5.8.9）'));
 
     const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'12px', lineHeight:'1.7', color:'var(--text)' } });
 
     docBody.innerHTML = `
+      <!-- ===== 文档入口卡片 ===== -->
+      <div style="margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#F0FDF4,#ECFDF5); border-radius:8px; border:1px solid #BBF7D0; display:flex; align-items:center; gap:10px;">
+        <div style="font-size:24px; flex-shrink:0;">📐</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px; color:'#166534';">评分规则·详细内部版（五子维度赋分与测算 v5.8.9）</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">完整评分矩阵(5子维度速查) + 详细赋分细则 + 计算规则 + 4个测算案例 → 核对赋分逻辑 / 检验测算结果 / 系统文档编写参考</div>
+        </div>
+        <a href="https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-internal-v5.8.9.md" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+      </div>
+
       <!-- ===== 第一部分：计算公式与逻辑 ===== -->
       <div style="margin-bottom:16px; padding:12px 14px; background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border-radius:8px; border-left:4px solid #4338CA;">
         <strong style="font-size:14px; color:#312E81;">📐 核心计算公式</strong>
@@ -7132,42 +7153,29 @@ function renderRatingsTab(panel) {
     panel.appendChild(docSec);
   }
 
-  // ===== 子管理员：实操调分指南（面向不了解评分体系的人）=====
-  if (!isMaster) {
-    const guide = h('div', { style:{ background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BBF7D0' } });
-    guide.appendChild(h('h4', { style:{ margin:'0 0 10px', fontSize:'14px', color:'#166534' } }, '📋 调分操作指南'));
+  // ===== 评分预警区（所有管理员，已整合观察库）=====
+  const warnIdx = isMaster ? '④' : '③';
+  panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警'));
 
-    // ✅ 能做的
-    const canDo = h('div', { style:{ marginBottom:'12px' } });
-    canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
-    const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    ['在下方专家列表中，直接修改每个子维度的分数输入框（0–10 分）','修改后综合分自动重新计算，无需手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
-      canList.appendChild(h('li', {}, t));
-    });
-    canDo.appendChild(canList);
-    guide.appendChild(canDo);
+  // Use global autoSyncObservation
+  autoSyncObservationGlobal();
 
-    // ⚠️ 注意
-    const note = h('div', { style:{ marginBottom:'12px' } });
-    note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
-    const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    noteList.appendChild(h('li', {}, '某个维度信息缺失时，该维度默认 5 分（中性值，不拉高也不压低）'));
-    noteList.appendChild(h('li', {}, '综合分低于 7 分的专家会自动进入观察库，不会在前端展示'));
-    noteList.appendChild(h('li', {}, '每个子维度最高 10 分，超过会自动截断'));
-    note.appendChild(noteList);
-    guide.appendChild(note);
+  const obsThreshold = 7;
+  const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
 
-    // 💡 调分建议
-    const tip = h('div', {});
-    tip.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#1D4ED8', marginBottom:'6px' } }, '💡 什么时候需要手动调分？'));
-    const tipList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应维度的数字即可'));
-    tipList.appendChild(h('li', {}, '有新的资质/成果信息未录入 → 先补充信息再重置为自动评分'));
-    tipList.appendChild(h('li', {}, '不确定怎么打分 → 保持自动评分不变，或联系主管理员确认'));
-    tip.appendChild(tipList);
-    guide.appendChild(tip);
-
-    panel.appendChild(guide);
+  // 简化：只保留高亮跳转框，统计和处理统一在观察库Tab
+  if (lowExperts.length === 0) {
+    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ 7分）'));
+  } else {
+    const warnBox = h('div', { style:{ padding:'20px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', textAlign:'center' } });
+    warnBox.appendChild(h('div', { style:{ fontSize:'16px', fontWeight:'700', color:'#92400e', marginBottom:'8px' } }, '⚠️ 共 ' + lowExperts.length + ' 位专家综合评分低于7分'));
+    warnBox.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'14px' } }, '以上专家已自动同步至观察库，请前往观察库Tab进行查看和处理'));
+    warnBox.appendChild(h('button', {
+      className: 'btn btn-primary',
+      style: { background:'#d97706', color:'white', fontSize:'13px', padding:'8px 24px' },
+      onclick: () => { appState.adminTab = 'observation'; renderAdmin(); }
+    }, '🔍 前往观察库处理'));
+    panel.appendChild(warnBox);
   }
 }
 
@@ -8705,13 +8713,6 @@ function renderSettingsTab(panel) {
       desc: '所有功能需求的优先级、排期、完成状态追踪',
       url: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
       label: '打开进度表'
-    },
-    {
-      icon: '📐',
-      title: '评分规则·详细内部版（五子维度赋分与测算 v5.8.9）',
-      desc: '完整评分规则留底：汇总评分矩阵(5子维度速查) + 详细赋分细则 + 计算规则 + 4个测算案例。用于核对赋分逻辑、检验测算结果、后续系统文档编写参考',
-      url: 'https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-internal-v5.8.9.md',
-      label: '打开详细文档'
     }
   ];
   dataDocsList.forEach(function(doc) {
