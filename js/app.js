@@ -6961,30 +6961,30 @@ function renderRatingsTab(panel) {
     const profW = Math.round((_profDim?.weight || 0.6) * 100);
     const inflW = Math.round((_inflDim?.weight || 0.4) * 100);
 
-    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'2px solid #6366F1' } });
-    docSec.appendChild(h('h4', { style: { margin:'0 0 12px', fontSize:'15px', color:'#4338CA', borderBottom:'2px solid #E0E7FF', paddingBottom:'8px' } }, '⑤ 评分测算验证文档（v5.8.9 · 赋分细则与计算逻辑）'));
+    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
+    docSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, '⑤ 评分测算验证文档（v5.8.9 · 赋分细则与计算逻辑）'));
 
     const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'12px', lineHeight:'1.7', color:'var(--text)' } });
 
     docBody.innerHTML = `
       <!-- ===== 第一部分：计算公式与逻辑 ===== -->
       <div style="margin-bottom:16px; padding:12px 14px; background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border-radius:8px; border-left:4px solid #4338CA;">
-        <strong style="font-size:14px; color:#312E81;">📐 核心计算公式（代码 recalcExpertFromSubscores 逻辑）</strong>
-        <div style="margin-top:8px; font-family:monospace; font-size:11.5px; background:#fff; padding:10px; border-radius:6px; line-height:1.9;">
-          <b>Step 1</b> — 子维度分值获取：<br>
-          &nbsp;&nbsp;score = (用户输入值 === undefined/null) ? <b style="color:#DC2626">missingScore(5)</b> : 用户输入值<br>
-          &nbsp;&nbsp;score = <b>Math.max(0, Math.min(score, cap=10))</b> — 硬截断 [0, 10]<br><br>
-          <b>Step 2</b> — 大维度加权求和：<br>
-          &nbsp;&nbsp;<b>专业度</b> = 学历×0.35 + 资质×0.30 + 成果×0.35 &nbsp;(权重之和=1.0)<br>
-          &nbsp;&nbsp;<b>影响力</b> = 荣誉×0.35 + 职称×0.65 &nbsp;(权重之和=1.0)<br><br>
-          <b>Step 3</b> — 综合分：<br>
+        <strong style="font-size:14px; color:#312E81;">📐 核心计算公式</strong>
+        <div style="margin-top:8px; font-size:11.5px; background:#fff; padding:10px; border-radius:6px; line-height:1.9;">
+          <b>Step 1</b> — 取子维度分值：<br>
+          &nbsp;&nbsp;有录入值 → 使用录入值；缺失(空/未公开/模糊) → 统一取 <b style="color:#DC2626">5.0</b><br>
+          &nbsp;&nbsp;结果截断到 <b>[0, 10]</b>（超出封顶或低于零均修正）<br><br>
+          <b>Step 2</b> — 加权求大维度分：<br>
+          &nbsp;&nbsp;<b>专业度</b> = 学历×35% + 资质×30% + 成果×35%<br>
+          &nbsp;&nbsp;<b>影响力</b> = 荣誉×35% + 职称×65%<br><br>
+          <b>Step 3</b> — 加权求综合分：<br>
           &nbsp;&nbsp;<b>综合</b> = 专业度 × ${profW}% + 影响力 × ${inflW}%<br><br>
-          <b>Step 4</b> — 全部保留1位小数：Math.round(x × 10) / 10
+          <b>Step 4</b> — 每步结果保留 1 位小数
         </div>
       </div>
 
       <!-- ===== 第二部分：五子维度完整赋分矩阵 ===== -->
-      <h5 style="color:#312E81; margin:14px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">📊 五子维度完整赋分矩阵（来自 DEFAULT_RATING_CONFIG.scoring）</h5>
+      <h5 style="color:#312E81; margin:14px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">📊 五子维度完整赋分矩阵</h5>
 
       <!-- 学历 -->
       <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #3B82F6;">
@@ -7077,8 +7077,8 @@ function renderRatingsTab(panel) {
 
       <div style="padding:10px; background:#FEF2F2; border-radius:6px; border:1px solid #FECACA; margin-bottom:10px;">
         <b style="color:#991B1B;">案例A：全缺失专家（所有子维度均为空）</b>
-        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
-          输入：5个维度全部 undefined → 每个子维度 → missingScore=<b>5.0</b><br>
+        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：5个维度全部缺失 → 每个子维度统一取 <b>5.0</b><br>
           专业度 = 5×0.35 + 5×0.30 + 5×0.35 = <b>5.0</b><br>
           影响力 = 5×0.35 + 5×0.65 = <b>5.0</b><br>
           综合 = 5.0×${profW}% + 5.0×${inflW}% = <b>5.0</b><br>
@@ -7088,7 +7088,7 @@ function renderRatingsTab(panel) {
 
       <div style="padding:10px; background:#F0FDF4; border-radius:6px; border:1px solid #BBF7D0; margin-bottom:10px;">
         <b style="color:#166534;">案例B：顶级专家（各维度接近满分）</b>
-        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
           输入：学历=9.5(博士T0) | 资质=9.0(A0) | 成果=9.0(A0) | 荣誉=9.0(H0+院士+1=10封顶) | 职称=9.5(J0×C0)<br>
           专业度 = 9.5×0.35 + 9.0×0.30 + 9.0×0.35 = 3.325 + 2.7 + 3.15 = <b>9.175→9.2</b><br>
           影响力 = 10×0.35 + 9.5×0.65 = 3.5 + 6.175 = <b>9.675→9.7</b><br>
@@ -7099,7 +7099,7 @@ function renderRatingsTab(panel) {
 
       <div style="padding:10px; background:#EFF6FF; border-radius:6px; border:1px solid #BFDBFE; margin-bottom:10px;">
         <b style="color:#1E40AF;">案例C：混合缺失（部分维度有值、部分缺失）</b>
-        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
+        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
           输入：学历=8.5(硕士T1) | 资质=<b>缺失→5.0</b> | 成果=6.0(A2) | 荣誉=<b>缺失→5.0</b> | 职称=7.0(J2×C0)<br>
           专业度 = 8.5×0.35 + 5.0×0.30 + 6.0×0.35 = 2.975 + 1.5 + 2.1 = <b>6.575→6.6</b><br>
           影响力 = 5.0×0.35 + 7.0×0.65 = 1.75 + 4.55 = <b>6.3</b><br>
@@ -7110,23 +7110,22 @@ function renderRatingsTab(panel) {
 
       <div style="padding:10px; background:#FFFbeb; border-radius:6px; border:1px solid #FDE68A; margin-bottom:10px;">
         <b style="color:#92400E;">案例D：边界值——子维度超10分硬截断</b>
-        <div style="font-family:monospace;font-size:11px;margin-top:4px;line-height:1.8;">
-          输入：某子维度手动输入 12 → Math.min(12, 10) = <b style="color:#92400E;">10.0（硬截断）</b><br>
-          输入：某子维度手动输入 -2 → Math.max(-2, 0) = <b style="color:#92400E;">0.0（硬截断）</b><br>
-          <span style="color:#92400E;">✅ 验证：cap=10 硬截断生效，不会出现异常分数。</span>
+        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
+          输入：某子维度手动输入 12 → 截断为 <b style="color:#92400E;">10.0（硬封顶）</b><br>
+          输入：某子维度手动输入 -2 → 截断为 <b style="color:#92400E;">0.0（硬下限）</b><br>
+          <span style="color:#92400E;">✅ 验证：硬封顶10与硬下限0均生效，不会出现异常分数。</span>
         </div>
       </div>
 
       <!-- ===== 第四部分：全局规则速查 ===== -->
       <h5 style="color:#312E81; margin:16px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">⚙️ 全局规则汇总</h5>
       <ul style="margin:0;padding-left:18px;font-size:11.5px;line-height:1.9;">
-        <li><b>信息缺失统一 5 分</b>（五维度一致），通过 missingScore 配置项控制</li>
-        <li><b>子维度硬封顶 10 分</b>（Math.max(0, Math.min(val, cap))），cap 可配置</li>
+        <li><b>信息缺失统一 5 分</b>（五维度一致），不空置不占优</li>
+        <li><b>子维度硬封顶 10 分</b>（超出截断），硬下限 0 分（低于归零）</li>
         <li><b>综合分 &lt; 7 不进入观察库</b>——前端只展示信息完整、实力明确的专家</li>
-        <li><b>主锚点原则</b>：同一子维度的多个条件取最高档（不累计），上海落户同款逻辑</li>
-        <li><b>动态封顶</b>：维度3加分上限 = 10 − base − 维度2得分，防止溢出</li>
+        <li><b>主锚点原则</b>：同一子维度的多个条件取最高档（不累计）</li>
+        <li><b>动态封顶</b>：维度3加分上限 = 10 − 主锚 − 维度2得分，防止溢出</li>
         <li><b>成就类1-3分档位</b>：资质/成果/荣誉/职称的低分段（1-3分）<b>待定</b>（方案X vs 方案Y）</li>
-        <li><b>configVersion: 3</b>（v5.8.9 重构版本号，用于 migrateRatingConfig 自动升级检测）</li>
       </ul>
     `;
     docSec.appendChild(docBody);
@@ -8710,7 +8709,7 @@ function renderSettingsTab(panel) {
     {
       icon: '📐',
       title: '评分规则·详细内部版（五子维度赋分与测算 v5.8.9）',
-      desc: '内部留底：五个子维度完整赋分矩阵 + 计算引擎 + 4 个测算案例 + 代码字段映射；用于核对赋分逻辑、检验测算结果',
+      desc: '完整评分规则留底：汇总评分矩阵(5子维度速查) + 详细赋分细则 + 计算规则 + 4个测算案例。用于核对赋分逻辑、检验测算结果、后续系统文档编写参考',
       url: 'https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-internal-v5.8.9.md',
       label: '打开详细文档'
     }
