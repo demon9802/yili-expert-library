@@ -1,0 +1,6 @@
+# Office temp lock files (Word/Excel open lock)
+~$*
+
+# OS / editor
+.DS_Store
+Thumbs.db
