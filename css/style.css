@@ -706,6 +706,37 @@ body {
   border-top: 1px solid #f1f5f9;
 }
 
+/* v-next: 联系方式智能展示单元 */
+.contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 8px 2px 0;
+}
+.contact-person {
+  margin-right: 4px;
+}
+.contact-link {
+  color: var(--primary, #2563eb);
+  text-decoration: none;
+  word-break: break-all;
+}
+.contact-link:hover { text-decoration: underline; }
+.contact-text {
+  word-break: break-all;
+}
+.contact-copy {
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-left: 2px;
+  border-radius: 4px;
+}
+.detail-contact-line .contact-chip {
+  margin-left: 2px;
+}
+
+
 /* 库内供应商 - 右下角圆角金色徽章 */
 .card-supplier-bookmark {
   position: absolute;
