@@ -709,12 +709,25 @@ body {
 /* v-next: 联系方式智能展示单元 */
 .contact-chip {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   margin: 0 8px 2px 0;
 }
+.contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 6px 4px 0;
+}
 .contact-person {
   margin-right: 4px;
+}
+.contact-icon {
+  display: inline-block;
+  line-height: 1;
+  text-decoration: none;
+  user-select: none;
 }
 .contact-link {
   color: var(--primary, #2563eb);
