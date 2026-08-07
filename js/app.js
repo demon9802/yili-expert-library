@@ -2540,7 +2540,7 @@ function showExpertDetail(expert) {
           const label = groups.length === 1 ? '联系人' : ('联系人' + (idx + 1));
           const line = h('div', { className: 'detail-text detail-contact-line', style: { marginBottom: groups.length > 1 ? '6px' : '0' } });
           line.appendChild(h('span', { innerHTML: label + '：' + (g.person ? highlightText(g.person, sq) + ' ' : '') }));
-          line.appendChild(renderContactGroup(g, { highlight: sq, showPersonIcon: false }));
+          line.appendChild(renderContactGroup(g, { highlight: sq, showPerson: false }));
           contactSection.appendChild(line);
         }
       });
@@ -6046,9 +6046,11 @@ function renderContactGroup(group, opts) {
   opts = opts || {};
   const sq = opts.highlight;
   const wrap = h('span', { className: 'contact-group' });
-  if (group.person && opts.showPersonIcon !== false) {
+  // showPerson: 是否显示联系人姓名；showPersonIcon: 是否带 👤 图标
+  const showPerson = opts.showPerson !== false;
+  if (group.person && showPerson && opts.showPersonIcon !== false) {
     wrap.appendChild(h('span', { className: 'contact-person', innerHTML: '👤 ' + (sq ? highlightText(group.person, sq) : escapeHtml(group.person)) }));
-  } else if (group.person) {
+  } else if (group.person && showPerson) {
     wrap.appendChild(h('span', { className: 'contact-person-text', innerHTML: sq ? highlightText(group.person, sq) : escapeHtml(group.person) }));
   }
   group.methods.forEach(function(m, idx) {
@@ -6112,7 +6114,7 @@ function getContactMethodTitle(c) {
   return '点击复制';
 }
 
-// v5.8.10: 桌面端联系方式操作弹窗（复制 / 拨号 / 发邮件）
+// v5.8.10: 桌面端联系方式操作弹窗（复制 / 发邮件；电话无拨号，因电脑端通常无拨号能力）
 function showContactActionMenu(c, anchorEl) {
   closeContactActionMenu();
 
@@ -6138,15 +6140,6 @@ function showContactActionMenu(c, anchorEl) {
       closeContactActionMenu();
     }
   }, '📋 复制'));
-
-  // 拨号
-  if (c.href && (c.kind === 'mobile' || c.kind === 'landline')) {
-    menu.appendChild(h('a', {
-      className: 'contact-action-item',
-      href: c.href,
-      onclick: function() { closeContactActionMenu(); }
-    }, '📞 拨号'));
-  }
 
   // 发邮件
   if (c.href && c.kind === 'email') {
