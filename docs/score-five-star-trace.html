@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>五星制评分：逐专家打分明细追踪</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 24px; background: #f8fafc; color: #1e293b; }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    h2 { font-size: 16px; border-left: 4px solid #3b82f6; padding-left: 10px; margin: 0 0 14px; }
+    h3 { font-size: 14px; margin: 16px 0 8px; color: #334155; }
+    .sub { color: #64748b; font-size: 13px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .metric { background: #f8fafc; border-radius: 8px; padding: 12px; border: 1px solid #e2e8f0; }
+    .metric .label { font-size: 12px; color: #64748b; }
+    .metric .value { font-size: 20px; font-weight: 700; margin-top: 4px; }
+    .green { color: #059669; } .red { color: #dc2626; } .blue { color: #2563eb; } .orange { color: #d97706; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+    th, td { padding: 8px 10px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; font-weight: 600; }
+    tr:nth-child(even) { background: #f8fafc; }
+    .score { font-weight: 700; }
+    .score5 { color: #059669; } .score4 { color: #16a34a; } .score3 { color: #d97706; } .score2 { color: #dc2626; } .score1 { color: #991b1b; }
+    .reason { color: #64748b; font-size: 11px; display: block; margin-top: 2px; }
+    .missing { background: #fef3c7; }
+    .obs { background: #fee2e2; }
+    .note { background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; font-size: 12px; color: #92400e; line-height: 1.7; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-size: 11px; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 11px; line-height: 1.5; }
+    .ellipsis { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h1>五星制评分：逐专家打分明细追踪</h1>
+    <div class="sub">样本：Supabase 线上 56 位真实专家 | 缺失默认 = 3★ | 展示线：综合 &lt; 3★</div>
+    <div class="grid-3">
+      <div class="metric"><div class="label">平均综合得分</div><div class="value blue">3.39★</div></div>
+      <div class="metric"><div class="label">高分专家（≥4★）</div><div class="value green">2 位 (3.6%)</div></div>
+      <div class="metric"><div class="label">观察库（&lt;3★）</div><div class="value red">0 位 (0.0%)</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>一、为什么高分少 / 平均分中庸？—— 诊断结论</h2>
+    <div class="note">
+      <b>1. 不是系统识别问题，而是规则“兜底 3★”太宽：</b>
+      当前启发式规则对“有信息但不够顶尖”的专家一律给 3★（例如：只要提到“本科”就给 3★，只要提到“项目/经验”就给 3★）。
+      这导致 5 项子维度大量集中在 3★，综合分自然被拉向 3.0–3.5 区间，真正达到 4–5★ 的顶尖信号（博士/院士/国标/世界500强等）很少。
+      <br><br>
+      <b>2. 真正“缺失”的比例并不高：</b>
+      在 280 项次评分中，缺失默认命中的主要是“学历未公开/未识别”和“荣誉/资质未识别”，其他维度因字段里多少有些相关关键词，大多被兜底为 3★ 而非判定为缺失。
+      <br><br>
+      <b>3. 差异化小的根因：档位粗 + 关键词匹配。</b>
+      规则目前只用关键词 presence/absence，没有“985/211 区分”、“几篇论文/几个项目”等量纲；
+      一个普通本科讲师和一个北大硕士都会被同一规则打到 3★ 或 4★，导致大量专家挤在同一档。
+    </div>
+
+    <h3>子维度得分分布（280 项次）</h3>
+    <table>
+      <tr><th>得分</th><th>1★</th><th>2★</th><th>3★</th><th>4★</th><th>5★</th></tr>
+      <tr>
+        <td>项次数</td>
+        <td>0</td>
+        <td>26</td>
+        <td class="missing">160</td>
+        <td>53</td>
+        <td>41</td>
+      </tr>
+      <tr>
+        <td>占比</td>
+        <td>0.0%</td>
+        <td>9.3%</td>
+        <td class="missing">57.1%</td>
+        <td>18.9%</td>
+        <td>14.6%</td>
+      </tr>
+    </table>
+
+    <h3>各维度“缺失默认”命中次数（真正未识别）</h3>
+    <table>
+      <tr><th>维度·评分项</th><th>缺失默认命中次数</th></tr>
+      <tr><td>影响力·社会荣誉与奖项</td><td>34</td></tr><tr><td>专业度·行业资质与认证</td><td>20</td></tr><tr><td>专业度·学历与学术背景</td><td>15</td></tr><tr><td>影响力·职称、管理履历与行业地位</td><td>3</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>二、极端案例参考</h2>
+    <h3>高分代表（≥4.5★）</h3>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:6px;">
+        <b>方明</b> · 综合 4.2★ · 专业 3.7 · 影响 5.0
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：清华大学首届长三角创新领军工程博士</div>
+        <div style="font-size:12px;color:#64748b;">资质：【职称/荣誉头衔】教授级高级工程师，俄罗斯工程院外籍院士，中国科学技术大学客座教授、博士生导师，安徽师范大学经管学院产业教授/【社会职务】安徽省院士专家联谊会副…</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:6px;">
+        <b>余星冰</b> · 综合 4.0★ · 专业 4.0 · 影响 4.0
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：中国人民大学商学院企业管理学硕士（在读）</div>
+        <div style="font-size:12px;color:#64748b;">资质：【社会职务】斯坦福大学中国区首批创新商业导师，北京大学全球双创中心创新商业引导教练，英国CIPMT认证国际职业培训师，新加坡SPOT国际认证引导师，中智咨询（国…</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:6px;">
+        <b>任沁源</b> · 综合 3.8★ · 专业 4.0 · 影响 3.5
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：浙江大学控制科学与工程专业博士</div>
+        <div style="font-size:12px;color:#64748b;">资质：【职称/荣誉头衔】浙江大学控制科学与工程学院教授、博士生导师，浙江数字化发展与治理研究中心研究员，IEEE Senior Member，新加坡国立大学、新加坡科…</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+
+    <h3>低分代表（如果改缺失=2★会进观察库的典型）</h3>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#fee2e2;border-radius:6px;">
+        <b>罗佳</b> · 综合 3.0★ · 专业 3.0 · 影响 3.0
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：未公开（复旦大学）</div>
+        <div style="font-size:12px;color:#64748b;">资质：【社会职务】TRIZ四级专家，中国创新研究所项目总监，国家外国专家局培训中心认证培训师、咨询师，上海行为科学学会常务理事/【履职资历】猫鼬工厂（原IEC创新赋能…</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#fee2e2;border-radius:6px;">
+        <b>罗文</b> · 综合 3.0★ · 专业 3.0 · 影响 3.0
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：未公开</div>
+        <div style="font-size:12px;color:#64748b;">资质：【履职资历】天度科技合伙人</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+      <div style="margin-bottom:12px;padding:10px;background:#fee2e2;border-radius:6px;">
+        <b>李忠秋</b> · 综合 3.0★ · 专业 2.7 · 影响 3.5
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">学历：未公开（中国传媒大学）</div>
+        <div style="font-size:12px;color:#64748b;">资质：【社会职务】中国人才思维发展联盟主席，中国思维教育专家，培训杂志常务理事/【履职资历】北京思考力管理咨询有限公司董事，T20培训机构董事长俱乐部创办人</div>
+        <div style="font-size:12px;color:#64748b;">背景：</div>
+      </div>
+    
+  </div>
+
+  <div class="card">
+    <h2>三、逐专家打分明细（按综合得分降序）</h2>
+    <table>
+      <tr>
+        <th>姓名</th>
+        <th>学历与学术背景</th>
+        <th>行业资质与认证</th>
+        <th>专业成果与经验</th>
+        <th>社会荣誉与奖项</th>
+        <th>职称/管理履历/行业地位</th>
+        <th>专业度</th>
+        <th>影响力</th>
+        <th>综合</th>
+        <th>状态</th>
+      </tr>
+      
+        <tr class="">
+          <td><b>方明</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 院士/国家级人才计划/长江学者/杰青/万人计划">识别到 院士/国家级人才计划/长江学者/杰青/万人计划</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>5.0</td>
+          <td><b class="green">4.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>余星冰</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 CFA/CPA/ACCA/PMP/国际权威认证">识别到 CFA/CPA/ACCA/PMP/国际权威认证</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>4.0</td>
+          <td>4.0</td>
+          <td><b class="green">4.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>任沁源</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 国家级项目/战略级/顶刊">识别到 国家级项目/战略级/顶刊</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>4.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.8</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>钱兴会</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>4.0</td>
+          <td><b class="orange">3.8</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>苏嘉昊</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>4.0</td>
+          <td><b class="orange">3.8</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>徐霄鹏</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 CFA/CPA/ACCA/PMP/国际权威认证">识别到 CFA/CPA/ACCA/PMP/国际权威认证</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 国家级荣誉/称号/奖项">识别到 国家级荣誉/称号/奖项</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 总监/副总裁/合伙人/副教授/VP/Director">识别到 总监/副总裁/合伙人/副教授/VP/Director</span></td>
+          <td>4.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.8</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>陈剑文</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>4.0</td>
+          <td><b class="orange">3.8</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>李晓华</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★（百强/大厂/头部/领军）">识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★…</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>胡赛全</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>刘华鹏</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>伍晖</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>4.0</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王国谦</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 国家级执业/注册/行业权威认证">识别到 国家级执业/注册/行业权威认证</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>罗建国</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>4.0</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>韩京伟</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省部级/省级荣誉/称号">识别到 省部级/省级荣誉/称号</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>赵先德</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>徐微</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>4.0</td>
+          <td><b class="orange">3.6</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>赵渝强</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class="missing"><span class="score score4">4★</span><span class="reason" title="未识别职称/管理履历关键词 → 缺失默认；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">未识别职称/管理履历关键词 → 缺失默认；机构权威性上浮 +1★（世界500强/央企…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>张赟</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 培训/进修/课程">识别到 培训/进修/课程</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>李家贵</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王明哲</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>韦玮</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>焦波</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>4.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王川</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>4.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>冯博</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>4.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王思轩</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.7</td>
+          <td>3.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>傅一航</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>蔡春久</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>韦凯元（凯元老师）</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>马涛</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>4.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>卜安洵</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>刘春雄</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>徐全</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>李广</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>阿木（阿布力克木·阿不力米提）</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>吕守升</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.3</td>
+          <td>3.5</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>黄岩</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 培训/进修/课程">识别到 培训/进修/课程</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>4.0</td>
+          <td><b class="orange">3.4</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>孔令涛</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>冰洋</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 经理/高工/主管；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 经理/高工/主管；机构权威性上浮 +1★（世界500强/央企/国企/上市公司…</span></td>
+          <td>3.3</td>
+          <td>3.0</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王春阳</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 培训/进修/课程">识别到 培训/进修/课程</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>陈才斌（陈天 sky）</b></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 本科/学士">识别到 本科/学士</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>卢森煌</b></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 本科/学士">识别到 本科/学士</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>冯豪</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>王旭刚</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 经理/高工/主管">识别到 经理/高工/主管</span></td>
+          <td>3.7</td>
+          <td>2.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>乔锐杰</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★（百强/大厂/头部/领军）">识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★…</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>蔚江</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>秦江</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.5</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>陈起辉</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.3</td>
+          <td>3.0</td>
+          <td><b class="orange">3.2</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>毛利涛</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class="missing"><span class="score score4">4★</span><span class="reason" title="未识别职称/管理履历关键词 → 缺失默认；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">未识别职称/管理履历关键词 → 缺失默认；机构权威性上浮 +1★（世界500强/央企…</span></td>
+          <td>3.0</td>
+          <td>3.0</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>陈哲</b></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 专科/大专/高职">识别到 专科/大专/高职</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>2.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>唐兴通</b></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 博士/博士后/PhD">识别到 博士/博士后/PhD</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 培训/进修/课程">识别到 培训/进修/课程</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别职称/管理履历关键词 → 缺失默认">未识别职称/管理履历关键词 → 缺失默认</span></td>
+          <td>3.3</td>
+          <td>2.5</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>邵昶盛</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 总监/副总裁/合伙人/副教授/VP/Director；机构权威性上浮 +1★…</span></td>
+          <td>3.0</td>
+          <td>3.0</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>魏凌睿</b></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 硕士/研究生/MBA">识别到 硕士/研究生/MBA</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 经理/高工/主管；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 经理/高工/主管；机构权威性上浮 +1★（世界500强/央企/国企/上市公司…</span></td>
+          <td>3.3</td>
+          <td>2.5</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>黄洁</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.0</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>罗佳</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 厂商/通用认证或资格">识别到 厂商/通用认证或资格</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score4">4★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人</span></td>
+          <td>3.0</td>
+          <td>3.0</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>罗文</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别资质认证关键词 → 缺失默认">未识别资质认证关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）">识别到 项目/讲师/培训/课程/开发/服务/企业/经验（兜底3★）</span></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别荣誉奖项关键词 → 缺失默认">未识别荣誉奖项关键词 → 缺失默认</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 总监/副总裁/合伙人/副教授/VP/Director">识别到 总监/副总裁/合伙人/副教授/VP/Director</span></td>
+          <td>3.0</td>
+          <td>3.0</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+        <tr class="">
+          <td><b>李忠秋</b></td>
+          <td class="missing"><span class="score score3">3★</span><span class="reason" title="未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认">未识别学历关键词（未填/未公开/表述模糊）→ 缺失默认</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 培训/进修/课程">识别到 培训/进修/课程</span></td>
+          <td class=""><span class="score score3">3★</span><span class="reason" title="识别到 省级/行业级/SCI/EI/论文/专利/软著/著作">识别到 省级/行业级/SCI/EI/论文/专利/软著/著作</span></td>
+          <td class=""><span class="score score2">2★</span><span class="reason" title="识别到 地市/市级荣誉/国家级学会/协会/理事/委员">识别到 地市/市级荣誉/国家级学会/协会/理事/委员</span></td>
+          <td class=""><span class="score score5">5★</span><span class="reason" title="识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +1★（世界500强/央企/国企/上市公司/集团）">识别到 教授/研究员/首席/CEO/总裁/总经理/董事长/创始人；机构权威性上浮 +…</span></td>
+          <td>2.7</td>
+          <td>3.5</td>
+          <td><b class="orange">3.0</b></td>
+          <td>展示</td>
+        </tr>
+      
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>四、原始字段示例（用于复核识别是否准确）</h2>
+    <p style="font-size:12px;color:#64748b;">展示前 3 位高分 + 后 3 位低分的原始 education / qualifications / background / advantages 字段，可对照规则复核识别问题。</p>
+    <pre>[
+  {
+    &quot;name&quot;: &quot;方明&quot;,
+    &quot;education&quot;: &quot;清华大学首届长三角创新领军工程博士&quot;,
+    &quot;qualifications&quot;: &quot;【职称/荣誉头衔】教授级高级工程师，俄罗斯工程院外籍院士，中国科学技术大学客座教授、博士生导师，安徽师范大学经管学院产业教授/【社会职务】安徽省院士专家联谊会副会长，中国声谷双创顾问，国家标准化技术委员会委员，科普产品国家地方联合工程研究中心创办人/【履职资历】科大讯飞股份有限公司副总裁&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;深耕人工智能领域三十余年，兼具技术深度与产业视野，主导多项国家级重大专项，在AI大模型技术研发与千行百业场景落地方面有丰富的经验与标杆案例，同时具备深厚的产学研用融合经验，推动AI技术产业化落地&quot;,
+        &quot;title&quot;: &quot;技术+产业落地&quot;
+      },
+      {
+        &quot;desc&quot;: &quot;俄罗斯工程院外籍院士，教授级高级工程师&quot;,
+        &quot;title&quot;: &quot;高学术title&quot;
+      }
+    ]
+  },
+  {
+    &quot;name&quot;: &quot;余星冰&quot;,
+    &quot;education&quot;: &quot;中国人民大学商学院企业管理学硕士（在读）&quot;,
+    &quot;qualifications&quot;: &quot;【社会职务】斯坦福大学中国区首批创新商业导师，北京大学全球双创中心创新商业引导教练，英国CIPMT认证国际职业培训师，新加坡SPOT国际认证引导师，中智咨询（国资委直管的央企）战略模块签约老师/【履职资历】曾任湖畔创研中心CEO与核心高管战略组织商业训战产品经理、钉钉大学数字化转型总裁班负责人、阿里巴巴淘天集团业务OD、阿里金融（现支付宝网商银行）业务运营等&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;17年+阿里系出身，聚焦组织数字化转型、AI 赋能业务、战略落地闭环、领导力与高效执行力等方向&quot;,
+        &quot;title&quot;: &quot;互联网大厂背景&quot;
+      }
+    ]
+  },
+  {
+    &quot;name&quot;: &quot;任沁源&quot;,
+    &quot;education&quot;: &quot;浙江大学控制科学与工程专业博士&quot;,
+    &quot;qualifications&quot;: &quot;【职称/荣誉头衔】浙江大学控制科学与工程学院教授、博士生导师，浙江数字化发展与治理研究中心研究员，IEEE Senior Member，新加坡国立大学、新加坡科技研究局资讯研究院前研究员/研究科学家&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;浙大控制科学与工程学院教授、博士生导师&quot;,
+        &quot;title&quot;: &quot;高科研/学术功底&quot;
+      },
+      {
+        &quot;desc&quot;: &quot;国家级项目背景，具备深厚的学术研究功底与产业落地经验，在仿生机器人、智能体协调控制、类脑学习等领域有多项重要科技成果&quot;,
+        &quot;title&quot;: &quot;深耕人工智能&quot;
+      }
+    ]
+  },
+  {
+    &quot;name&quot;: &quot;罗佳&quot;,
+    &quot;education&quot;: &quot;未公开（复旦大学）&quot;,
+    &quot;qualifications&quot;: &quot;【社会职务】TRIZ四级专家，中国创新研究所项目总监，国家外国专家局培训中心认证培训师、咨询师，上海行为科学学会常务理事/【履职资历】猫鼬工厂（原IEC创新赋能中心）创始人兼CEO&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;国内顶级的TRIZ四级专家，擅长创新管理、创新赋能、创新方法，推出产品战略金三角&quot;,
+        &quot;title&quot;: &quot;产品战略创新专家&quot;
+      }
+    ]
+  },
+  {
+    &quot;name&quot;: &quot;罗文&quot;,
+    &quot;education&quot;: &quot;未公开&quot;,
+    &quot;qualifications&quot;: &quot;【履职资历】天度科技合伙人&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;天度科技合伙人，聚焦营销/电商/企业服务领域的AI智能体搭建与落地，包括营销智能体定制、提示词工程、工作流搭建、AI 思维赋能等，已与伊利合作《AI强基计划【YILI-AI实用技巧】》&quot;,
+        &quot;title&quot;: &quot;国内知名AI智能体实战专家&quot;
+      }
+    ]
+  },
+  {
+    &quot;name&quot;: &quot;李忠秋&quot;,
+    &quot;education&quot;: &quot;未公开（中国传媒大学）&quot;,
+    &quot;qualifications&quot;: &quot;【社会职务】中国人才思维发展联盟主席，中国思维教育专家，培训杂志常务理事/【履职资历】北京思考力管理咨询有限公司董事，T20培训机构董事长俱乐部创办人&quot;,
+    &quot;advantages&quot;: [
+      {
+        &quot;desc&quot;: &quot;专注于结构思考力领域研究超过16年，创办了结构思考力研究中心，开发了《结构思考力®》系列版权课，有多本著作&quot;,
+        &quot;title&quot;: &quot;结构思考力培训专家&quot;
+      }
+    ]
+  }
+]</pre>
+  </div>
+</div>
+</body>
+</html>
