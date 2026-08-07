@@ -6129,65 +6129,95 @@ function aiScoreExpert(expert) {
   const adv = (expert.advantages || []).map(a => (a.title || '') + ' ' + a.desc).join(' ');
   const combinedText = qual + ' ' + adv + ' ' + (expert.education || '') + ' ' + (expert.background || '');
   const txt = combinedText.toLowerCase();
+  const eduText = ((expert.education || '') + ' ' + (expert.background || '')).toLowerCase();
 
-  // 任职机构权威性：0=普通/C2，0.5=行业百强/大厂/C1，1=世界500强/央企/上市公司/C0
+  // 任职机构权威性：2=顶尖（世界500强/央企/知名大厂），1=行业百强/知名头部，0=普通
   function getCompanyAuthorityLevel(text) {
-    if (/世界500强|财富500|央企|国企|上市公司|股份|集团|有限责任公司|有限公司| co\.? ltd|inc\.|corp/i.test(text)) return 1;
-    if (/百强|大厂|头部|领军|龙头|行业前五|top\s?\d/i.test(text)) return 0.5;
+    if (/世界500强|财富500|央企|国有企业|上市公司|知名大厂|华为|腾讯|阿里巴巴|阿里|字节跳动|字节|百度|美团|京东|滴滴|小米|网易|搜狐|新浪|联想|海尔|格力/i.test(text)) return 2;
+    if (/百强|行业百强|领军企业|龙头企业|行业前五|行业前三|头部企业|大厂|top\s?5|top\s?10|行业领先/i.test(text)) return 1;
     return 0;
   }
   const authorityLevel = getCompanyAuthorityLevel(txt);
 
-  // 学历与学术背景
+  function isExplicitlyMissing(fieldText) {
+    return /未公开|保密|暂无|不清楚|未知|缺失|无.*信息|信息未提供/i.test(fieldText);
+  }
+
+  // ① 学历与学术背景
   function scoreEducation() {
-    if (/博士|博士后|phd/i.test(txt)) return 5;
-    if (/硕士|研究生|master|mba/i.test(txt)) return 4;
-    if (/本科|学士|bachelor/i.test(txt)) return 3;
-    if (/专科|大专|高职/i.test(txt)) return 2;
-    if (/中专|高中|初中|小学/i.test(txt)) return 1;
+    if (!eduText.trim() || isExplicitlyMissing(eduText)) return cfg.missingScore;
+    const topSchools = /清华|北大|中国科学技术大学|中科大|复旦大学|上海交大|上海交通大学|浙江大学|南京大学|哈尔滨工业大学|哈工大|西安交通大学|西交大|中国人民大学|c9|qs前50|qs top 50|常春藤|mit|斯坦福|哈佛|牛津|剑桥/i;
+    const eliteSchools = /985|211|双一流|海外知名|国外知名|世界知名/i;
+    const hasTop = topSchools.test(eduText);
+    const hasElite = eliteSchools.test(eduText);
+    if (/博士|博士后|phd/i.test(eduText)) return hasTop ? 5 : 4;
+    if (/硕士|研究生|master|mba/i.test(eduText)) return hasElite ? 4 : 3;
+    if (/本科|学士|bachelor/i.test(eduText)) return hasElite ? 3 : 2;
+    if (/专科|大专|高职/i.test(eduText)) return 2;
+    if (/中专|高中|初中|小学/i.test(eduText)) return 1;
     return cfg.missingScore;
   }
 
-  // 行业资质与认证
+  // ② 行业资质与认证
   function scoreCertification() {
-    if (/cfa|cpa|acca|pmp|国际权威|国际认证/i.test(txt)) return 5;
-    if (/国家级执业|注册会计师|注册|执业资格|行业权威|权威认证/i.test(txt)) return 4;
-    if (/认证|资格|华为|微软|阿里|腾讯|厂商认证/i.test(txt)) return 3;
-    if (/培训|进修|课程|通用认证/i.test(txt)) return 2;
+    if (/无.*认证|无.*资质|没有认证|没有资质/i.test(txt)) return 1;
+    if (/cfa|cpa|acca|pmp|frm|cissp|cisa|itil|六西格玛黑带|精益黑带|国际权威认证|国际公认认证|国际认可认证|国际注册/i.test(txt)) return 5;
+    if (/注册会计师|注册税务师|注册资产评估师|执业律师|执业医师|专利代理人|国家级执业|国家.*资格|高级技师|一级建造师|注册电气工程师|注册结构工程师|注册建筑师|注册造价工程师/i.test(txt)) return 4;
+    if (/hcie|微软mvp|阿里云.*认证|腾讯云.*认证|aws.*认证|谷歌.*认证|oracle.*认证|厂商.*高级认证|厂商.*专家/i.test(txt)) return 3;
+    if (/认证讲师|认证培训师|认证.*师|华为.*讲师|微软.*讲师|厂商.*认证|获得.*认证|资格证书|职业资格/i.test(txt)) return 3;
+    if (/培训.*证书|进修.*证书|课程.*证书|结业.*证书|通用认证|参加过.*培训/i.test(txt)) return 2;
     return cfg.missingScore;
   }
 
-  // 专业成果与经验
+  // ③ 专业成果与经验
   function scoreAchievement() {
-    if (/国标|行标|高被引|重大成果转化|牵头.*标准/i.test(txt)) return 5;
-    if (/国家级项目|战略级|顶刊/i.test(txt)) return 4;
-    if (/省级|行业级|sci|ei|论文|专利|软著|著作|出版/i.test(txt)) return 3;
-    if (/项目|讲师|培训|课程|开发|服务|企业|集团|公司|经验/i.test(txt)) return 3;
+    if (/仅.*演讲|只.*演讲|一般.*经验|无.*成果|无.*项目/i.test(txt)) return 1;
+    if (/牵头.*国标|牵头.*行标|牵头.*标准|制定.*国家标准|制定.*行业标准|高被引|重大.*成果转化|国家.*重大.*专项/i.test(txt)) return 5;
+    if (/国家级.*项目|国家.*项目|战略.*项目|顶刊|nature|science|cell|sci.*一作|sci.*通讯|top.*期刊/i.test(txt)) return 4;
+    const softMatch = txt.match(/(\d+)\s*项?\s*软著|软著\s*(\d+)\s*项?/g);
+    let softCount = 0;
+    if (softMatch) {
+      softMatch.forEach(m => {
+        const n = parseInt(m.match(/\d+/)[0], 10);
+        if (n > softCount) softCount = n;
+      });
+    }
+    const hasHighPatent = /发明.*专利|发明专利|国家.*专利|国际.*专利/i.test(txt);
+    const hasSCI = /sci|ei|核心期刊|cssci|北大核心/i.test(txt);
+    const hasPublish = /出版.*著作|出版.*书籍|专著|著书|主编|副主编/i.test(txt);
+    const hasProvincial = /省级.*项目|省部级.*项目|行业.*项目|行业级.*项目|重点.*项目/i.test(txt);
+    if (hasProvincial || hasSCI || hasHighPatent || softCount >= 5 || hasPublish) return 3;
+    if (/参与.*项目|普通.*论文|软著|实用新型|参与.*研发|参与.*课题|论文.*发表/i.test(txt) || softCount >= 1) return 2;
+    if (/项目|讲师|培训|课程|开发|服务|企业|集团|公司|经验/i.test(txt)) return 2;
     return cfg.missingScore;
   }
 
-  // 社会荣誉与奖项
+  // ④ 社会荣誉与奖项
   function scoreHonor() {
-    if (/院士|国家级人才计划|长江学者|杰青|万人计划/i.test(txt)) return 5;
-    if (/国家级荣誉|国家级称号|国家.*奖/i.test(txt)) return 4;
-    if (/省部级|省级荣誉|省级称号/i.test(txt)) return 3;
-    if (/地市|市级荣誉|国家级学会|协会|理事|委员/i.test(txt)) return 2;
+    if (/无.*荣誉|无.*奖项|不是.*会员|非.*会员/i.test(txt)) return 1;
+    if (/院士|国家级人才计划|长江学者|杰青|万人计划|国家.*特聘|国家.*领军|享受国务院|国家级.*专家/i.test(txt)) return 5;
+    if (/国家级.*荣誉|国家级.*称号|国家.*奖|全国.*奖|国家.*表彰/i.test(txt)) return 4;
+    if (/省部级|省级.*荣誉|省级.*称号|省.*奖|部.*奖|自治区.*奖/i.test(txt)) return 3;
+    if (/地市.*荣誉|市级.*荣誉|市.*奖|国家级学会.*理事|国家级学会.*委员|协会.*理事|协会.*委员/i.test(txt)) return 2;
+    if (/协会.*会员|学会.*会员|会员|理事|委员/i.test(txt)) return 1;
     return cfg.missingScore;
   }
 
-  // 职称、管理履历与行业地位
+  // ⑤ 职称、管理履历与行业地位（修复正则重叠，按职称+机构综合）
   function scoreTitle() {
-    const hasTopTitle = /教授|研究员|高级工程师|院士|首席|ceo|总裁|总经理|董事长|创始人/i.test(txt);
-    const hasSeniorTitle = /总监|副总裁|合伙人|副教授|vp|director/i.test(txt);
-    const hasMidTitle = /经理|高工|主管|高级工程师/i.test(txt);
+    const hasProfessor = /教授\b|研究员\b|正高|正高级/i.test(txt);
+    const hasSeniorTitle = /副教授\b|总监|副总裁|合伙人|vp\b|director|cio|cto|cfo|coo/i.test(txt);
+    const hasMidTitle = /经理\b|主管\b|高工\b|高级工程师\b|讲师\b|工程师\b|项目经理\b/i.test(txt);
+    const hasFounder = /创始人|ceo|首席执行官|总裁|总经理|董事长|董事局主席/i.test(txt);
     let s = cfg.missingScore;
-    if (hasTopTitle) s = 4;
-    else if (hasSeniorTitle) s = 3;
-    else if (hasMidTitle) s = 2;
-    // 机构权威性上浮（封顶5）
-    if (authorityLevel === 1 && s < 5) s += 1;
-    else if (authorityLevel === 0.5 && s < 4) s += 1;
-    return Math.min(5, s);
+    if (hasFounder || hasProfessor) {
+      s = (authorityLevel === 2) ? 5 : 4;
+    } else if (hasSeniorTitle) {
+      s = (authorityLevel >= 1) ? 4 : 3;
+    } else if (hasMidTitle) {
+      s = 2;
+    }
+    return Math.max(1, Math.min(5, s));
   }
 
   const profDims = cfg.dimensions.find(d => d.id === 'professional');
