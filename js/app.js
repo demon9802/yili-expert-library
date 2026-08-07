@@ -2148,16 +2148,14 @@ function renderExpertGrid() {
       card.appendChild(h('div', { className: 'card-edu card-edu-bottom', innerHTML: '🎓 ' + highlightText(eduText, sq) }));
     }
     
-    // Contact (v-next: 智能解析，手机/座机→tel: 拨出，邮箱→mailto:，微信→复制)
+    // Contact (v5.8.10: 按联系人分组，桌面弹窗，移动端原生链接)
     const contacts = getContactsList(expert);
     if (contacts.length > 0) {
       const contactDiv = h('div', { className: 'card-contact' });
-      contacts.forEach(function(c) {
-        if (c.person) {
-          contactDiv.appendChild(h('span', { className: 'contact-person', innerHTML: '👤 ' + highlightText(c.person, sq) }));
-        }
-        const chip = renderContactChip(c, { highlight: sq });
-        if (chip.childNodes.length > 0) contactDiv.appendChild(chip);
+      const groups = groupContactsByPerson(contacts);
+      groups.forEach(function(g, idx) {
+        if (idx > 0) contactDiv.appendChild(document.createTextNode(' | '));
+        contactDiv.appendChild(renderContactGroup(g, { highlight: sq, showPersonIcon: true }));
       });
       card.appendChild(contactDiv);
     }
@@ -2531,22 +2529,21 @@ function showExpertDetail(expert) {
     body.appendChild(yiliSection);
   }
   
-  // Contact (v-next: 智能解析，手机/座机→tel: 拨出，邮箱→mailto:+复制，微信→复制)
-  const detailContacts = getContactsList(expert);
-  if (detailContacts.length > 0 || expert.referrer) {
-    const contactSection = h('div', { className: 'detail-section' });
-    contactSection.appendChild(h('div', { className: 'detail-section-title' }, '联系方式'));
-    detailContacts.forEach((c, idx) => {
-      if (c.person || c.info) {
-        const label = detailContacts.length === 1 ? '联系人' : ('联系人' + (idx + 1));
-        let prefix = label + '：' + (c.person ? highlightText(c.person, sq) + '，' : '');
-        const line = h('div', { className: 'detail-text detail-contact-line', style: { marginBottom: detailContacts.length > 1 ? '6px' : '0' } });
-        line.appendChild(h('span', { innerHTML: prefix }));
-        const chip = renderContactChip(c, { highlight: sq });
-        if (chip.childNodes.length > 0) line.appendChild(chip);
-        contactSection.appendChild(line);
-      }
-    });
+    // Contact (v5.8.10: 按联系人分组，桌面弹窗，移动端原生链接)
+    const detailContacts = getContactsList(expert);
+    if (detailContacts.length > 0 || expert.referrer) {
+      const contactSection = h('div', { className: 'detail-section' });
+      contactSection.appendChild(h('div', { className: 'detail-section-title' }, '联系方式'));
+      const groups = groupContactsByPerson(detailContacts);
+      groups.forEach((g, idx) => {
+        if (g.person || g.methods.length) {
+          const label = groups.length === 1 ? '联系人' : ('联系人' + (idx + 1));
+          const line = h('div', { className: 'detail-text detail-contact-line', style: { marginBottom: groups.length > 1 ? '6px' : '0' } });
+          line.appendChild(h('span', { innerHTML: label + '：' + (g.person ? highlightText(g.person, sq) + ' ' : '') }));
+          line.appendChild(renderContactGroup(g, { highlight: sq, showPersonIcon: false }));
+          contactSection.appendChild(line);
+        }
+      });
 
     if (expert.referrer) {
       contactSection.appendChild(h('div', { className: 'detail-text', style: { marginTop: '8px' }, innerHTML: '内部推荐人：' + highlightText(expert.referrer, sq) }));
@@ -5911,6 +5908,51 @@ function isTouchDevice() {
           (window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 }
 
+// v5.8.10: 从一段混合文本中提取多个联系方式（邮箱 / 手机 / 座机），避免空格分隔导致的信息丢失
+function extractContactTokens(s) {
+  const tokens = [];
+  const positions = [];
+  function add(token, pos) {
+    if (!token) return;
+    // 去重：若该 token 已被更长的覆盖，跳过；否则插入
+    for (let i = 0; i < tokens.length; i++) {
+      if (positions[i] <= pos && positions[i] + tokens[i].length >= pos + token.length) return;
+      if (pos <= positions[i] && pos + token.length >= positions[i] + tokens[i].length) {
+        tokens[i] = token;
+        positions[i] = pos;
+        return;
+      }
+    }
+    tokens.push(token);
+    positions.push(pos);
+  }
+
+  // 1. 邮箱
+  s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, function(m, offset) { add(m, offset); return ' '.repeat(m.length); });
+
+  // 2. 手机号
+  s.replace(/1[3-9]\d{9}/g, function(m, offset) { add(m, offset); return ' '.repeat(m.length); });
+
+  // 3. 座机：带区号 0... 或不带区号的 7-8 位数字，且上下文含座机关键字
+  const landlineRe = /(?:\D|^)(?:0\d{1,3}[-\s]?)?\d{7,8}(?![\d])/g;
+  let lm;
+  while ((lm = landlineRe.exec(s)) !== null) {
+    const match = lm[0].replace(/^\D/, '');
+    const digits = match.replace(/\D/g, '');
+    const start = lm.index + (lm[0].length - match.length);
+    const ctx = s.substring(Math.max(0, start - 12), start + match.length + 12);
+    const hasLandlineKeyword = /电话|座机|办公|固话/i.test(ctx);
+    if (/^0\d{9,}$/.test(digits) || (digits.length >= 7 && digits.length <= 8 && hasLandlineKeyword)) {
+      add(match, start);
+    }
+  }
+
+  // 按原字符串位置排序
+  const combined = tokens.map(function(t, i) { return { token: t, pos: positions[i] }; });
+  combined.sort(function(a, b) { return a.pos - b.pos; });
+  return combined.map(function(x) { return x.token; });
+}
+
 function parseSingleContact(raw) {
   if (!raw) return null;
   const s = String(raw).replace(/\s+/g, ' ').trim();
@@ -5943,6 +5985,10 @@ function parseSingleContact(raw) {
   if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && hasLandlineKeyword) {
     return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits };
   }
+  // 6. 兜底：联系方式场景下，7-8 位纯数字也视为座机，避免信息丢失
+  if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && /^\d[\d\s-]*\d$/.test(landlineClean)) {
+    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits };
+  }
   return { kind: 'unknown', display: s, href: null, copy: s };
 }
 
@@ -5954,15 +6000,10 @@ function parseContactInfo(raw, hintType) {
   // 强分隔符：或、斜杠、竖线、中文/英文分号、中文/英文逗号、顿号、换行
   const splitRe = /[或\/|；;，,、\n\r]+/;
   let parts = rawStr.split(splitRe).map(function(p) { return p.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
-  // 若强分隔符未拆分，尝试用全局正则提取多个邮箱/手机号
+  // 若强分隔符未拆分，尝试提取多个联系方式（邮箱 + 手机 + 座机，兼容空格分隔的混合写法）
   if (parts.length === 1) {
-    const emails = rawStr.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
-    if (emails && emails.length > 1) {
-      parts = emails;
-    } else {
-      const mobiles = rawStr.match(/1[3-9]\d{9}/g);
-      if (mobiles && mobiles.length > 1) parts = mobiles;
-    }
+    const tokens = extractContactTokens(rawStr);
+    if (tokens.length > 1) parts = tokens;
   }
   let list = parts.map(parseSingleContact).filter(function(c) { return c && c.display; });
   // 若原始串含微信标记，把相邻的未知字母数字串推断为微信号
@@ -5984,42 +6025,154 @@ function parseContactInfo(raw, hintType) {
   return list;
 }
 
-// v-next: 渲染单个联系方式的智能展示单元（链接 / 复制）
-function renderContactChip(contact, opts) {
+// v5.8.10: 按联系人姓名分组（同一联系人的多种联系方式归到一起展示）
+function groupContactsByPerson(contacts) {
+  const groups = [];
+  const map = {};
+  contacts.forEach(function(c) {
+    const person = c.person || '';
+    if (!map.hasOwnProperty(person)) {
+      map[person] = { person: person, methods: [] };
+      groups.push(map[person]);
+    }
+    const list = parseContactInfo(c.info, c.type);
+    list.forEach(function(m) { map[person].methods.push(m); });
+  });
+  return groups;
+}
+
+// v5.8.10: 渲染一个联系人分组（姓名 + 多种联系方式，用 / 分隔）
+function renderContactGroup(group, opts) {
   opts = opts || {};
-  const wrap = h('span', { className: 'contact-chip' });
-  if (!contact || !contact.info) return wrap;
-  const parsedList = parseContactInfo(contact.info, contact.type);
-  if (!parsedList.length) return wrap;
   const sq = opts.highlight;
-  const isMobile = isTouchDevice();
-  parsedList.forEach(function(c, idx) {
-    if (idx > 0) wrap.appendChild(document.createTextNode(' '));
-    const item = h('span', { className: 'contact-item contact-kind-' + c.kind });
-    const icon = c.kind === 'email' ? '📧' : c.kind === 'wechat' ? '💬' : '📞';
-    const displayHtml = sq ? highlightText(c.display, sq) : escapeHtml(c.display);
-    // 桌面端：复制为主；手机端：电话/邮箱可点击跳转
-    const useLink = c.href && (isMobile || c.kind === 'email');
-    if (useLink) {
-      item.appendChild(h('span', { className: 'contact-icon' }, icon));
-      item.appendChild(h('a', { href: c.href, className: 'contact-link', innerHTML: displayHtml }));
-    } else {
-      item.appendChild(h('span', { className: 'contact-icon' }, icon));
-      item.appendChild(h('span', { className: 'contact-text', innerHTML: displayHtml }));
-    }
-    // 所有联系方式均提供复制按钮
-    if (c.copy) {
-      (function(copyVal) {
-        item.appendChild(h('button', {
-          className: 'btn btn-xs contact-copy',
-          title: '复制',
-          onclick: function(e) { e.stopPropagation(); e.preventDefault(); copyToClipboard(copyVal); toast('已复制', 'success'); }
-        }, '📋'));
-      })(c.copy);
-    }
-    wrap.appendChild(item);
+  const wrap = h('span', { className: 'contact-group' });
+  if (group.person && opts.showPersonIcon !== false) {
+    wrap.appendChild(h('span', { className: 'contact-person', innerHTML: '👤 ' + (sq ? highlightText(group.person, sq) : escapeHtml(group.person)) }));
+  } else if (group.person) {
+    wrap.appendChild(h('span', { className: 'contact-person-text', innerHTML: sq ? highlightText(group.person, sq) : escapeHtml(group.person) }));
+  }
+  group.methods.forEach(function(m, idx) {
+    if (idx > 0) wrap.appendChild(document.createTextNode(' / '));
+    wrap.appendChild(renderContactMethod(m, { highlight: sq }));
   });
   return wrap;
+}
+
+// v5.8.10: 渲染单个联系方式（桌面端点击弹窗，移动端原生链接）
+function renderContactMethod(c, opts) {
+  opts = opts || {};
+  const sq = opts.highlight;
+  const isMobile = isTouchDevice();
+  const displayHtml = sq ? highlightText(c.display, sq) : escapeHtml(c.display);
+  const icon = c.kind === 'email' ? '📧' : c.kind === 'wechat' ? '💬' : '📞';
+  const title = isMobile ? getContactMethodTitle(c) : '点击选择操作';
+
+  // 移动端：电话/邮箱使用原生链接（系统自动弹出拨号/邮件/复制选项）
+  if (isMobile && c.href && (c.kind === 'mobile' || c.kind === 'landline' || c.kind === 'email')) {
+    const iconSpan = h('span', { className: 'contact-icon' }, icon);
+    const textSpan = h('span', { innerHTML: displayHtml });
+    return h('a', {
+      href: c.href,
+      className: 'contact-method contact-kind-' + c.kind,
+      title: title
+    }, iconSpan, ' ', textSpan);
+  }
+
+  // 桌面端全部、移动端微信/未知：可点击 span，点击后复制或弹出菜单
+  const el = h('span', {
+    className: 'contact-method contact-kind-' + c.kind,
+    title: title,
+    'data-copy': c.copy || c.display || ''
+  });
+  el.appendChild(h('span', { className: 'contact-icon' }, icon));
+  el.appendChild(document.createTextNode(' '));
+  el.appendChild(h('span', { innerHTML: displayHtml }));
+
+  if (isMobile) {
+    // 移动端微信/未知：点击直接复制
+    el.onclick = function(e) {
+      e.stopPropagation();
+      copyToClipboard(c.copy || c.display);
+      toast('已复制', 'success');
+    };
+  } else {
+    // 桌面端：点击弹出操作菜单
+    el.onclick = function(e) {
+      e.stopPropagation();
+      showContactActionMenu(c, el);
+    };
+  }
+  return el;
+}
+
+function getContactMethodTitle(c) {
+  if (c.kind === 'mobile' || c.kind === 'landline') return '点击拨号或复制';
+  if (c.kind === 'email') return '点击发邮件';
+  if (c.kind === 'wechat') return '长按复制或点击复制';
+  return '点击复制';
+}
+
+// v5.8.10: 桌面端联系方式操作弹窗（复制 / 拨号 / 发邮件）
+function showContactActionMenu(c, anchorEl) {
+  closeContactActionMenu();
+
+  const rect = anchorEl.getBoundingClientRect();
+  const menu = h('div', {
+    id: 'contact-action-menu',
+    className: 'contact-action-menu',
+    style: {
+      position: 'fixed',
+      left: Math.min(rect.left, window.innerWidth - 160) + 'px',
+      top: (rect.bottom + 6) + 'px',
+      zIndex: 9999
+    }
+  });
+
+  // 复制
+  menu.appendChild(h('div', {
+    className: 'contact-action-item',
+    onclick: function(e) {
+      e.stopPropagation();
+      copyToClipboard(c.copy || c.display);
+      toast('已复制', 'success');
+      closeContactActionMenu();
+    }
+  }, '📋 复制'));
+
+  // 拨号
+  if (c.href && (c.kind === 'mobile' || c.kind === 'landline')) {
+    menu.appendChild(h('a', {
+      className: 'contact-action-item',
+      href: c.href,
+      onclick: function() { closeContactActionMenu(); }
+    }, '📞 拨号'));
+  }
+
+  // 发邮件
+  if (c.href && c.kind === 'email') {
+    menu.appendChild(h('a', {
+      className: 'contact-action-item',
+      href: c.href,
+      onclick: function() { closeContactActionMenu(); }
+    }, '📧 发邮件'));
+  }
+
+  document.body.appendChild(menu);
+
+  // 点击外部关闭
+  setTimeout(function() {
+    document.addEventListener('click', function handler(e) {
+      if (!menu.contains(e.target)) {
+        closeContactActionMenu();
+        document.removeEventListener('click', handler);
+      }
+    }, { once: true });
+  }, 0);
+}
+
+function closeContactActionMenu() {
+  const m = document.getElementById('contact-action-menu');
+  if (m) m.remove();
 }
 
 function roundScore(s) { return Math.round(s * 10) / 10; }

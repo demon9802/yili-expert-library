@@ -698,55 +698,76 @@ body {
 .card-contact {
   font-size: 13px;
   color: #1e293b;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  line-height: 1.6;
   padding-top: 8px;
   margin-top: 6px;
   border-top: 1px solid #f1f5f9;
 }
 
-/* v-next: 联系方式智能展示单元 */
-.contact-chip {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin: 0 8px 2px 0;
-}
-.contact-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin: 0 6px 4px 0;
+/* v5.8.10: 联系方式智能展示单元（按联系人分组，无复制按钮） */
+.contact-group {
+  display: inline;
+  margin-right: 12px;
+  white-space: normal;
 }
 .contact-person {
   margin-right: 4px;
+  white-space: nowrap;
 }
-.contact-icon {
-  display: inline-block;
+.contact-person-text {
+  margin-right: 4px;
+}
+.contact-method {
+  display: inline;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--primary, #2563eb);
+  text-decoration: none;
+  user-select: text;
+  transition: opacity 0.15s ease;
+}
+.contact-method:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+.contact-method .contact-icon {
+  display: inline;
   line-height: 1;
   text-decoration: none;
   user-select: none;
+  margin-right: 1px;
 }
-.contact-link {
-  color: var(--primary, #2563eb);
+.detail-contact-line .contact-group {
+  margin-right: 0;
+}
+.detail-contact-line .contact-method {
+  margin-right: 2px;
+}
+
+/* 桌面端联系方式操作弹窗 */
+.contact-action-menu {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-sm, 8px);
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0,0,0,0.1));
+  padding: 4px 0;
+  min-width: 120px;
+  font-size: 13px;
+  color: var(--text, #1e293b);
+  overflow: hidden;
+}
+.contact-action-item {
+  display: block;
+  padding: 8px 14px;
+  color: var(--text, #1e293b);
   text-decoration: none;
-  word-break: break-all;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
 }
-.contact-link:hover { text-decoration: underline; }
-.contact-text {
-  word-break: break-all;
-}
-.contact-copy {
-  padding: 1px 6px;
-  font-size: 11px;
-  line-height: 1.5;
-  margin-left: 2px;
-  border-radius: 4px;
-}
-.detail-contact-line .contact-chip {
-  margin-left: 2px;
+.contact-action-item:hover {
+  background: var(--bg, #f8fafc);
+  text-decoration: none;
 }
 
 
