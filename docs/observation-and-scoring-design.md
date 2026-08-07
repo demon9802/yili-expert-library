@@ -38,10 +38,10 @@
 ### 2.1 设计原则
 
 1. **只对观察库内的专家调分留痕**：正常活跃专家的信息更新走 `updatedAt` 即可，不增加记录负担。
-2. **主管理员可见，子管理员只写不看自己的操作记录**：避免子管理员互相干扰，但主管理员可审计。
-3. **操作必须写"操作意见"**：调分、淘汰、移出观察库等动作保存前必填简短理由。
-4. **系统自动操作也要留痕**：周期到期、评分跌破展示线自动移入观察库等，标记为 `system`。
-5. **历史记录永久留存**：即使专家被删除，操作历史也保留在独立表中。
+2. **所有管理员操作与系统操作均记录且均带操作意见**：主管理员、子管理员调分/淘汰时必填简短理由；系统操作自带默认意见（如"综合评分低于展示线，系统自动移入观察库"）。主管理员可审计全部记录，子管理员仅可写自己的记录。
+3. **操作意见必须填写，但可简单**：保存前校验非空，提供填写提示，不强制字数，但不能为空。
+4. **历史记录永久留存**：即使专家被删除，操作历史也保留在独立表中。
+5. **评分规则只读**：主管理员仅可查看完整评分规则文档，不可在后台修改规则；子管理员不展示完整文档，仅展示评分结构与规则表（在评分管理）及观察库调分说明（在观察库）。规则调整通过代码/部署层实现。
 
 ### 2.2 数据结构设计
 
@@ -71,9 +71,12 @@
   "id": "uuid",
   "expertId": "专家ID",
   "enteredAt": "进入观察库时间",
-  "reviewDueAt": "复审到期时间（默认进入后 90 天）",
-  "status": "evaluating|extended|eliminated|released",
-  "extensionCount": 0,
+  "reminder6mAt": "半年后首次提醒时间",
+  "reminder12mAt": "一年后第二次提醒时间",
+  "autoEliminateAt": "一年半后自动淘汰时间",
+  "lastReminderSentAt": "上次已发送提醒时间",
+  "reminderCount": 0,
+  "status": "evaluating|reminded|eliminated|released",
   "lastOperationId": "关联最近一条 operationId",
   "finalDisposition": "released / eliminated / extended",
   "resolvedAt": "解决时间"
@@ -104,47 +107,61 @@
 
 1. `autoSyncObservationGlobal()` 检测到 `overall < 3★`。
 2. `expert.status = 'observation'`，`observationStatus = 'evaluating'`，`observationDate = now()`。
-3. 写入 `observation_review_cycles`：`enteredAt=now`，`reviewDueAt=now+90天`，`status='evaluating'`。
-4. 写入 `observation_operations`：`operation='auto_in'`，`operator='system'`，`note='综合评分低于展示线，系统自动移入观察库'`。
+3. 写入 `observation_review_cycles`：
+   - `enteredAt=now`
+   - `reminder6mAt=now+6个月`
+   - `reminder12mAt=now+12个月`
+   - `autoEliminateAt=now+18个月`
+   - `status='evaluating'`
+4. 写入 `observation_operations`：`operation='auto_in'`，`operator='system'`，`note='综合评分低于展示线，系统自动移入观察库（观察期 18 个月）'`。
 5. 前端专家卡/列表高亮提示管理员处理。
 
 #### 流程 B：管理员在观察库调分
 
 1. 管理员在观察库详情页修改 5 个评分项。
-2. 弹窗要求填写**操作意见**（必填，最少 5 个字）。
+2. 弹窗要求填写**操作意见**（必填，提供提示如"说明为什么调整、依据是什么"，可简单填写）。
 3. 保存时：
    - 更新 `expert.subScores`、重算维度/综合分。
    - 若 `overall >= 3★`：`status='active'`，`observationStatus=''`。
-   - 写入 `observation_operations`：`operation='adjust'` 或 `'release'`，记录 before/after、操作意见。
+   - 写入 `observation_operations`：`operation='adjust'` 或 `'release'`，记录 before/after、操作意见。主管理员与子管理员均记录。
    - 更新 `observation_review_cycles`：`status='released'`，`resolvedAt=now`。
 
 #### 流程 C：管理员淘汰专家
 
 1. 管理员点击"淘汰"。
-2. 弹窗要求填写**淘汰原因**（必填）。
+2. 弹窗要求填写**淘汰原因/操作意见**（必填，提供提示如"说明淘汰原因"）。
 3. 保存时：
    - `expert.status = 'eliminated'`，`observationStatus = 'eliminated'`。
-   - 写入 `observation_operations`：`operation='eliminate'`。
-   - 写入 `expert_elimination_history`（或 operations 表已足够时省略）。
+   - 写入 `observation_operations`：`operation='eliminate'`，记录操作意见。主管理员与子管理员均记录。
+   - 写入 `expert_elimination_history`。
    - 更新 `observation_review_cycles`：`status='eliminated'`，`resolvedAt=now`。
 
 #### 流程 D：周期到期自动处理
 
-1. 每日/每次管理员打开后台时扫描 `reviewDueAt < now 且 status='evaluating'` 的记录。
-2. 对到期未处理的专家：
-   - 默认动作：**维持观察库状态（不自动淘汰）**，但系统写入 `operation='due_reminder'` 记录。
-   - 若管理员配置了"到期自动淘汰"，则执行 `operation='auto_eliminate'`。
-3. 前端观察库卡片显示"已逾期 X 天"红色标签。
+1. 每日/每次管理员打开后台时扫描 `observation_review_cycles` 中 `status='evaluating'` 的记录。
+2. 对到达 `reminder6mAt` 但未达 `reminder12mAt` 的专家：
+   - 系统写入 `observation_operations`：`operation='due_reminder'`，`operator='system'`，`note='观察期满 6 个月，系统提醒管理员复核'`。
+   - 前端观察库卡片显示"观察期满 6 个月"黄色标签。
+3. 对到达 `reminder12mAt` 但未达 `autoEliminateAt` 的专家：
+   - 系统写入 `observation_operations`：`operation='due_reminder'`，`operator='system'`，`note='观察期满 12 个月，系统再次提醒管理员复核'`。
+   - 前端观察库卡片显示"观察期满 12 个月"橙色标签。
+4. 对到达 `autoEliminateAt` 的专家：
+   - 自动执行淘汰：`expert.status='eliminated'`，`expert.observationStatus='eliminated'`。
+   - 写入 `observation_operations`：`operation='auto_eliminate'`，`operator='system'`，`note='观察期满 18 个月仍未达标，系统自动淘汰'`。
+   - 写入 `expert_elimination_history`。
+   - 更新 `observation_review_cycles`：`status='eliminated'`，`resolvedAt=now`。
 
 ### 2.4 配置项
 
-在 `db.ratingConfig` 中增加：
+在 `db.ratingConfig` 中增加（常量，暂不在后台开放编辑）：
 
 ```json
 {
-  "observationReviewDays": 90,
-  "observationAutoEliminate": false,
-  "observationRequireNote": true
+  "observationReminder6m": true,
+  "observationReminder12m": true,
+  "observationAutoEliminateMonths": 18,
+  "observationRequireNote": true,
+  "ratingRulesEditableByMaster": false
 }
 ```
 
@@ -257,41 +274,57 @@
 
 ---
 
-## 四、服务情况表格重构建议
+## 四、观察库 UI 与调分说明展示
 
-当前表格按"与我司关系"划分，但用户指出"3–5 行其实根本没指导意义"。建议改为**按"可获取的补充信息类型"划分**，每个类型给出"看什么字段 / 可调哪个评分项 / 调分上限"：
+观察库页面顶部展示一段**调分说明/参考文字**（即规则文档第三章内容），不采用表格形式。文字内容如下：
 
-| 补充信息方向 | 看什么 | 可调评分项 | 建议 |
-|---|---|---|---|
- 合作评价高 | 客户/合作方反馈、授课现场评价 | ④ 社会荣誉与奖项、⑤ 职称/管理履历 | 若反馈中体现行业地位或客户认可，可据实上调；需附简要说明 |
- 合作评价一般 | 合作方具体反馈、交付问题 | 一般不调分，维持现状 | 留在观察库，待后续新合作评价或补充信息后再评估 |
- 有公开履历/媒体报道 | 公开简历、新闻、出版物、公开演讲 | ① 学历、② 资质、③ 成果、④ 荣誉 | 按公开信息据实补录，对应上调 |
- 有合作方/推荐人背书 | 内部推荐人、合作方介绍 | ①–⑤ 均可 | 需具体说明背书内容对应哪项评分项 |
- 信息模糊/无法核实 | 字段笼统、无佐证 | 不调分 | 维持现状或标记待核实 |
- 确认不适合 | 合作反馈差、领域不匹配等 | 淘汰 | 填写淘汰原因 |
+> **操作说明**
+>
+> 1、**原则**：仅调整 5 个评分项的分值，且必须为整数分，调分幅度≤2；专业度、影响力、综合得分由系统按权重自动计算平均值，不可直接编辑。
+>
+> 2、**顺序**：请先复核评分项（补录漏填信息、修正误评项），再结合实际情况判断是否需要调整某项评分。当前无法判断的，建议暂存在观察库，请记得在观察期内更新。
+>
+> 3、**参考**：如某位专家专业度、影响力在 2.7–2.9，无法进一步拿到 5 个评分项其他确认信息，可结合服务情况调整。若该专家与我司曾有合作，或明确知晓其服务项目/合作公司的评价（有背书），对满意度高、反馈好的专家，可重点看：
+> - ① 合作方是否有关于专家的详细介绍、资质的佐证材料，授课过程中专家是否曾提到过自己的相关履历，优先补充、调整该专家的缺失/模糊信息，并调整对应评分项分值；
+> - ② 无补充信息，可适当调整 ③ 专业成果与经验的分值，服务也是经验的其中之一。
 
----
+观察库卡片/专家行需展示：
+- 专家姓名、领域、当前综合得分
+- **掉库低分项**（哪几项评分项最低）
+- **掉库原因**（系统自动判定：综合评分低于展示线；或管理员操作备注）
+- 当前观察阶段（第 N 个月 / 已逾期 / 待淘汰）
+- 调分操作入口（弹出评分项编辑 + 操作意见输入框）
+- 操作记录入口（主管理员可见全部，子管理员仅看自己）
 
-## 五、待确认清单
-
-本方案确认后，再进入开发：
-
-1. 观察库周期默认 **90 天** 是否合适？
-2. 到期后默认动作：**维持观察库（仅提醒）** 还是 **自动淘汰**？
-3. 操作意见是否对**子管理员**也强制要求？（建议是）
-4. 调分留痕是否对**主管理员自己的操作**也记录？（建议必须记录，主管理员可见全部）
-5. 评分识别细化方案中，**学历院校词表**、**认证词表**、**荣誉词表** 是否由主管理员在后台维护？（建议首期硬编码，后续可配置）
-6. 服务情况表格重构方向是否认可？
+是否增加调分案例：待定。
 
 ---
 
-## 六、实现优先级建议
+## 五、已确认事项
+
+1. **观察库周期**：进入观察库后 **6 个月首次提醒、12 个月再次提醒、18 个月自动淘汰**。
+2. **到期动作**：到达 18 个月自动淘汰，无需管理员手动确认。
+3. **操作意见**：主管理员、子管理员在调分/淘汰时均**必填**操作意见；系统操作自带默认意见。
+4. **操作留痕**：主管理员、子管理员、系统操作全部记录；主管理员可见全部记录，子管理员仅看自己。
+5. **评分规则权限**：评分规则**只读**。主管理员可查看完整规则文档；子管理员不展示完整文档，仅通过评分管理页看规则表、通过观察库页看调分说明。规则调整走代码/部署层。
+6. **调分说明展示**：观察库页面以纯文字"操作说明 1/2/3"展示，不采用表格。
+
+## 六、待确认实现细节
+
+1. 评分识别细化词表（学历院校 / 认证 / 荣誉）首期硬编码、后续可配置，是否接受？
+2. 观察库卡片是否展示"掉库低分项"的具体数值（如 ① 学历 2★）？
+3. 调分操作是否需要"二次确认"弹窗（显示 before/after + 操作意见输入）？
+
+---
+
+## 七、实现优先级建议
 
 | 优先级 | 功能 | 预估工作量 |
 |---|---|---|
  P0 | 评分识别细化（`aiScoreExpert` 重写） | 1–2 天 |
- P0 | 观察库调分留痕（`observation_operations`） | 1–2 天 |
- P1 | 观察库周期与到期提醒 | 0.5–1 天 |
- P1 | 月报增加操作明细 Section | 0.5 天 |
- P2 | 独立淘汰历史表 | 0.5 天 |
- P2 | 服务情况表格重构进后台 UI | 0.5 天 |
+ P0 | 观察库调分留痕（`observation_operations`）+ 操作意见必填 | 1–2 天 |
+ P1 | 观察库 6/12/18 个月周期与自动淘汰 | 0.5–1 天 |
+ P1 | 月报增加 Section ⑤ 观察库操作明细 | 0.5 天 |
+ P1 | 评分规则权限调整（主管理员只读完整文档、子管理员按页面展示） | 0.5 天 |
+ P2 | 独立淘汰历史表 `expert_elimination_history` | 0.5 天 |
+ P2 | 观察库 UI 增加掉库低分项、操作记录入口 | 0.5 天 |
