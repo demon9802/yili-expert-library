@@ -6915,7 +6915,7 @@ function renderRatingsTab(panel) {
     const canDo = h('div', { style:{ marginBottom:'12px' } });
     canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
     const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    ['在下方专家列表中，直接修改每个子维度的分数输入框（0–10 分）','修改后综合分自动重新计算，无需手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
+    ['在下方专家列表中，直接修改每个子维度（共 5 个评分项）的分数输入框，仅可填整数 1–10 分','修改后专业度/影响力/综合得分由系统按权重自动重新计算，无需也无法手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
       canList.appendChild(h('li', {}, t));
     });
     canDo.appendChild(canList);
@@ -6924,7 +6924,8 @@ function renderRatingsTab(panel) {
     const note = h('div', { style:{ marginBottom:'12px' } });
     note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
     const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    noteList.appendChild(h('li', {}, '某个维度信息缺失时，该维度默认 5 分（中性值，不拉高也不压低）'));
+    noteList.appendChild(h('li', {}, '某个子维度信息缺失时，该子维度默认 5 分（中性值，不拉高也不压低）'));
+    noteList.appendChild(h('li', {}, '专业度、影响力、综合得分均为系统按权重自动计算的平均值，不可直接编辑，只能改 5 个评分项的整数分'));
     noteList.appendChild(h('li', {}, '综合分低于 7 分的专家会自动进入观察库，不会在前端展示'));
     noteList.appendChild(h('li', {}, '每个子维度最高 10 分，超过会自动截断'));
     note.appendChild(noteList);
@@ -6933,7 +6934,7 @@ function renderRatingsTab(panel) {
     const tip = h('div', {});
     tip.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#1D4ED8', marginBottom:'6px' } }, '💡 什么时候需要手动调分？'));
     const tipList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应维度的数字即可'));
+    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应评分项（子维度）的整数分即可'));
     tipList.appendChild(h('li', {}, '有新的资质/成果信息未录入 → 先补充信息再重置为自动评分'));
     tipList.appendChild(h('li', {}, '不确定怎么打分 → 保持自动评分不变，或联系主管理员确认'));
     tip.appendChild(tipList);
@@ -6956,7 +6957,7 @@ function renderRatingsTab(panel) {
 
   // 评分说明提示（用 innerHTML 支持加粗标记）
   const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
-  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员可手动调整每个子维度的分值。';
+  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员<b>仅可手动调整 5 个评分项（子维度）的整数分值（1–10 分）</b>；专业度 / 影响力 / 综合得分由系统按权重自动计算，不可直接编辑。';
   configSec.appendChild(hintDiv);
 
   // 遍历每个主维度
@@ -7228,10 +7229,10 @@ function renderRatingsTab(panel) {
         const val = (e.subScores && e.subScores[sd.dim] && e.subScores[sd.dim][sd.name] !== undefined) ? e.subScores[sd.dim][sd.name] : 6;
         const td = h('td', { style:{ padding:'4px 6px' } });
         const inp = h('input', {
-          type:'number', value: String(val), min:1, max:10,
+          type:'number', value: String(val), min:1, max:10, step:1,
           style:{ width:'48px', padding:'3px 4px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', textAlign:'center' },
           onchange: (ev) => {
-            const ns = parseInt(ev.target.value);
+            const ns = Math.round(Number(ev.target.value));
             if (isNaN(ns) || ns < 1 || ns > 10) { toast('分值1-10', 'error'); return; }
             if (!e.subScores) e.subScores = {};
             if (!e.subScores[sd.dim]) e.subScores[sd.dim] = {};
@@ -8357,10 +8358,10 @@ function renderObservationTab(panel) {
         row.appendChild(h('span', { style:{ fontSize:'11px', color: color, minWidth:'120px', flex:'1' } }, sd.name));
         var val = (expert.subScores && expert.subScores[dimId] && expert.subScores[dimId][sd.name] !== undefined) ? expert.subScores[dimId][sd.name] : 6;
         var inp = h('input', {
-          type: 'number', value: String(val), min: 1, max: 10,
+          type: 'number', value: String(val), min: 1, max: 10, step: 1,
           style: { width:'50px', padding:'3px 4px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', textAlign:'center' },
           onchange: function(ev) {
-            var ns = parseInt(ev.target.value);
+            var ns = Math.round(Number(ev.target.value));
             if (isNaN(ns) || ns < 1 || ns > 10) { toast('分值1-10', 'error'); return; }
             if (!expert.subScores) expert.subScores = {};
             if (!expert.subScores[dimId]) expert.subScores[dimId] = {};
