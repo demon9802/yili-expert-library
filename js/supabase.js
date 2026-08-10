@@ -565,7 +565,9 @@ function rowToExpert(row) {
     contacts: row.contacts || [],
     createdBy: row.created_by || '主管理员',
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    // v5.9.0: 从 scores jsonb 还原 subScores（详见 expertToRow 注释）
+    subScores: (row.scores && row.scores.subScores) || null
   };
 }
 
@@ -585,7 +587,8 @@ function expertToRow(expert) {
     is_supplier: expert.isSupplier || false,
     qual_display: expert.qualDisplay || '',
     adv_display: expert.advDisplay || '',
-    scores: expert.scores || { professional: null, influence: null, overall: null },
+    // v5.9.0: 将 subScores 一并持久化进 scores jsonb（Supabase 无独立 sub_scores 列），确保评分明细跨用户/设备同步
+    scores: Object.assign({}, expert.scores || { professional: null, influence: null, overall: null }, expert.subScores ? { subScores: expert.subScores } : {}),
     status: expert.status || 'active',
     observation_status: expert.observationStatus || null,
     observation_date: expert.observationDate || null,
