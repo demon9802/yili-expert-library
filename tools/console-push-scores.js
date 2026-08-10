@@ -68,8 +68,10 @@
         var row = rows[r];
         var d2 = lookup(row.name);
         if (!d2) continue;
-        // subScores 内嵌进 scores jsonb（与 supabase.js expertToRow/rowToExpert 约定一致）
-        var newScores = Object.assign({}, row.scores || {}, { subScores: d2.subScores });
+        // subScores + 综合分一并内嵌进 scores jsonb（与 supabase.js expertToRow/rowToExpert 约定一致）
+        // 注：必须同时覆盖 professional/influence/overall 为 curated 值，否则 Supabase 仍存旧 AI 分数，
+        // 与 localStorage 及前端子维度条不一致
+        var newScores = Object.assign({}, row.scores || {}, d2.scores, { subScores: d2.subScores });
         try {
           await supabase.from('experts').update({ scores: newScores, updated_at: new Date().toISOString() }).eq('id', row.id);
           supMatched++;
@@ -81,7 +83,7 @@
     }
     // 同步 ratingConfig（showScores=on）
     try {
-      await supabase.from('app_settings').upsert({ key: 'ratingConfig', value: db.ratingConfig });
+      await supabase.from('app_settings').upsert({ key: 'ratingConfig', value: db.ratingConfig }, { onConflict: 'key' });
       console.log('app_settings.ratingConfig 已更新 (showScores=on)');
     } catch (err) {
       console.error('ratingConfig 同步失败:', err.message);
