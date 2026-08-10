@@ -29,8 +29,16 @@ def first_match(text, patterns):
 # ---------- ① 学历与学术背景 ----------
 def score_education(text):
     t = (text or "").strip()
-    if not t or "未公开" in t:
-        return 2, "missing", ("未公开" if "未公开" in t else "(空白)")
+    if not t:
+        return 2, "missing", "(空白)"
+    if "未公开" in t:
+        m = re.search(r"未公开[（(]([^）)]+)[）)]", t)
+        if m:
+            school = m.group(1)
+            if re.search(r"博士|博士后|硕士|MBA|EMBA|研究生", school):
+                return 4, "clear", f"未公开（{school}）"
+            return 3, "clear", f"未公开（{school}，学校已知学位未知）"
+        return 2, "missing", "未公开"
     if re.search(r"博士|博士后", t):
         return 5, "clear", t[:24]
     if re.search(r"硕士|MBA|EMBA|研究生|master", t, re.I):
@@ -47,7 +55,10 @@ CERT_5 = [r"CFA", r"CPA", r"注册会计师", r"ACCA", r"FRM", r"PMP",
           r"华为云\s*MVP|腾讯云\s*MVP|阿里云\s*MVP", r"认证出题", r"认证&培训专家|认证培训专家",
           r"认证讲师.*(工信部|人社部)"]
 CERT_4 = [r"华为认证|阿里云认证|腾讯云认证|云认证讲师", r"IEEE\s*Senior|IEEE\s*会员",
-          r"国家级执业|执业资格", r"认证讲师|授权讲师|金牌讲师", r"认证专家|特聘专家|特聘大数据专家"]
+          r"国家级执业|执业资格", r"认证讲师|授权讲师|金牌讲师", r"认证专家|特聘专家|特聘大数据专家",
+          r"微软\s*Azure|Azure\s*云|TCA|TCP", r"云专家认证|系统架构师|高级系统架构师|架构师认证",
+          r"工信部\s*AI智能体工程师|信创高级系统架构师|高级系统架构设计师|高级信息系统项目管理师",
+          r"国家一级互联网营销师|国家高级系统架构设计师|接入网高级讲师认证|大数据工程师|工信部信创"]
 CERT_VAGUE = [r"认证|资格|培训师|讲师|持证"]
 
 def score_certification(text):
@@ -91,14 +102,14 @@ def score_honor(zz, soc, adv):
     t = " ".join([zz or "", soc or "", adv or ""])
     if re.search(r"院士", t):  # 含外籍院士
         return 5, "clear", first_match(t, [r"院士"])
-    if re.search(r"长江学者|杰青|万人计划|国家级人才|国务院特殊津贴|国家.*奖|ISMS|Gary", t):
+    if re.search(r"长江学者|杰青|万人计划|国家级人才|国务院特殊津贴|ISMS|Gary", t):
         return 5, "clear", "国家级人才/奖项"
-    if re.search(r"省部级|省级|学者|岳麓学者|杰出青年|领军人才", t):
-        return 3, "clear", "省部级/学者称号"
-    if re.search(r"副会长|理事|委员|秘书长|会长|主席", t):
-        return 2, "vague", first_match(t, [r"副会长|理事|委员|秘书长|会长|主席"])
-    if re.search(r"荣誉|奖项|称号|拔尖|优秀人才", t):
-        return 3, "clear", first_match(t, [r"荣誉|奖项|称号"])
+    if re.search(r"年度领军人物|年度影响力人物|影响力人物|重大专项专家组专家|国家级创业项目评审专家|国家级.*评审专家|国家级奖项|国家.*奖", t):
+        return 4, "clear", first_match(t, [r"年度领军人物|年度影响力人物|影响力人物|重大专项专家组专家|国家级创业项目评审专家|国家级.*评审专家|国家级奖项"])
+    if re.search(r"艾菲奖评委|金鼠标|艾奇奖|虎啸奖|金远奖|评委|副会长|主席|理事长|常委|副主任|特聘专家|首席专家|研究院院长|专栏作家|高级研究员|常务理事|专家库成员|协会.*副会长|科技部.*专家", t):
+        return 3, "clear", first_match(t, [r"艾菲奖评委|金鼠标|艾奇奖|虎啸奖|金远奖|评委|副会长|主席|理事长|特聘专家|首席专家|研究院院长|专栏作家|高级研究员|常务理事|专家库成员|协会.*副会长|科技部.*专家"])
+    if re.search(r"荣誉|奖项|称号|拔尖|优秀人才|理事", t):
+        return 3, "clear", first_match(t, [r"荣誉|奖项|称号|拔尖|优秀人才|理事"])
     return 2, "missing", "(无荣誉表述)"
 
 # ---------- ⑤ 职称、管理履历与行业地位 ----------
