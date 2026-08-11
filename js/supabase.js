@@ -666,6 +666,57 @@ async function fetchPermissions() {
   return data.value;
 }
 
+// ===== v5.9.2: 观察库操作记录 CRUD =====
+function rowToObservationOperation(row) {
+  return {
+    id: row.id,
+    expertId: row.expert_id,
+    expertName: row.expert_name || '',
+    operation: row.operation,
+    operatorId: row.operator_id || '',
+    operatorName: row.operator_name || '',
+    operatorRole: row.operator_role || 'system',
+    before: row.before_state || {},
+    after: row.after_state || {},
+    note: row.note || '',
+    tags: row.tags || [],
+    createdAt: row.created_at,
+    _synced: true
+  };
+}
+
+function observationOperationToRow(op) {
+  return {
+    id: op.id,
+    expert_id: op.expertId,
+    expert_name: op.expertName || '',
+    operation: op.operation,
+    operator_id: op.operatorId || '',
+    operator_name: op.operatorName || '',
+    operator_role: op.operatorRole || 'system',
+    before_state: op.before || {},
+    after_state: op.after || {},
+    note: op.note || '',
+    tags: op.tags || []
+  };
+}
+
+async function createObservationOperation(op) {
+  if (!supabase) throw new Error('Supabase unavailable');
+  const { data, error } = await supabase.from('observation_operations').insert(observationOperationToRow(op)).select().single();
+  if (error) throw error;
+  return rowToObservationOperation(data);
+}
+
+async function fetchObservationOperations(expertId) {
+  if (!supabase) return [];
+  let query = supabase.from('observation_operations').select('*').order('created_at', { ascending: false });
+  if (expertId) query = query.eq('expert_id', expertId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(rowToObservationOperation);
+}
+
 // ===== v4.21: SHA-256 纯客户端实现（不依赖外部库）=====
 function sha256(str) {
   function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }

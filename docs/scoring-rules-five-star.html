@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>专家评分规则 · 五星制</title>
+<style>
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --radius: 8px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+}
+.container {
+  max-width: 900px;
+  margin: 24px auto;
+  padding: 32px;
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+h1 { font-size: 28px; margin: 0 0 16px; padding-bottom: 12px; border-bottom: 2px solid var(--primary); }
+h2 { font-size: 20px; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: #1e40af; }
+h3 { font-size: 16px; margin: 20px 0 10px; color: #334155; }
+h4 { font-size: 14px; margin: 16px 0 8px; color: #475569; }
+p { margin: 10px 0; }
+blockquote {
+  margin: 14px 0;
+  padding: 12px 16px;
+  background: #f0f7ff;
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius);
+  color: #334155;
+}
+blockquote p { margin: 6px 0; }
+code {
+  font-family: "SF Mono", Consolas, monospace;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.92em;
+}
+pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre code { background: transparent; padding: 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 13px;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #334155;
+}
+tr:nth-child(even) { background: #f8fafc; }
+ul, ol { margin: 10px 0; padding-left: 22px; }
+li { margin: 4px 0; }
+strong { color: #1e40af; }
+@media (max-width: 640px) {
+  .container { margin: 12px; padding: 16px; }
+  h1 { font-size: 22px; }
+  table { font-size: 12px; }
+  th, td { padding: 6px; }
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="_1">专家评分规则 · 五星制</h1>
+<h2 id="_2">一、评分结构与计算</h2>
+<p>覆盖专业度、影响力 2 个维度，共 5 个评分项，并计算综合得分，具体设置如下：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评分项</th>
+<th>占比</th>
+<th>综合得分</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>专业度</td>
+<td>① 学历与学术背景 · ② 行业资质与认证 · ③ 专业成果与经验</td>
+<td>60%（各项各 20%）</td>
+<td>专业度 × 60% + 影响力 × 40%，保留 1 位小数</td>
+</tr>
+<tr>
+<td>影响力</td>
+<td>④ 社会荣誉与奖项 · ⑤ 职称、管理履历与行业地位</td>
+<td>40%（各项各 20%）</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_3">二、评分规则</h2>
+<table>
+<thead>
+<tr>
+<th>评分项</th>
+<th>1★</th>
+<th>2★</th>
+<th>3★</th>
+<th>4★</th>
+<th>5★</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 学历与学术背景</td>
+<td>大专 / 中专及以下</td>
+<td>普通本科（一般院校）</td>
+<td>较好本科（211 / 双一流）或 普通硕士（授课型 / 一般院校）</td>
+<td>名校硕士（985 / 双一流 / 海外知名）或 普通博士</td>
+<td>博士 + 顶尖院校（清北 / C9 / QS 前 50 等）</td>
+</tr>
+<tr>
+<td>② 行业资质与认证</td>
+<td>无相关认证</td>
+<td>培训 / 通用认证</td>
+<td>行业厂商认证（华为 / 微软等）或 国家级执业资格（单一）</td>
+<td>国家级执业 / 行业权威认证（多重领域）</td>
+<td>国际权威认证（CFA / CPA / ACCA 等）或 多顶国家级</td>
+</tr>
+<tr>
+<td>③ 专业成果与经验</td>
+<td>一般服务经验 / 仅公开演讲</td>
+<td>参与级项目 / 普通论文</td>
+<td>省级 / 行业级项目 · SCI/EI 论文</td>
+<td>战略级 / 国家级项目 · 顶刊论文</td>
+<td>标杆级（牵头国标行标 / 高被引 / 重大成果转化）</td>
+</tr>
+<tr>
+<td>④ 社会荣誉与奖项</td>
+<td>无荣誉 / 一般协会成员</td>
+<td>地市级荣誉 / 国家级学会成员</td>
+<td>省部级荣誉或称号</td>
+<td>国家级荣誉或称号</td>
+<td>顶尖人才（两院院士 / 国家级人才计划）</td>
+</tr>
+<tr>
+<td>⑤ 职称、管理履历与行业地位</td>
+<td>无职称 / 基层岗位</td>
+<td>经理 / 高工 / 主管（普通企业）</td>
+<td>副教授 / 总监 / VP / 合伙人（或同等级别 + 普通企业）</td>
+<td>教授 / CEO / 创始人（行业百强 / 大厂）</td>
+<td>教授 / CEO / 创始人（世界 500 强 / 央企 / 上市公司）</td>
+</tr>
+</tbody>
+</table>
+<p>信息缺失（未填 / 未公开 / 无法核实）的评分项，默认 3★。</p>
+<hr />
+<h2 id="_4">三、观察库与调分建议</h2>
+<p>观察库用于暂存综合评分低于 3⭐ 的专家，这些专家不会在前端对外展示。专家进入观察库后，系统会在半年、一年时分别提醒管理员复核；超过一年半仍未处理或仍未达标的专家将自动淘汰。</p>
+<p><strong>操作说明</strong></p>
+<p>1、<strong>原则</strong>：仅调整 5 个评分项的分值，且必须为整数分，调分幅度≤2；专业度、影响力、综合得分由系统按权重自动计算平均值，不可直接编辑。</p>
+<p>2、<strong>顺序</strong>：请先复核评分项（补录漏填信息、修正误评项），再结合实际情况判断是否需要调整某项评分。当前无法判断的，建议暂存在观察库，请记得在观察期内更新。</p>
+<p>3、<strong>参考</strong>：如某位专家专业度、影响力在 2.7–2.9，无法进一步拿到 5 个评分项其他确认信息，可结合服务情况调整。若该专家与我司曾有合作，或明确知晓其服务项目/合作公司的评价（有背书），对满意度高、反馈好的专家，可重点看</p>
+<p>① 合作方是否有关于专家的详细介绍、资质的佐证材料，授课过程中专家是否曾提到过自己的相关履历，优先补充、调整该专家的缺失/模糊信息，并调整对应评分项分值；
+② 无补充信息，可适当调整 ③ 专业成果与经验的分值，服务也是经验的其中之一。</p>
+<hr />
+<h2 id="_5">四、测算</h2>
+<h3 id="41">4.1 极端情形验证</h3>
+<table>
+<thead>
+<tr>
+<th>情形</th>
+<th>①</th>
+<th>②</th>
+<th>③</th>
+<th>④</th>
+<th>⑤</th>
+<th>综合得分</th>
+<th>是否进观察库</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全部缺失（默认 3★）</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3.0</td>
+<td>否（恰好 3★）</td>
+</tr>
+<tr>
+<td>全部满星</td>
+<td>5</td>
+<td>5</td>
+<td>5</td>
+<td>5</td>
+<td>5</td>
+<td>5.0</td>
+<td>否</td>
+</tr>
+<tr>
+<td>全部最低</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>1.0</td>
+<td>是</td>
+</tr>
+<tr>
+<td>专业度满星、影响力最低</td>
+<td>5</td>
+<td>5</td>
+<td>5</td>
+<td>1</td>
+<td>1</td>
+<td>3.4</td>
+<td>否</td>
+</tr>
+<tr>
+<td>专业度最低、影响力满星</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td>5</td>
+<td>5</td>
+<td>2.6</td>
+<td>是</td>
+</tr>
+<tr>
+<td>仅学历满星，其余默认</td>
+<td>5</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3</td>
+<td>3.4</td>
+<td>否</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42">4.2 真实专家抽样</h3>
+<p>以下从现有专家中抽取代表，按本规则逐项打星：</p>
+<p><strong>方明（顶尖型）</strong>
+- ① 清华工程博士 → 5★　② 教授级高工 + 多认证讲师 → 4★　③ 主导国家级项目 → 5★
+- ④ 俄罗斯工程院外籍院士 → 5★　⑤ 教授级高工 + 上市公司副总裁 → 5★
+- 综合得分 = <strong>4.8★</strong> → 不进观察库</p>
+<p><strong>孔令涛（实战型讲师）— 进观察库</strong>
+- ① 学历未公开 → 3★　② 工信部认证讲师 → 3★　③ 13 年经验、无标杆成果 → 3★
+- ④ 无明确荣誉 → 2★　⑤ 研究员 / 教研总监 / 高工 → 2★
+- 综合得分 = <strong>2.6★</strong></p>
+<blockquote>
+<p><strong>管理员操作建议（方向性，不规定具体分值）</strong>：
+1. 主要拉分点在学历未公开和荣誉/职称偏低。优先核实学历：若可确认为本科及以上，据实上调 ①。
+2. 若该专家曾为我司提供过培训/咨询服务且反馈良好：可据实上调 ④ 社会荣誉与奖项，综合达展示线后自动在前端展示。
+3. 若无法核实学历且无合作记录：维持现有评分，留在观察库。</p>
+</blockquote>
+<p><strong>卢森煌（创业 + 产品型）— 进观察库</strong>
+- ① 北邮（211）学士 → 3★　② 认证讲师 → 2★　③ 25 软著 + 3 专利 + 著书 → 4★
+- ④ 企业讲师奖 → 2★　⑤ 创始人 / 前阿里产品经理 → 3★
+- 综合得分 = <strong>2.8★</strong></p>
+<blockquote>
+<p><strong>管理员操作建议（方向性，不规定具体分值）</strong>：
+1. 成果项（③）和职称项（⑤）不弱，短板在资质（②）和荣誉（④）。若软著/专利中有较有影响力的（如已被引用或商业化），据实上调 ③。
+2. 若该专家曾参与我司项目或合作：可据实上调 ④ 社会荣誉与奖项、⑤ 职称/管理履历，综合达展示线后自动在前端展示。
+3. 若无合作记录且当前评分准确：维持现状，离展示线差距很小，后续任一维度补实信息即可达标。</p>
+</blockquote>
+  </div>
+</body>
+</html>

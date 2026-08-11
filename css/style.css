@@ -615,30 +615,24 @@ body {
   margin-left: auto;
 }
 .card-score-main {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: #7C3AED; /* 综合分用紫色，与详情页一致 */
+  white-space: nowrap;
+  line-height: 1.2;
 }
-.card-score-main .star-rating .star-fill { color: #8B5CF6; }
 .card-score-subs {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 .card-score-sub {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 600;
   padding: 1px 0;
   white-space: nowrap;
 }
 .card-score-sub.prof { color: #3B82F6; }
-.card-score-sub.prof .star-rating .star-fill { color: #3B82F6; }
 .card-score-sub.infl { color: #F59E0B; }
-.card-score-sub.infl .star-rating .star-fill { color: #F59E0B; }
 
 /* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
 .star-rating {
