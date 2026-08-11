@@ -2028,8 +2028,10 @@ function renderExpertGrid() {
     }, favved ? '♥' : '♡');
     nameRow.appendChild(favStar);
     
+    headerInfo.appendChild(nameRow);
+
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.3: 专家卡评分改为 X.X + CSS 材质填充星（★），提升质感与辨识度
+      // v5.9.3-fix2: 评分区放在 card-header 右上角独立区域，避免压盖名字/领域标签
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('div', { className: 'card-score-main' });
       overallScore.textContent = expert.scores.overall.toFixed(1);
@@ -2042,9 +2044,8 @@ function renderExpertGrid() {
       subScores.appendChild(profTag);
       subScores.appendChild(inflTag);
       scoreBox.appendChild(subScores);
-      nameRow.appendChild(scoreBox);
+      cardHeader.appendChild(scoreBox);
     }
-    headerInfo.appendChild(nameRow);
     
     // Row 2: fields (v4.18: with search highlight)
     const fieldsRow = h('div', { className: 'card-fields-row' });
@@ -3057,7 +3058,8 @@ function renderDoughnutChart(containerId, labels, data) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
-  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+  // v5.9.3-fix: 分值分布使用从高到低的渐变色调，不再带“优秀/良好”评价词
+  const colors = ['#1D4ED8', '#3B82F6', '#10B981', '#84CC16', '#9CA3AF'];
   const total = data.reduce((a,b) => a+b, 0);
   const h = Math.max(280, container.clientHeight);
   const w = container.clientWidth || 400;
@@ -3124,18 +3126,19 @@ function renderDoughnutChart(containerId, labels, data) {
 function renderScoreDistChart(containerId, experts) {
   const cfg = appState.db.ratingConfig || DEFAULT_RATING_CONFIG;
   const cap = cfg.cap || 5;
-  const threshold = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
   const scored = experts.filter(e => e.scores && e.scores.overall > 0);
-  // 五星制分布桶：优秀(4-5★)、良好(3-4★)、合格(2-3★)、待提升(<2★)
+  // v5.9.3-fix: 按 0.5★ 细分为 5 个不重叠区间，去掉“优秀/良好”等评价词，避免 2-3★ 与 <3★ 重合
   const buckets = [
-    { label: '4-5★（优秀）', min: 4, max: cap },
-    { label: '3-4★（良好）', min: 3, max: 4 },
-    { label: '2-3★（合格）', min: 2, max: 3 },
-    { label: '<' + threshold + '★（待提升）', min: 0, max: threshold }
+    { label: '4.5-5.0★', min: 4.5, max: cap, includeMax: true },
+    { label: '4.0-4.5★', min: 4.0, max: 4.5 },
+    { label: '3.5-4.0★', min: 3.5, max: 4.0 },
+    { label: '3.0-3.5★', min: 3.0, max: 3.5 },
+    { label: '<3.0★', min: 0, max: 3.0 }
   ];
-  const counts = buckets.map(b => scored.filter(e => e.scores.overall >= b.min && e.scores.overall < b.max).length);
-  // 封顶值包含等于
-  counts[0] = scored.filter(e => e.scores.overall >= buckets[0].min).length;
+  const counts = buckets.map(b => {
+    if (b.includeMax) return scored.filter(e => e.scores.overall >= b.min && e.scores.overall <= b.max).length;
+    return scored.filter(e => e.scores.overall >= b.min && e.scores.overall < b.max).length;
+  });
   const labels = buckets.map(b => b.label);
   renderDoughnutChart(containerId, labels, counts);
 }
@@ -3981,7 +3984,26 @@ function renderAdmin() {
   
   header.appendChild(headerInner);
   app.appendChild(header);
-  
+
+  // v5.9.3-fix2: 全局数据维护提示（主管理员看全部，子管理员看分配给自己的）
+  var reminders = getObservationReminders(db);
+  var myReminderCount = 0;
+  var me = getOperatorInfo();
+  [].concat(reminders.overdue, reminders.oneYear, reminders.halfYear).forEach(function(r) {
+    if (isMaster || (r.assignee.type === 'sub' && r.assignee.account === me.id)) myReminderCount++;
+  });
+  if (myReminderCount > 0) {
+    var banner = h('div', { style:{ background:'#fffbeb', borderBottom:'1px solid #fde68a', padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap' } });
+    banner.appendChild(h('div', { style:{ fontSize:'13px', color:'#92400e' } },
+      '⚠️ 数据维护提示：当前有 ' + myReminderCount + ' 位观察库专家需要复核（半年/一年提醒或已超期），请及时处理。'
+    ));
+    banner.appendChild(h('button', { className:'btn btn-sm', style:{ background:'#f59e0b', color:'white', border:'none' }, onclick: function() {
+      appState.adminTab = 'observation';
+      renderAdmin();
+    } }, '去处理'));
+    app.appendChild(banner);
+  }
+
   // Container
   const container = h('div', { className: 'admin-container' });
   
@@ -6004,16 +6026,24 @@ function parseSingleContact(raw) {
   const hasLandlineKeyword = /电话|座机|办公|固话/i.test(s);
   const landlineClean = s.replace(/^(办公电话|电话|座机|固话)[:：]?\s*/i, '');
   const landlineDigits = landlineClean.replace(/\D/g, '');
+  function formatLandlineDisplay(digits) {
+    // 统一格式：0 + 区号(3-4位含0) + 号码(7-8位)
+    if (/^0\d{9,}$/.test(digits)) {
+      var areaCodeLen = Math.min(Math.max(3, digits.length - 7), 4);
+      return digits.slice(0, areaCodeLen) + '-' + digits.slice(areaCodeLen);
+    }
+    return landlineClean;
+  }
   if (/^0\d{9,}$/.test(landlineDigits)) {
-    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits };
+    return { kind: 'landline', display: formatLandlineDisplay(landlineDigits), href: 'tel:' + landlineDigits, copy: landlineDigits };
   }
   // 5. 无区号座机/办公电话（7-8 位数字，且出现电话/座机/办公字样）
   if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && hasLandlineKeyword) {
-    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits };
+    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits, noAreaCode: true };
   }
   // 6. 兜底：联系方式场景下，7-8 位纯数字也视为座机，避免信息丢失
   if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && /^\d[\d\s-]*\d$/.test(landlineClean)) {
-    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits };
+    return { kind: 'landline', display: landlineClean, href: 'tel:' + landlineDigits, copy: landlineDigits, noAreaCode: true };
   }
   return { kind: 'unknown', display: s, href: null, copy: s };
 }
@@ -6094,6 +6124,7 @@ function renderContactMethod(c, opts) {
   const displayHtml = sq ? highlightText(c.display, sq) : escapeHtml(c.display);
   const icon = c.kind === 'email' ? '📧' : c.kind === 'wechat' ? '💬' : '📞';
   const title = isMobile ? getContactMethodTitle(c) : '点击选择操作';
+  const landlineWarning = (c.kind === 'landline' && c.noAreaCode) ? '（未带区号，跨区拨打可能失败）' : '';
 
   // 移动端：电话/邮箱使用原生链接（系统自动弹出拨号/邮件/复制选项）
   if (isMobile && c.href && (c.kind === 'mobile' || c.kind === 'landline' || c.kind === 'email')) {
@@ -6102,14 +6133,14 @@ function renderContactMethod(c, opts) {
     return h('a', {
       href: c.href,
       className: 'contact-method contact-kind-' + c.kind,
-      title: title
+      title: title + landlineWarning
     }, iconSpan, ' ', textSpan);
   }
 
   // 桌面端全部、移动端微信/未知：可点击 span，点击后复制或弹出菜单
   const el = h('span', {
     className: 'contact-method contact-kind-' + c.kind,
-    title: title,
+    title: title + landlineWarning,
     'data-copy': c.copy || c.display || ''
   });
   el.appendChild(h('span', { className: 'contact-icon' }, icon));
@@ -6414,6 +6445,46 @@ function formatObservationDeadline(expert) {
   if (days < 0) return { text: '已超期（截止 ' + dateStr + '）', color: '#dc2626', warning: true };
   if (days <= 30) return { text: '即将到期：' + days + ' 天后（' + dateStr + '）', color: '#d97706', warning: true };
   return { text: '观察截止：' + dateStr, color: 'var(--text-secondary)', warning: false };
+}
+
+// v5.9.3-fix2: 计算观察库提醒（半年 / 一年 / 超期）
+function getObservationReminders(db) {
+  if (!db || !db.experts) return { halfYear: [], oneYear: [], overdue: [] };
+  var now = new Date();
+  var halfYear = [], oneYear = [], overdue = [];
+  db.experts.forEach(function(e) {
+    if (e.status !== 'observation' || e.observationStatus === 'eliminated' || !e.observationDate) return;
+    var d = new Date(e.observationDate);
+    var daysIn = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+    var deadline = getObservationDeadline(e);
+    var assignee = getObservationAssignee(db, e);
+    if (now >= deadline) {
+      overdue.push({ expert: e, daysIn: daysIn, assignee: assignee });
+    } else if (daysIn >= 365) {
+      oneYear.push({ expert: e, daysIn: daysIn, assignee: assignee });
+    } else if (daysIn >= 180) {
+      halfYear.push({ expert: e, daysIn: daysIn, assignee: assignee });
+    }
+  });
+  return { halfYear: halfYear, oneYear: oneYear, overdue: overdue };
+}
+
+// 提醒对象：优先专家创建者 createdBy；若创建者是子管理员且账号仍有效，则提醒该子管理员，否则提醒主管理员
+function getObservationAssignee(db, expert) {
+  var creator = expert.createdBy || '主管理员';
+  var user = db.permissions && db.permissions.users ? db.permissions.users.find(function(u) { return u.account === creator || u.name === creator; }) : null;
+  if (user) return { type: 'sub', account: user.account, name: user.account };
+  return { type: 'master', account: '', name: '主管理员' };
+}
+
+function formatDaysSince(dateStr) {
+  var d = new Date(dateStr);
+  var days = Math.floor((new Date() - d) / (1000 * 60 * 60 * 24));
+  if (days < 30) return days + ' 天';
+  var months = Math.floor(days / 30);
+  if (months < 12) return months + ' 个月';
+  var years = (months / 12).toFixed(1);
+  return years + ' 年';
 }
 
 function recordObservationOperation(db, expert, operation, before, after, note, tags, operator) {
@@ -7668,12 +7739,14 @@ function exportDashboardImage() {
     var cfg = appState.db.ratingConfig || DEFAULT_RATING_CONFIG;
     var obsThr = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
     var scoredExperts = experts.filter(function(e) { return e.scores && e.scores.overall > 0; });
-    var distLabels = ['4-5★（优秀）', '3-4★（良好）', '2-3★（合格）', '<' + obsThr + '★（待提升）'];
+    // v5.9.3-fix2: 仪表盘导出分值分布与前端一致
+    var distLabels = ['4.5-5.0★', '4.0-4.5★', '3.5-4.0★', '3.0-3.5★', '<3.0★'];
     var distData = [
-      scoredExperts.filter(function(e) { return e.scores.overall >= 4; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall >= 3 && e.scores.overall < 4; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall >= 2 && e.scores.overall < 3; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall < obsThr; }).length
+      scoredExperts.filter(function(e) { return e.scores.overall >= 4.5 && e.scores.overall <= 5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 4.0 && e.scores.overall < 4.5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 3.5 && e.scores.overall < 4.0; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 3.0 && e.scores.overall < 3.5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall < 3.0; }).length
     ];
     
     var halfW = (canvasW - 80 - 24) / 2; // two columns with gap
@@ -7822,7 +7895,8 @@ function drawScoreCardsOnCanvas(ctx, profAvg, inflAvg, overallAvg, x, y, w, h) {
 
 // ===== Canvas 环形图绘制 =====
 function drawDoughnutChartOnCanvas(ctx, labels, data, x, y, w, h) {
-  var colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899'];
+  // v5.9.3-fix: 分值分布颜色与前端保持一致（高分深蓝→中分绿→低分灰）
+  var colors = ['#1D4ED8', '#3B82F6', '#10B981', '#84CC16', '#9CA3AF'];
   var total = data.reduce(function(a,b) { return a+b; }, 0);
   if (total === 0) return;
   
@@ -8211,8 +8285,36 @@ function renderObservationTab(panel) {
   panel.appendChild(h('h3', {}, '观察库'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '综合评分 < 3★ 自动列入观察库（评分系统自动同步），或手动移入的待观察专家。'));
   panel.appendChild(h('div', { style:{ padding:'10px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.7', marginBottom:'16px' } },
-    '📌 观察库中的专家将不在前端展示。在此可连续修改子维度评分，完成后点“确认调分”并填写意见；临近淘汰节点可“延后观察”（顺延 6 个月）；确认不符合入库标准则“淘汰”。所有操作均留痕。'
+    '📌 观察库中的专家将不在前端展示。在此可连续修改子维度评分，完成后点“确认调分”并填写意见；临近淘汰节点可“延后观察”（在当前淘汰截止日基础上顺延 6 个月，非重新计算 18 个月）；确认不符合入库标准则“淘汰”。所有操作均留痕。'
   ));
+
+  // v5.9.3-fix2: 观察库维护提醒（半年 / 一年 / 超期），按创建者分配，子管理员回收则归主管理员
+  var reminders = getObservationReminders(db);
+  var myReminders = [];
+  var isMaster = isMasterAdmin();
+  var me = getOperatorInfo();
+  [].concat(reminders.overdue, reminders.oneYear, reminders.halfYear).forEach(function(r) {
+    if (isMaster || (r.assignee.type === 'sub' && r.assignee.account === me.id)) {
+      myReminders.push(r);
+    }
+  });
+  if (myReminders.length > 0) {
+    var remBox = h('div', { style:{ padding:'12px 14px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', fontSize:'12px', lineHeight:'1.7', marginBottom:'16px' } });
+    remBox.appendChild(h('div', { style:{ fontWeight:'600', color:'#92400e', marginBottom:'6px' } }, '⚠️ 观察库维护提醒'));
+    myReminders.slice(0, 20).forEach(function(r) {
+      var level = reminders.overdue.indexOf(r) >= 0 ? '已超期' : (reminders.oneYear.indexOf(r) >= 0 ? '一年提醒' : '半年提醒');
+      var color = reminders.overdue.indexOf(r) >= 0 ? '#dc2626' : (reminders.oneYear.indexOf(r) >= 0 ? '#d97706' : '#059669');
+      var deadline = getObservationDeadline(r.expert).toLocaleDateString('zh-CN');
+      remBox.appendChild(h('div', { style:{ color:'#78350f' } },
+        '• ' + r.expert.name + '（已入库 ' + formatDaysSince(r.expert.observationDate) + '）· ' + level + ' · 截止 ' + deadline +
+        ' · 负责：' + r.assignee.name
+      ));
+    });
+    if (myReminders.length > 20) {
+      remBox.appendChild(h('div', { style:{ color:'var(--text-muted)', marginTop:'4px' } }, '…等共 ' + myReminders.length + ' 位专家需维护'));
+    }
+    panel.appendChild(remBox);
+  }
 
   const cfg = db.ratingConfig;
   const profDim = cfg.dimensions.find(function(d) { return d.id === 'professional'; });
@@ -8319,7 +8421,7 @@ function renderObservationTab(panel) {
     var deadlineInfo = formatObservationDeadline(expert);
     var statusLine = h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' } },
       '专业度：' + expert.scores.professional + ' | 影响力：' + expert.scores.influence +
-      (expert.observationDate ? ' | 录入日期：' + formatDate(expert.observationDate) : '')
+      (expert.observationDate ? ' | 已入库 ' + formatDaysSince(expert.observationDate) : '')
     );
     if (isEliminated) {
       statusLine.appendChild(h('span', {}, ' | ⚠️ 状态：已淘汰'));
@@ -9643,7 +9745,7 @@ function renderMonthlyReportTab(panel) {
   }
 
   var opTypeCounts = {};
-  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分', extend:'延后观察' };
   monthOps.forEach(function(op) { opTypeCounts[op.operation] = (opTypeCounts[op.operation] || 0) + 1; });
 
   if (monthOps.length === 0) {
@@ -9781,7 +9883,7 @@ function buildMonthlyReportCanvas() {
       return d >= monthStart && d < monthEnd;
     });
   }
-  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分', extend:'延后观察' };
 
   // Canvas dimensions
   var W = 800;
@@ -9930,12 +10032,14 @@ function buildMonthlyReportCanvas() {
   if (scoredExperts.length > 0) {
     drawTextRow('专家评分分布：', leftPad, y + 14);
     y += 22;
-    var sDistLabels = ['4-5★（优秀）', '3-4★（良好）', '2-3★（合格）', '<3★（待提升）'];
+    // v5.9.3-fix2: 月报 canvas 分值分布与前端一致（0.5★ 细分，无评价词，无重叠）
+    var sDistLabels = ['4.5-5.0★', '4.0-4.5★', '3.5-4.0★', '3.0-3.5★', '<3.0★'];
     var sDistData = [
-      scoredExperts.filter(function(e) { return e.scores.overall >= 4; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall >= 3 && e.scores.overall < 4; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall >= 2 && e.scores.overall < 3; }).length,
-      scoredExperts.filter(function(e) { return e.scores.overall < 3; }).length
+      scoredExperts.filter(function(e) { return e.scores.overall >= 4.5 && e.scores.overall <= 5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 4.0 && e.scores.overall < 4.5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 3.5 && e.scores.overall < 4.0; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall >= 3.0 && e.scores.overall < 3.5; }).length,
+      scoredExperts.filter(function(e) { return e.scores.overall < 3.0; }).length
     ];
     // Doughnut on left (60% width), score cards on right
     var doughnutW = (W - leftPad * 2) * 0.55;

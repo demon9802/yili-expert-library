@@ -533,7 +533,8 @@ body {
 }
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 12px;
   padding-bottom: 10px;
@@ -611,17 +612,20 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  margin-left: auto;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  margin-left: 4px;
 }
-/* v5.9.3-fix: 专家卡评分重设计——综合分深紫实底徽章+金星(清晰醒目有质感)，子分高对比蓝/橙描边胶囊 */
+/* v5.9.3-fix2: 专家卡评分重设计——金色实底徽章+白字（清晰醒目、不与领域标签/供应商铜金混淆） */
 .card-score-main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 4px 11px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border: 1px solid #d97706;
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
@@ -629,14 +633,14 @@ body {
   letter-spacing: 0.3px;
   white-space: nowrap;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(109,40,217,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 2px 6px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 .card-score-main::before {
   content: '★';
   font-size: 12px;
-  color: #fbbf24;
+  color: #ffffff;
   line-height: 1;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.15);
 }
 .card-score-subs {
   display: flex;
