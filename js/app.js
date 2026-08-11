@@ -229,8 +229,8 @@ async function toggleFavorite(expertId) {
 
 // Default ratingConfig with sub-dimensions
 const DEFAULT_RATING_CONFIG = {
-  configVersion: 4, // v5.9.0: 五星制（1-5★，缺失默认3★，展示线3★，权重60-40）
-  missingScore: 3,  // 信息缺失（未填/未公开/模糊）统一默认 3★
+  configVersion: 5, // v5.9.3: 五星制（1-5★，缺失默认2★，展示线3★，权重60-40）
+  missingScore: 2,  // 信息缺失（未填/未公开/模糊）统一默认 2★
   cap: 5,           // 子维度得分封顶 5★
   observationThreshold: 3, // 综合得分 < 3★ 进入观察库（不含 3★）
   dimensions: [
@@ -239,27 +239,27 @@ const DEFAULT_RATING_CONFIG = {
       desc: '评估专家的学历背景、行业资质及专业成果',
       subDimensions: [
         {
-          name: '学历与学术背景', weight: 1/3, maxScore: 5, missingScore: 3, cap: 5,
-          criteria: '1★大专/中专及以下；2★普通本科（一般院校）；3★较好本科（211/双一流）或普通硕士；4★名校硕士（985/双一流/海外知名）或普通博士；5★博士+顶尖院校（清北/C9/QS前50等）。信息缺失默认3★。',
+          name: '学历与学术背景', weight: 1/3, maxScore: 5, missingScore: 2, cap: 5,
+          criteria: '1★大专/中专及以下；2★普通本科（一般院校）；3★较好本科（211/双一流）或普通硕士；4★名校硕士（985/双一流/海外知名）或普通博士；5★博士+顶尖院校（清北/C9/QS前50等）。信息缺失默认2★。',
           scoring: {
             type: 'tier',
-            tiers: { '5★ 博士+顶尖院校': 5, '4★ 名校硕士/普通博士': 4, '3★ 较好本科/普通硕士': 3, '2★ 普通本科': 2, '1★ 大专/中专及以下': 1, '信息缺失': 3 }
+            tiers: { '5★ 博士+顶尖院校': 5, '4★ 名校硕士/普通博士': 4, '3★ 较好本科/普通硕士': 3, '2★ 普通本科': 2, '1★ 大专/中专及以下': 1, '信息缺失': 2 }
           }
         },
         {
-          name: '行业资质与认证', weight: 1/3, maxScore: 5, missingScore: 3, cap: 5,
-          criteria: '1★无相关认证；2★培训/通用认证；3★行业厂商认证（华为/微软等）或国家级执业资格（单一）；4★国家级执业/行业权威认证（多重领域）；5★国际权威认证（CFA/CPA/ACCA等）或多顶国家级。信息缺失默认3★。',
+          name: '行业资质与认证', weight: 1/3, maxScore: 5, missingScore: 2, cap: 5,
+          criteria: '1★无相关认证；2★培训/通用认证；3★行业厂商认证（华为/微软等）或国家级执业资格（单一）；4★国家级执业/行业权威认证（多重领域）；5★国际权威认证（CFA/CPA/ACCA等）或多顶国家级。信息缺失默认2★。',
           scoring: {
             type: 'tier',
-            tiers: { '5★ 国际权威/多顶国家级': 5, '4★ 国家级执业/行业权威（多领域）': 4, '3★ 行业厂商/单一国家级执业': 3, '2★ 培训/通用认证': 2, '1★ 无相关认证': 1, '信息缺失': 3 }
+            tiers: { '5★ 国际权威/多顶国家级': 5, '4★ 国家级执业/行业权威（多领域）': 4, '3★ 行业厂商/单一国家级执业': 3, '2★ 培训/通用认证': 2, '1★ 无相关认证': 1, '信息缺失': 2 }
           }
         },
         {
-          name: '专业成果与经验', weight: 1/3, maxScore: 5, missingScore: 3, cap: 5,
-          criteria: '1★一般服务经验/仅公开演讲；2★参与级项目/普通论文；3★省级/行业级项目·SCI/EI论文；4★战略级/国家级项目·顶刊论文；5★标杆级（牵头国标行标/高被引/重大成果转化）。信息缺失默认3★。',
+          name: '专业成果与经验', weight: 1/3, maxScore: 5, missingScore: 2, cap: 5,
+          criteria: '1★一般服务经验/仅公开演讲；2★参与级项目/普通论文；3★省级/行业级项目·SCI/EI论文；4★战略级/国家级项目·顶刊论文；5★标杆级（牵头国标行标/高被引/重大成果转化）。信息缺失默认2★。',
           scoring: {
             type: 'tier',
-            tiers: { '5★ 标杆级成果': 5, '4★ 战略级/国家级项目·顶刊': 4, '3★ 省级/行业级·SCI/EI': 3, '2★ 参与级/普通论文': 2, '1★ 一般经验/仅演讲': 1, '信息缺失': 3 }
+            tiers: { '5★ 标杆级成果': 5, '4★ 战略级/国家级项目·顶刊': 4, '3★ 省级/行业级·SCI/EI': 3, '2★ 参与级/普通论文': 2, '1★ 一般经验/仅演讲': 1, '信息缺失': 2 }
           }
         }
       ]
@@ -269,19 +269,19 @@ const DEFAULT_RATING_CONFIG = {
       desc: '评估专家的社会荣誉、职称头衔、管理履历及任职机构权威性',
       subDimensions: [
         {
-          name: '社会荣誉与奖项', weight: 0.5, maxScore: 5, missingScore: 3, cap: 5,
-          criteria: '1★无荣誉/一般协会成员；2★地市级荣誉/国家级学会成员；3★省部级荣誉或称号；4★国家级荣誉或称号；5★顶尖人才（两院院士/国家级人才计划）。信息缺失默认3★。',
+          name: '社会荣誉与奖项', weight: 0.5, maxScore: 5, missingScore: 2, cap: 5,
+          criteria: '1★无荣誉/一般协会成员；2★地市级荣誉/国家级学会成员；3★省部级荣誉或称号；4★国家级荣誉或称号；5★顶尖人才（两院院士/国家级人才计划）。信息缺失默认2★。',
           scoring: {
             type: 'tier',
-            tiers: { '5★ 顶尖人才/国家级人才计划': 5, '4★ 国家级荣誉/称号': 4, '3★ 省部级荣誉/称号': 3, '2★ 地市级/国家级学会成员': 2, '1★ 无荣誉/一般协会': 1, '信息缺失': 3 }
+            tiers: { '5★ 顶尖人才/国家级人才计划': 5, '4★ 国家级荣誉/称号': 4, '3★ 省部级荣誉/称号': 3, '2★ 地市级/国家级学会成员': 2, '1★ 无荣誉/一般协会': 1, '信息缺失': 2 }
           }
         },
         {
-          name: '职称、管理履历与行业地位', weight: 0.5, maxScore: 5, missingScore: 3, cap: 5,
-          criteria: '1★无职称/基层岗位；2★经理/高工/主管（普通企业）；3★副教授/总监/VP/合伙人（或同等级别+普通企业）；4★教授/CEO/创始人（行业百强/大厂）；5★教授/CEO/创始人（世界500强/央企/上市公司）。信息缺失默认3★。',
+          name: '职称、管理履历与行业地位', weight: 0.5, maxScore: 5, missingScore: 2, cap: 5,
+          criteria: '1★无职称/基层岗位；2★经理/高工/主管（普通企业）；3★副教授/总监/VP/合伙人（或同等级别+普通企业）；4★教授/CEO/创始人（行业百强/大厂）；5★教授/CEO/创始人（世界500强/央企/上市公司）。信息缺失默认2★。',
           scoring: {
             type: 'tier',
-            tiers: { '5★ 教授/CEO/创始人（世界500强/央企/上市公司）': 5, '4★ 教授/CEO/创始人（行业百强/大厂）': 4, '3★ 副教授/总监/VP/合伙人': 3, '2★ 经理/高工/主管': 2, '1★ 无职称/基层': 1, '信息缺失': 3 }
+            tiers: { '5★ 教授/CEO/创始人（世界500强/央企/上市公司）': 5, '4★ 教授/CEO/创始人（行业百强/大厂）': 4, '3★ 副教授/总监/VP/合伙人': 3, '2★ 经理/高工/主管': 2, '1★ 无职称/基层': 1, '信息缺失': 2 }
           }
         }
       ]
@@ -311,7 +311,7 @@ const COLOR_SCHEMES = {
   dark:    { name: '暗夜黑', primary: '#111827', primaryLight: '#1F2937', accent: '#6366F1' }
 };
 
-const CURRENT_DB_VERSION = 15;
+const CURRENT_DB_VERSION = 16;
 
 // ===== UI Config Management =====
 function applyUiConfig(uic) {
@@ -364,7 +364,7 @@ function migrateRatingConfig(cfg) {
             if (defaultSD.missingScore !== undefined) sd.missingScore = defaultSD.missingScore;
             if (defaultSD.cap !== undefined) sd.cap = defaultSD.cap;
           } else {
-            sd.criteria = '6-9分：按资质等级评定 | 5分：信息缺失/模糊（默认中值）';
+            sd.criteria = '1-5★：按资质等级评定 | 信息缺失/模糊默认 2★';
           }
         }
       });
@@ -378,7 +378,7 @@ function migrateRatingConfig(cfg) {
     if (hasSeparate && !hasMerged) {
       // Merge: combine the two sub-dimensions into one
       const merged = { name: '职称、管理履历与行业地位', weight: 0.65, maxScore: 10,
-        criteria: '9分：教授/研究员/院士/首席/CEO/总裁/创始人/董事长（世界500强/央企/上市公司） | 8分：总监/VP/合伙人/副教授（行业百强/大厂） | 7分：经理/高级工程师/主管（普通企业） | 6分：信息缺失/模糊 | 注：任职机构权威性加权——世界500强/央企/上市公司+1分，行业百强/大厂+0.5分'
+        criteria: '5★：教授/研究员/院士/首席/CEO/总裁/创始人/董事长（世界500强/央企/上市公司） | 4★：总监/VP/合伙人/副教授（行业百强/大厂） | 3★：经理/高级工程师/主管（普通企业） | 2★：信息缺失/模糊 | 1★：无职称/基层 | 注：任职机构权威性加权——世界500强/央企/上市公司+1★，行业百强/大厂+0.5★'
       };
       // Remove the two old ones, keep 社会荣誉与奖项, add merged
       inflDim.subDimensions = inflDim.subDimensions.filter(sd => sd.name !== '职称与专业头衔' && sd.name !== '管理履历与行业地位');
@@ -659,6 +659,30 @@ function ensureMinimalConfig(db) {
   if (db.experts) {
     db.experts.forEach(function(e) { migrateContactsForExpert(e); });
   }
+
+  // v5.9.3: 评分规则缺失默认值从 3★ 调整为 2★，若配置刚升级到 configVersion 5，一次性重算所有专家分数与状态
+  if (db.ratingConfig && db.ratingConfig.configVersion === 5 && !db._scoreMigrationV5Done) {
+    var cfg5 = db.ratingConfig;
+    var obsThr5 = cfg5.observationThreshold !== undefined ? cfg5.observationThreshold : 3;
+    if (db.experts) {
+      db.experts.forEach(function(e) {
+        if (!e.subScores) { aiScoreExpert(e); }
+        recalcExpertFromSubscores(e);
+        if (e.status !== 'eliminated') {
+          if (e.scores.overall < obsThr5) {
+            e.status = 'observation';
+            if (!e.observationStatus) e.observationStatus = 'evaluating';
+          } else {
+            e.status = 'active';
+            e.observationStatus = '';
+          }
+        }
+      });
+    }
+    db._scoreMigrationV5Done = true;
+    console.log('[v5.9.3] 已按缺失默认 2★ 重算所有专家分数');
+  }
+
   return db;
 }
 
@@ -992,13 +1016,14 @@ function openScoringHelp() {
       <table class="sh-table">
         <tr><td class="sh-range r-top">5★</td><td>顶尖（清北博士、两院院士、世界500强掌舵人）</td></tr>
         <tr><td class="sh-range r-hi">4★</td><td>优秀（985硕士、省部级荣誉、行业百强高管）</td></tr>
-        <tr><td class="sh-range r-mid">3★</td><td>良好 / 中等（信息缺失也统一计 3★）</td></tr>
-        <tr><td class="sh-range r-low">1–2★</td><td>相对较弱</td></tr>
+        <tr><td class="sh-range r-mid">3★</td><td>良好</td></tr>
+        <tr><td class="sh-range r-low">2★</td><td>中等 / 信息缺失默认</td></tr>
+        <tr><td class="sh-range r-low">1★</td><td>相对较弱</td></tr>
       </table>
 
       <h4 class="sh-h">两点说明</h4>
       <ul class="sh-list">
-        <li>信息缺失<b>统一计 3★</b>，不空置、不占优。</li>
+        <li>信息缺失<b>统一计 2★</b>，不空置、不占优。</li>
         <li>综合分 <b>低于 3★ 不进入前端展示</b>，自动列入「观察库」。</li>
       </ul>
     </div>
@@ -2004,16 +2029,16 @@ function renderExpertGrid() {
     nameRow.appendChild(favStar);
     
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.2: 专家卡评分简化为 X.X⭐ 形式，便于卡片与手机端紧凑展示
+      // v5.9.3: 专家卡评分改为 X.X + CSS 材质填充星（★），提升质感与辨识度
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('div', { className: 'card-score-main' });
-      overallScore.textContent = expert.scores.overall.toFixed(1) + '⭐';
+      overallScore.textContent = expert.scores.overall.toFixed(1);
       scoreBox.appendChild(overallScore);
       const subScores = h('div', { className: 'card-score-subs' });
       const profTag = h('span', { className: 'card-score-sub prof' });
-      profTag.textContent = '专业' + expert.scores.professional.toFixed(1) + '⭐';
+      profTag.textContent = '专业' + expert.scores.professional.toFixed(1);
       const inflTag = h('span', { className: 'card-score-sub infl' });
-      inflTag.textContent = '影响' + expert.scores.influence.toFixed(1) + '⭐';
+      inflTag.textContent = '影响' + expert.scores.influence.toFixed(1);
       subScores.appendChild(profTag);
       subScores.appendChild(inflTag);
       scoreBox.appendChild(subScores);
@@ -6171,7 +6196,7 @@ function closeContactActionMenu() {
 
 function roundScore(s) { return Math.round(s * 10) / 10; }
 
-// ===== AI SCORING (v5.9.0 五星制：子维度 1-5★，缺失默认 3★) =====
+// ===== AI SCORING (v5.9.3 五星制：子维度 1-5★，缺失默认 2★) =====
 function aiScoreExpert(expert) {
   const cfg = appState.db.ratingConfig;
   if (!expert.subScores) expert.subScores = {};
@@ -6373,16 +6398,17 @@ function getOperatorInfo() {
   return { id: user.account || user.email || 'sub', name: user.account || user.email || '子管理员', role: 'sub' };
 }
 
-function recordObservationOperation(db, expert, operation, before, after, note, tags) {
+function recordObservationOperation(db, expert, operation, before, after, note, tags, operator) {
   if (!db.observationOperations) db.observationOperations = [];
+  const opInfo = operator || getOperatorInfo();
   const op = {
     id: 'obsop_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 8),
     expertId: expert.id || expert.name,
     expertName: expert.name,
     operation: operation,
-    operatorId: getOperatorInfo().id,
-    operatorName: getOperatorInfo().name,
-    operatorRole: getOperatorInfo().role,
+    operatorId: opInfo.id,
+    operatorName: opInfo.name,
+    operatorRole: opInfo.role,
     before: before,
     after: after,
     note: note || '',
@@ -6434,46 +6460,92 @@ function promptObservationNote(title, defaultNote, onConfirm) {
   textarea.focus();
 }
 
-// 弹窗：展示观察库操作记录
+// 渲染观察库操作记录表格（复用：全局审计 + 单专家弹窗）
+function renderObservationOpsTable(ops, options) {
+  options = options || {};
+  const typeMap = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+  if (!ops || ops.length === 0) {
+    return h('div', { style: { padding:'20px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' } }, '暂无操作记录');
+  }
+  const table = h('table', { style: { width:'100%', borderCollapse:'collapse', fontSize:'12px' } });
+  const thead = h('thead');
+  const hr = h('tr', { style: { borderBottom:'2px solid var(--border)' } });
+  var headers = ['时间'];
+  if (options.showExpert) headers.push('专家');
+  headers = headers.concat(['操作者', '类型', '综合分变化', '调整内容', '操作意见']);
+  headers.forEach(function(hdr) { hr.appendChild(h('th', { style: { padding:'8px', textAlign:'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' } }, hdr)); });
+  thead.appendChild(hr); table.appendChild(thead);
+  const tbody = h('tbody');
+  ops.forEach(function(op) {
+    var noteText = op.note || '';
+    var detail = '';
+    // 从 note 的括号中提取调整内容；否则用标签
+    var m = noteText.match(/[（(]([^)）]+)[)）]/);
+    if (m) {
+      detail = m[1];
+      noteText = noteText.replace(/[（(][^)）]+[)）]/, '').trim();
+    } else if (op.tags && op.tags.length > 0) {
+      detail = op.tags.join('、');
+    }
+    const beforeOverall = op.before && op.before.scores && op.before.scores.overall !== undefined ? op.before.scores.overall.toFixed(1) : '-';
+    const afterOverall = op.after && op.after.scores && op.after.scores.overall !== undefined ? op.after.scores.overall.toFixed(1) : '-';
+    const tr = h('tr', { style: { borderBottom:'1px solid #f1f5f9' } });
+    tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-secondary)', whiteSpace:'nowrap' } }, formatDate(op.createdAt)));
+    if (options.showExpert) {
+      tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap', fontWeight:'600' } }, op.expertName || '-'));
+    }
+    tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, op.operatorName + (op.operatorRole === 'master' ? '（主）' : op.operatorRole === 'sub' ? '（子）' : op.operatorRole === 'system' ? '（系统）' : '')));
+    tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, typeMap[op.operation] || op.operation));
+    tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap', fontFamily:'monospace' } }, beforeOverall + ' → ' + afterOverall));
+    tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-secondary)', lineHeight:'1.4', maxWidth:'200px' } }, detail || '-'));
+    tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-muted)', lineHeight:'1.4' } }, noteText || '-'));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+// 弹窗：展示单个专家的操作记录（历次修改痕迹）
 function showObservationHistory(expert) {
   const db = appState.db;
   const ops = getObservationOperationsForDisplay(db, expert.id || expert.name);
   const overlay = h('div', { className: 'modal-overlay', onclick: function(e) { if (e.target === overlay) overlay.remove(); } });
-  const content = h('div', { className: 'modal-content', style: { maxWidth: '640px', maxHeight:'80vh', display:'flex', flexDirection:'column' } });
+  const content = h('div', { className: 'modal-content', style: { maxWidth: '680px', maxHeight:'80vh', display:'flex', flexDirection:'column' } });
 
   const header = h('div', { className: 'modal-header' });
-  header.appendChild(h('div', { className: 'modal-title' }, '操作记录：' + expert.name));
+  header.appendChild(h('div', { className: 'modal-title' }, expert.name + ' · 历次调分记录'));
   header.appendChild(h('button', { className: 'modal-close', onclick: function() { overlay.remove(); } }, '✕'));
   content.appendChild(header);
 
   const body = h('div', { className: 'modal-body', style: { overflowY:'auto' } });
-  if (ops.length === 0) {
-    body.appendChild(h('div', { style: { padding:'20px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' } }, '暂无操作记录'));
-  } else {
-    const table = h('table', { style: { width:'100%', borderCollapse:'collapse', fontSize:'12px' } });
-    const thead = h('thead');
-    const hr = h('tr', { style: { borderBottom:'2px solid var(--border)' } });
-    ['时间', '操作者', '类型', '综合分变化', '操作意见'].forEach(function(hdr) { hr.appendChild(h('th', { style: { padding:'8px', textAlign:'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600' } }, hdr)); });
-    thead.appendChild(hr); table.appendChild(thead);
-    const tbody = h('tbody');
-    ops.forEach(function(op) {
-      const typeMap = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
-      const beforeOverall = op.before && op.before.scores && op.before.scores.overall !== undefined ? op.before.scores.overall.toFixed(1) : '-';
-      const afterOverall = op.after && op.after.scores && op.after.scores.overall !== undefined ? op.after.scores.overall.toFixed(1) : '-';
-      const tr = h('tr', { style: { borderBottom:'1px solid #f1f5f9' } });
-      tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-secondary)', whiteSpace:'nowrap' } }, formatDate(op.createdAt)));
-      tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, op.operatorName + (op.operatorRole === 'master' ? '（主）' : op.operatorRole === 'sub' ? '（子）' : '')));
-      tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, typeMap[op.operation] || op.operation));
-      tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap', fontFamily:'monospace' } }, beforeOverall + ' → ' + afterOverall));
-      tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-muted)', lineHeight:'1.4' } }, op.note || '-'));
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    body.appendChild(table);
-  }
+  body.appendChild(renderObservationOpsTable(ops, { showExpert: false }));
   content.appendChild(body);
   overlay.appendChild(content);
   document.body.appendChild(overlay);
+}
+
+// 渲染全局观察库操作记录审计区
+function renderObservationAuditLog(container, db) {
+  const isMaster = isMasterAdmin();
+  const me = getOperatorInfo();
+  let ops = (db.observationOperations || []).slice();
+  // 子管理员只能看自己的操作
+  if (!isMaster) {
+    ops = ops.filter(function(op) { return op && op.operatorId === me.id; });
+  }
+  // 默认按时间倒序，最多显示 100 条
+  ops.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); }).slice(0, 100);
+
+  const box = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  box.appendChild(h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', flexWrap:'wrap', gap:'8px' } },
+    h('div', { style: { fontSize:'14px', fontWeight:'600', color:'var(--primary)' } }, '📋 观察库操作记录'),
+    h('div', { style: { fontSize:'11px', color:'var(--text-muted)' } }, isMaster ? '主管理员可见全部操作记录' : '子管理员仅可见自己的操作记录')
+  ));
+  box.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-secondary)', marginBottom:'12px', lineHeight:'1.6' } },
+    '记录所有观察库相关操作：系统自动进出库、管理员调分、淘汰、重置为自动评分等。每条记录包含专家、调整内容、操作者、操作意见与时间。'
+  ));
+  box.appendChild(renderObservationOpsTable(ops, { showExpert: true }));
+  container.appendChild(box);
 }
 
 // Global autoSyncObservation function
@@ -6481,6 +6553,7 @@ function autoSyncObservationGlobal() {
   const db = appState.db;
   const cfg = db.ratingConfig || DEFAULT_RATING_CONFIG;
   const obsThreshold = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
+  const systemOperator = { id: 'system', name: '系统', role: 'system' };
   let changed = false;
   db.experts.forEach(e => {
     if (e.status === 'eliminated') return;
@@ -6491,7 +6564,8 @@ function autoSyncObservationGlobal() {
       const after = snapshotExpertScores(e);
       recordObservationOperation(db, e, 'auto_in', before, after,
         '综合评分低于 ' + obsThreshold + '★，系统自动移入观察库（观察期 18 个月）',
-        ['自动入库']
+        ['自动入库'],
+        systemOperator
       );
       changed = true;
     }
@@ -6501,7 +6575,8 @@ function autoSyncObservationGlobal() {
       const after = snapshotExpertScores(e);
       recordObservationOperation(db, e, 'auto_out', before, after,
         '综合评分达到 ' + obsThreshold + '★，系统自动移出观察库',
-        ['自动出库']
+        ['自动出库'],
+        systemOperator
       );
       changed = true;
     }
@@ -7117,7 +7192,7 @@ function renderRatingsTab(panel) {
 
   // 顶部简明提示
   const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
-  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>3★</b>，子维度分值范围 <b>1–5★</b>，综合分低于 <b>3★</b> 进入观察库。管理员仅可调整 5 个评分项的整数分值；专业度 / 影响力 / 综合得分由系统自动计算。';
+  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>2★</b>，子维度分值范围 <b>1–5★</b>，综合分低于 <b>3★</b> 进入观察库。管理员仅可调整 5 个评分项的整数分值；专业度 / 影响力 / 综合得分由系统自动计算。';
   configSec.appendChild(hintDiv);
 
   // 完整文档入口（仅主管理员）
@@ -7126,7 +7201,7 @@ function renderRatingsTab(panel) {
     docLink.innerHTML = `
       <div style="font-size:24px; flex-shrink:0;">📐</div>
       <div style="flex:1;">
-        <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.0）</div>
+        <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.3）</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
       </div>
       <a href="./docs/scoring-rules-five-star.html" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
@@ -7147,20 +7222,19 @@ function renderRatingsTab(panel) {
   const overviewTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px', marginBottom:'16px' } });
   const overviewHead = h('thead');
   const ohr = h('tr', { style:{ borderBottom:'2px solid var(--border)' } });
-  ['维度', '评分项', '占比', '综合得分'].forEach((hdr, hi) => {
+  ['维度', '评分项', '占比'].forEach((hdr, hi) => {
     ohr.appendChild(h('th', { style:{ padding:'8px 10px', textAlign: hi === 2 ? 'center' : 'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600', background:'#f8fafc' } }, hdr));
   });
   overviewHead.appendChild(ohr); overviewTable.appendChild(overviewHead);
   const overviewBody = h('tbody');
   [
-    { dim: '专业度', items: '① 学历与学术背景 · ② 行业资质与认证 · ③ 专业成果与经验', weight: '60%（各项各 20%）', formula: '专业度 × 60% + 影响力 × 40%，保留 1 位小数' },
-    { dim: '影响力', items: '④ 社会荣誉与奖项 · ⑤ 职称、管理履历与行业地位', weight: '40%（各项各 20%）', formula: '' }
+    { dim: '专业度', items: '① 学历与学术背景 · ② 行业资质与认证 · ③ 专业成果与经验', weight: '60%（各项各 20%）' },
+    { dim: '影响力', items: '④ 社会荣誉与奖项 · ⑤ 职称、管理履历与行业地位', weight: '40%（各项各 20%）' }
   ].forEach((row, ri) => {
     const tr = h('tr', { style:{ borderBottom:'1px solid #f1f5f9', background: ri === 0 ? '#eff6ff' : '#fffbeb' } });
     tr.appendChild(h('td', { style:{ padding:'8px 10px', fontWeight:'700', color: ri === 0 ? '#1e40af' : '#92400e' } }, row.dim));
     tr.appendChild(h('td', { style:{ padding:'8px 10px', fontSize:'11px' } }, row.items));
     tr.appendChild(h('td', { style:{ padding:'8px 10px', textAlign:'center', fontWeight:'600', color:'var(--text-secondary)' } }, row.weight));
-    tr.appendChild(h('td', { style:{ padding:'8px 10px', fontSize:'11px', color:'var(--text-muted)' } }, row.formula));
     overviewBody.appendChild(tr);
   });
   overviewTable.appendChild(overviewBody);
@@ -7187,7 +7261,7 @@ function renderRatingsTab(panel) {
   configSec.appendChild(matrixTable);
 
   configSec.appendChild(h('div', { style:{ marginTop:'12px', padding:'10px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'12px', color:'#1e40af', lineHeight:'1.6' } },
-    '💡 信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 3★ 计。'
+    '💡 信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计。'
   ));
 
   // 自动评分开关（仅主管理，放在规则表格下方）
@@ -8127,6 +8201,9 @@ function renderObservationTab(panel) {
     h('span', { style:{ padding:'4px 10px', background: elimCount > 0 ? '#fef2f2' : '#f0fdf4', borderRadius:'6px', border:'1px solid ' + (elimCount > 0 ? '#fecaca' : '#bbf7d0') } }, '已淘汰: ' + elimCount + ' 位')
   ));
 
+  // v5.9.3: 全局观察库操作记录审计区
+  renderObservationAuditLog(panel, db);
+
   obsExperts.forEach(function(expert) {
     var card = h('div', { className: 'observation-card' + (expert.observationStatus === 'eliminated' ? ' eliminated' : '') });
 
@@ -8184,7 +8261,6 @@ function renderObservationTab(panel) {
       h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
         evalBtn,
         elimBtn,
-        h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: function() { showObservationHistory(expert); } }, '操作记录'),
         h('button', { className:'btn btn-danger btn-sm', style:{ fontSize:'11px' }, onclick: function() {
           if (confirm('确认永久删除' + expert.name + '？此操作不可撤销。')) {
             db.experts = db.experts.filter(function(ex) { return ex.id !== expert.id; });
@@ -8252,8 +8328,8 @@ function renderObservationTab(panel) {
     renderSubDimInputs(profDim, 'professional', '#3B82F6');
     renderSubDimInputs(inflDim, 'influence', '#F59E0B');
 
-    // Reset AI button
-    scoreBox.appendChild(h('div', { style:{ marginTop:'6px' } },
+    // Reset AI button + 历次调分记录入口
+    scoreBox.appendChild(h('div', { style:{ marginTop:'8px', display:'flex', gap:'10px', alignItems:'center' } },
       h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'10px', padding:'2px 10px' }, onclick: function() {
         var before = snapshotExpertScores(expert);
         promptObservationNote('重置为自动评分确认：' + expert.name, '', function(note) {
@@ -8275,7 +8351,8 @@ function renderObservationTab(panel) {
           renderObservationTab(panel);
           toast(expert.name + ' 已重置为自动评分', 'success');
         });
-      } }, '重置为自动评分')
+      } }, '重置为自动评分'),
+      h('a', { href:'#', style:{ fontSize:'11px', color:'var(--primary)', textDecoration:'none' }, onclick: function(e) { e.preventDefault(); showObservationHistory(expert); } }, '📋 历次调分记录')
     ));
     card.appendChild(scoreBox);
 
@@ -9467,10 +9544,40 @@ function renderMonthlyReportTab(panel) {
   
   usageCard.appendChild(usageCols);
   panel.appendChild(usageCard);
-  
-  // ===== Section ⑤: 系统更新日志概要 =====
+
+  // ===== Section ⑤: 观察库操作明细 =====
+  var obsOpCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
+  obsOpCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '⑤ 观察库操作明细'));
+
+  var monthOps = [];
+  if (db.observationOperations && db.observationOperations.length > 0) {
+    monthOps = db.observationOperations.filter(function(op) {
+      if (!op || !op.createdAt) return false;
+      var d = new Date(op.createdAt);
+      return d >= monthStart && d < monthEnd;
+    });
+  }
+
+  var opTypeCounts = {};
+  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+  monthOps.forEach(function(op) { opTypeCounts[op.operation] = (opTypeCounts[op.operation] || 0) + 1; });
+
+  if (monthOps.length === 0) {
+    obsOpCard.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-muted)', padding:'8px 0' } }, '本月暂无观察库操作记录'));
+  } else {
+    var opSummary = h('div', { style: { display:'flex', gap:'10px', marginBottom:'12px', flexWrap:'wrap', fontSize:'12px' } });
+    opSummary.appendChild(h('span', { style: { padding:'4px 10px', background:'#eff6ff', borderRadius:'6px', border:'1px solid #bfdbfe' } }, '本月操作：' + monthOps.length + ' 次'));
+    Object.keys(opTypeCounts).forEach(function(k) {
+      opSummary.appendChild(h('span', { style: { padding:'4px 10px', background:'#f8fafc', borderRadius:'6px', border:'1px solid var(--border)' } }, (opTypeNames[k] || k) + '：' + opTypeCounts[k] + ' 次'));
+    });
+    obsOpCard.appendChild(opSummary);
+    obsOpCard.appendChild(renderObservationOpsTable(monthOps.slice(0, 50), { showExpert: true }));
+  }
+  panel.appendChild(obsOpCard);
+
+  // ===== Section ⑥: 系统更新日志概要 =====
   var logCard = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
-  logCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '⑤ 系统更新日志概要'));
+  logCard.appendChild(h('div', { style: { fontSize:'13px', fontWeight:'600', marginBottom:'12px' } }, '⑥ 系统更新日志概要'));
   
   var monthLogs = VERSION_CHANGELOG.filter(function(entry) {
     var d = new Date(entry.date);
@@ -9581,7 +9688,17 @@ function buildMonthlyReportCanvas() {
     var d = new Date(entry.date);
     return d >= monthStart && d < monthEnd;
   });
-  
+
+  var monthOps = [];
+  if (db.observationOperations && db.observationOperations.length > 0) {
+    monthOps = db.observationOperations.filter(function(op) {
+      if (!op || !op.createdAt) return false;
+      var d = new Date(op.createdAt);
+      return d >= monthStart && d < monthEnd;
+    });
+  }
+  var opTypeNames = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+
   // Canvas dimensions
   var W = 800;
   var sectionGap = 16;
@@ -9592,8 +9709,9 @@ function buildMonthlyReportCanvas() {
   var scoreDistH = scoredExperts.length > 0 ? 220 : 0;
   var sec3H = 60 + barChartH + scoreDistH;
   var sec4H = 120;
-  var sec5H = 60 + monthLogs.length * 28;
-  var H = titleH + sec1H + sec2H + sec3H + sec4H + sec5H + sectionGap * 6 + 40;
+  var sec5H = 60 + (monthOps.length === 0 ? 22 : (28 + monthOps.length * 24));
+  var sec6H = 60 + monthLogs.length * 28;
+  var H = titleH + sec1H + sec2H + sec3H + sec4H + sec5H + sec6H + sectionGap * 7 + 40;
   
   var canvas = document.createElement('canvas');
   canvas.width = W;
@@ -9799,9 +9917,29 @@ function buildMonthlyReportCanvas() {
   drawTextRow('累计页面访问：' + pageViews.total + '次', leftPad + 200, y + 14);
   y += 30;
   y += sectionGap;
-  
-  // ---- Section 5: Changelog ----
-  drawSectionTitle('⑤ 系统更新日志概要');
+
+  // ---- Section 5: Observation operations ----
+  drawSectionTitle('⑤ 观察库操作明细');
+  if (monthOps.length === 0) {
+    drawTextRow('本月暂无观察库操作记录', leftPad, y + 14);
+    y += 22;
+  } else {
+    drawTextRow('本月操作：' + monthOps.length + ' 次', leftPad, y + 14);
+    y += 22;
+    monthOps.slice(0, 20).forEach(function(op) {
+      var typeName = opTypeNames[op.operation] || op.operation;
+      var beforeOverall = op.before && op.before.scores && op.before.scores.overall !== undefined ? op.before.scores.overall.toFixed(1) : '-';
+      var afterOverall = op.after && op.after.scores && op.after.scores.overall !== undefined ? op.after.scores.overall.toFixed(1) : '-';
+      var line = '  • ' + formatDate(op.createdAt) + '  ' + (op.expertName || '-') + '  ' + typeName +
+                 '  ' + op.operatorName + '  综合:' + beforeOverall + '→' + afterOverall;
+      drawTextRow(line, leftPad, y + 14);
+      y += 24;
+    });
+  }
+  y += sectionGap;
+
+  // ---- Section 6: Changelog ----
+  drawSectionTitle('⑥ 系统更新日志概要');
   if (monthLogs.length === 0) {
     drawTextRow('本月无更新记录', leftPad, y + 14);
     y += 22;
@@ -9811,7 +9949,7 @@ function buildMonthlyReportCanvas() {
       y += 24;
     });
   }
-  
+
   return canvas;
 }
 
