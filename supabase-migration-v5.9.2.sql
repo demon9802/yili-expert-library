@@ -1,11 +1,12 @@
 -- v5.9.2: 观察库操作记录表
 -- 手动执行方式：Supabase Dashboard → SQL Editor → 粘贴执行
 -- 用途：记录观察库内专家的调分、淘汰、自动进出库等操作，支持主管理员审计与子管理员自审
+-- 修正（2026-08-11）: expert_id 改为 INTEGER，以匹配 experts.id 类型，避免 FK 约束创建失败
 
 -- 1. 创建 observation_operations 表
 CREATE TABLE IF NOT EXISTS observation_operations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  expert_id TEXT REFERENCES experts(id) ON DELETE SET NULL,
+  expert_id INTEGER REFERENCES experts(id) ON DELETE SET NULL,
   expert_name TEXT,
   operation TEXT NOT NULL, -- adjust / release / eliminate / auto_in / auto_out / ai_reset
   operator_id TEXT,
