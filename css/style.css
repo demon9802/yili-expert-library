@@ -618,29 +618,27 @@ body {
   display: flex;
   align-items: center;
   gap: 3px;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  color: #92400e;
-  padding: 2px 8px;
-  border-radius: 12px;
   font-size: 13px;
   font-weight: 700;
+  color: #7C3AED; /* 综合分用紫色，与详情页一致 */
 }
-.card-score-main .star { color: #f59e0b; font-size: 12px; }
+.card-score-main .star-rating .star-fill { color: #8B5CF6; }
 .card-score-subs {
   display: flex;
   gap: 4px;
 }
 .card-score-sub {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   font-size: 11px;
-  background: #f8fafc;
-  padding: 1px 5px;
-  border-radius: 6px;
+  padding: 1px 0;
   white-space: nowrap;
-  color: #475569;
 }
 .card-score-sub.prof { color: #3B82F6; }
+.card-score-sub.prof .star-rating .star-fill { color: #3B82F6; }
 .card-score-sub.infl { color: #F59E0B; }
-.card-score .star { color: #f59e0b; font-size: 14px; }
+.card-score-sub.infl .star-rating .star-fill { color: #F59E0B; }
 
 /* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
 .star-rating {
@@ -666,10 +664,12 @@ body {
 .star-rating.lg { font-size: 26px; letter-spacing: 2px; }
 .card-score-main .star-rating { font-size: 13px; }
 .card-score-sub .star-rating { font-size: 11px; }
-.card-score-num { margin-left: 4px; font-size: 12px; font-weight: 700; color: #92400e; }
+.card-score-num { margin-left: 4px; font-size: 12px; font-weight: 700; color: inherit; }
 .detail-score-card-val { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .detail-score-num { font-size: 13px; font-weight: 700; color: var(--text-muted); margin-top: 2px; }
 .detail-score-card-val.overall .star-fill { color: #8B5CF6; }
+.detail-score-card-val.prof .star-fill { color: #3B82F6; }
+.detail-score-card-val.infl .star-fill { color: #F59E0B; }
 .card-edu {
   font-size: 13px;
   color: #1e293b;

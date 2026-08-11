@@ -2284,12 +2284,14 @@ function showExpertDetail(expert) {
   const detailFavStar = h('span', {
     className: 'card-fav-star detail-fav-star' + (detailFavved ? ' active' : ''),
     title: detailFavved ? '取消收藏' : '收藏专家',
-    onclick: (e) => {
+    onclick: async (e) => {
       e.stopPropagation();
-      const nowFavved = toggleFavorite(expert.id);
+      const nowFavved = await toggleFavorite(expert.id);
       detailFavStar.className = 'card-fav-star detail-fav-star' + (nowFavved ? ' active' : '');
       detailFavStar.title = nowFavved ? '取消收藏' : '收藏专家';
       detailFavStar.textContent = nowFavved ? '♥' : '♡';
+      // 同步刷新专家卡上的收藏状态
+      renderExpertGrid();
     }
   }, detailFavved ? '♥' : '♡');
   nameGroup.appendChild(detailFavStar);
@@ -6893,8 +6895,8 @@ function renderRatingsTab(panel) {
   const showScores = cfg.showScores !== false;
 
   panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } },
-    isMaster ? '管理评分的维度配置、子维度权重及所有专家的各项分值。调整后自动重新计算综合评分。'
-             : '查看评分细则、调整各专家分值。维度配置和权重调整仅主管理员可操作。'
+    isMaster ? '管理评分的展示开关、查看评分规则，以及调整所有专家的子维度分值。'
+             : '查看评分规则、调整各专家分值。维度配置和权重调整仅主管理员可操作。'
   ));
 
   // ===== 辅助函数 =====
@@ -6933,116 +6935,51 @@ function renderRatingsTab(panel) {
     return;
   }
 
-  // ===== 子管理员：① 调分操作指南（放在最前面，先告诉怎么用再看规则）=====
+  // ===== 子管理员：顶部简明提示 =====
   if (!isMaster) {
-    const guide = h('div', { style:{ background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BBF7D0' } });
-    guide.appendChild(h('h4', { style:{ margin:'0 0 10px', fontSize:'14px', color:'#166534' } }, '① 调分操作指南'));
-
-    const canDo = h('div', { style:{ marginBottom:'12px' } });
-    canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
-    const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    ['在下方专家列表中，直接修改每个子维度（共 5 个评分项）的分数输入框，仅可填整数 1–5★','修改后专业度/影响力/综合得分由系统按权重自动重新计算，无需也无法手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
-      canList.appendChild(h('li', {}, t));
-    });
-    canDo.appendChild(canList);
-    guide.appendChild(canDo);
-
-    const note = h('div', { style:{ marginBottom:'12px' } });
-    note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
-    const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    noteList.appendChild(h('li', {}, '某个子维度信息缺失时，该子维度默认 3★（中性值，不拉高也不压低）'));
-    noteList.appendChild(h('li', {}, '专业度、影响力、综合得分均为系统按权重自动计算的平均值，不可直接编辑，只能改 5 个评分项的整数分（1–5★）'));
-    noteList.appendChild(h('li', {}, '综合分低于 3★ 的专家会自动进入观察库，不会在前端展示'));
-    noteList.appendChild(h('li', {}, '每个子维度最高 5★，超过会自动截断'));
-    note.appendChild(noteList);
-    guide.appendChild(note);
-
-    const tip = h('div', {});
-    tip.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#1D4ED8', marginBottom:'6px' } }, '💡 什么时候需要手动调分？'));
-    const tipList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    tipList.appendChild(h('li', {}, '自动评分偏高或偏低，与实际能力不符 → 直接改对应评分项（子维度）的整数分即可'));
-    tipList.appendChild(h('li', {}, '有新的资质/成果信息未录入 → 先补充信息再重置为自动评分'));
-    tipList.appendChild(h('li', {}, '不确定怎么打分 → 保持自动评分不变，或联系主管理员确认'));
-    tip.appendChild(tipList);
-    guide.appendChild(tip);
-
+    const guide = h('div', { style:{ background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', padding:'12px 16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid #BBF7D0' } });
+    guide.appendChild(h('div', { style:{ fontSize:'12px', lineHeight:'1.8', color:'#166534' } },
+      '直接修改下方表格中 5 个评分项的整数分值（1–5★，最高 5★）；专业度、影响力、综合得分由系统自动计算，不可直接编辑。'
+    ));
     panel.appendChild(guide);
   }
 
-  // ===== ② 评分体系配置（合并评分细则 + 赋分标准可编辑）=====
-  // 主管理员：完整编辑界面 | 子管理员：只读细则说明
+  // ===== ② 评分配置 / 评分规则（只读表格）=====
+  // v5.9.1：主管理员暂不开放编辑评分规则（需接入大模型才能精准调分），统一为查分表
   const configSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-  const configTitle = isMaster ? '② 评分体系配置（维度 & 赋分标准）' : '② 评分细则说明';
+  const configTitle = isMaster ? '② 评分配置（规则及文档）' : '① 评分规则';
   configSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, configTitle));
 
-  if (!isMaster) {
-    configSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'12px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px' } },
-      '评分细则仅主管理员可编辑。以下为当前生效的评分标准，子管理员可据此为专家调整分值。'
-    ));
-  }
-
-  // 评分说明提示（用 innerHTML 支持加粗标记）
+  // 顶部简明提示
   const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
-  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>3★</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 5★；综合分低于 3★ 不进入观察库。自动评分仅供参考，管理员<b>仅可手动调整 5 个评分项（子维度）的整数分值（1–5★）</b>；专业度 / 影响力 / 综合得分由系统按权重自动计算，不可直接编辑。';
+  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>3★</b>，子维度分值范围 <b>1–5★</b>，综合分低于 <b>3★</b> 进入观察库。管理员仅可调整 5 个评分项的整数分值；专业度 / 影响力 / 综合得分由系统自动计算。';
   configSec.appendChild(hintDiv);
 
-  // 遍历每个主维度
+  // 完整文档入口（仅主管理员）
+  if (isMaster) {
+    const docLink = h('div', { style:{ marginBottom:'14px', padding:'10px 14px', background:'linear-gradient(135deg,#F0FDF4,#ECFDF5)', borderRadius:'8px', border:'1px solid #BBF7D0', display:'flex', alignItems:'center', gap:'10px' } });
+    docLink.innerHTML = `
+      <div style="font-size:24px; flex-shrink:0;">📐</div>
+      <div style="flex:1;">
+        <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.0）</div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
+      </div>
+      <a href="https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-five-star.md" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+    `;
+    configSec.appendChild(docLink);
+  }
+
+  // 评分规则表格：主维度 → 子维度 / 权重 / 赋分标准
   cfg.dimensions.forEach((dim, dimIdx) => {
-    const dimCard = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'10px', marginBottom:'12px', border:'2px solid ' + (dimIdx === 0 ? '#bfdbfe' : '#fde68a') } });
+    const dimCard = h('div', { style: { background:'var(--bg)', padding:'12px 14px', borderRadius:'10px', marginBottom:'12px', border:'2px solid ' + (dimIdx === 0 ? '#bfdbfe' : '#fde68a') } });
     const dimColor = dimIdx === 0 ? '#1e40af' : '#92400e';
     const dimBgColor = dimIdx === 0 ? '#dbeafe' : '#fef3c7';
 
-    // --- 主维度头部：名称 + 权重 ---
-    const dimHeader = h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px', marginBottom:'8px' } });
-    const dimNameCol = h('div', { style:{ flex:1, minWidth:'200px' } });
+    dimCard.appendChild(h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'8px', marginBottom:'10px' } },
+      h('div', { style:{ fontWeight:'700', fontSize:'14px', color: dimColor } }, dim.name),
+      h('span', { style:{ fontSize:'13px', color: dimColor, fontWeight:'600', background: dimBgColor, padding:'3px 10px', borderRadius:'12px' } }, '权重 ' + Math.round(dim.weight * 100) + '%')
+    ));
 
-    if (isMaster) {
-      // 可编辑的主维度名称
-      const nameInp = h('input', {
-        type: 'text', value: dim.name,
-        style: { width:'160px', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'14px', fontWeight:'700', color: dimColor },
-        onchange: (e) => {
-          const v = e.target.value.trim();
-          if (!v) { toast('名称不能为空', 'error'); e.target.value = dim.name; return; }
-          dim.name = v; saveDB(db); renderRatingsTab(panel);
-          toast('主维度名称已更新', 'success');
-        }
-      });
-      dimNameCol.appendChild(nameInp);
-      // [v5.8.8.3] 评估方向(desc)输入框已移除，不再显示/编辑
-    } else {
-      dimNameCol.appendChild(h('div', { style:{ fontWeight:'700', fontSize:'14px', color: dimColor } }, dim.name));
-      // [v5.8.8.3] 子管理员也不再显示评估方向(desc)
-    }
-    dimHeader.appendChild(dimNameCol);
-
-    // 权重控制
-    if (isMaster) {
-      const weightCtrl = h('div', { style: { display:'flex', gap:'6px', alignItems:'center' } });
-      weightCtrl.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '权重：'));
-      const weightInput = h('input', {
-        type: 'number', value: String(Math.round(dim.weight * 100)), min: 10, max: 90, step: 5,
-        style: { width:'60px', padding:'4px 6px', border:'1px solid var(--border)', borderRadius:'6px', fontSize:'13px', textAlign:'center' },
-        onchange: (e) => {
-          const newW = parseInt(e.target.value) / 100;
-          if (isNaN(newW) || newW < 0.1 || newW > 0.9) { toast('权重需在10%-90%之间', 'error'); return; }
-          dim.weight = newW;
-          cfg.dimensions[1 - dimIdx].weight = 1 - newW;
-          recalcAllExperts();
-          saveDB(db);
-          renderRatingsTab(panel);
-          toast('权重已更新并重算所有专家评分', 'success');
-        }
-      });
-      weightCtrl.appendChild(weightInput);
-      weightCtrl.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '%'));
-      dimHeader.appendChild(weightCtrl);
-    } else {
-      dimHeader.appendChild(h('span', { style:{ fontSize:'13px', color: dimColor, fontWeight:'600', background: dimBgColor, padding:'3px 10px', borderRadius:'12px' } }, '权重 ' + Math.round(dim.weight * 100) + '%'));
-    }
-    dimCard.appendChild(dimHeader);
-
-    // --- 子维度表格：名称 + 权重 + 赋分标准 ---
     if (!dim.subDimensions) dim.subDimensions = [];
     const subTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px' } });
     const subThead = h('thead');
@@ -7053,141 +6990,21 @@ function renderRatingsTab(panel) {
     subThead.appendChild(sr); subTable.appendChild(subThead);
     const subTbody = h('tbody');
 
-    dim.subDimensions.forEach((sd, sdIdx) => {
+    dim.subDimensions.forEach((sd) => {
       const row = h('tr', { style:{ borderBottom:'1px solid #f3f4f6' } });
-
-      // 子维度名称
-      const nameTd = h('td', { style:{ padding:'6px 8px' } });
-      if (isMaster) {
-        const nameInp = h('input', {
-          type: 'text', value: sd.name,
-          style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px' },
-          placeholder: '子维度名称...',
-          onchange: (ev) => {
-            const newName = ev.target.value.trim();
-            if (!newName) { toast('名称不能为空', 'error'); ev.target.value = sd.name; return; }
-            const oldName = sd.name;
-            sd.name = newName;
-            db.experts.forEach(e => {
-              if (e.subScores && e.subScores[dim.id] && e.subScores[dim.id][oldName] !== undefined) {
-                e.subScores[dim.id][newName] = e.subScores[dim.id][oldName];
-                delete e.subScores[dim.id][oldName];
-              }
-            });
-            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
-            toast('子维度名称已更新', 'success');
-          }
-        });
-        nameTd.appendChild(nameInp);
-      } else {
-        nameTd.appendChild(h('span', { style:{ fontWeight:'500' } }, sd.name));
-      }
-      row.appendChild(nameTd);
-
-      // 权重
-      const wTd = h('td', { style:{ padding:'6px 8px', textAlign:'center' } });
-      if (isMaster) {
-        const wInp = h('input', {
-          type: 'number', value: String(Math.round(sd.weight * 100)), min: 5, max: 80, step: 5,
-          style: { width:'50px', padding:'3px 5px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'12px', textAlign:'center' },
-          onchange: (ev) => {
-            const newSW = parseInt(ev.target.value) / 100;
-            if (isNaN(newSW) || newSW < 0.05 || newSW > 0.8) { toast('子维度权重需在5%-80%之间', 'error'); return; }
-            sd.weight = newSW;
-            const total = dim.subDimensions.reduce((s, d) => s + d.weight, 0);
-            if (Math.abs(total - 1) > 0.001) {
-              const others = dim.subDimensions.filter((_, i) => i !== sdIdx);
-              const rem = others.reduce((s, d) => s + d.weight, 0);
-              if (rem > 0) others.forEach(d => { d.weight = Math.round(d.weight / rem * (1 - newSW) * 100) / 100; });
-              dim.subDimensions[dim.subDimensions.length - 1].weight += parseFloat((1 - dim.subDimensions.reduce((s, d) => s + d.weight, 0)).toFixed(2));
-            }
-            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
-            toast('子维度权重已更新', 'success');
-          }
-        });
-        wTd.appendChild(wInp);
-        wTd.appendChild(h('span', { style:{ fontSize:'11px', color:'var(--text-muted)' } }, '%'));
-      } else {
-        wTd.appendChild(h('span', { style:{ color:'var(--text-secondary)' } }, Math.round(sd.weight * 100) + '%'));
-      }
-      row.appendChild(wTd);
-
-      // 赋分标准
-      const critTd = h('td', { style:{ padding:'6px 8px' } });
-      if (isMaster) {
-        const critInp = h('textarea', {
-          value: sd.criteria || '',
-          placeholder: '输入赋分标准（如：9分：... | 8分：... | 6分：信息缺失/模糊）',
-          style: { width:'100%', padding:'4px 8px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', lineHeight:'1.5', resize:'vertical', minHeight:'36px' },
-          onchange: (ev) => {
-            sd.criteria = ev.target.value.trim();
-            saveDB(db);
-            toast('赋分标准已保存', 'success');
-          }
-        });
-        critTd.appendChild(critInp);
-      } else {
-        critTd.appendChild(h('span', { style:{ fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5', whiteSpace:'pre-wrap' } }, sd.criteria || '暂无赋分标准'));
-      }
-      row.appendChild(critTd);
-
-      // 删除按钮（仅主管理）
-      if (isMaster && dim.subDimensions.length > 1) {
-        const delTd = h('td', { style:{ padding:'6px 8px', textAlign:'center' } });
-        const delBtn = h('button', {
-          style: { background:'none', border:'1px solid #fca5a5', color:'#dc2626', borderRadius:'4px', cursor:'pointer', fontSize:'14px', padding:'2px 7px', lineHeight:'1' },
-          title: '删除此子维度',
-          onclick: () => {
-            const sdName = sd.name;
-            dim.subDimensions.splice(sdIdx, 1);
-            const rem = dim.subDimensions.reduce((s, d) => s + d.weight, 0);
-            if (rem > 0) dim.subDimensions.forEach(d => { d.weight = Math.round(d.weight / rem * 100) / 100; });
-            db.experts.forEach(e => {
-              if (e.subScores && e.subScores[dim.id] && e.subScores[dim.id][sdName] !== undefined) {
-                delete e.subScores[dim.id][sdName];
-              }
-            });
-            recalcAllExperts(); saveDB(db); renderRatingsTab(panel);
-            toast('已删除子维度「' + sdName + '」', 'success');
-          }
-        }, '×');
-        delTd.appendChild(delBtn);
-        row.appendChild(delTd);
-      } else if (isMaster) {
-        row.appendChild(h('td', { style:{ padding:'6px 8px' } }));
-      }
+      row.appendChild(h('td', { style:{ padding:'6px 8px', fontWeight:'500' } }, sd.name));
+      row.appendChild(h('td', { style:{ padding:'6px 8px', textAlign:'center', color:'var(--text-secondary)' } }, Math.round(sd.weight * 100) + '%'));
+      row.appendChild(h('td', { style:{ padding:'6px 8px', fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5', whiteSpace:'pre-wrap' } }, sd.criteria || '暂无赋分标准'));
       subTbody.appendChild(row);
     });
     subTable.appendChild(subTbody);
-
-    // 添加子维度按钮（仅主管理）
-    if (isMaster && dim.subDimensions.length < 4) {
-      const addRow = h('tr');
-      const addTd = h('td', { colspan: 4, style:{ padding:'6px 8px' } });
-      const addBtn = h('button', {
-        style: { background:'none', border:'1px dashed var(--border)', color:'var(--primary)', borderRadius:'6px', cursor:'pointer', fontSize:'12px', padding:'4px 14px' },
-        onclick: () => {
-          const newSD = { name: '新子维度', weight: Math.round((1 / (dim.subDimensions.length + 1)) * 100) / 100, maxScore: 10, criteria: '6-9分：按资质等级评定 | 6分：信息缺失/模糊' };
-          dim.subDimensions.push(newSD);
-          const eq = Math.round(100 / dim.subDimensions.length) / 100;
-          dim.subDimensions.forEach(d => { d.weight = eq; });
-          dim.subDimensions[dim.subDimensions.length - 1].weight += parseFloat((1 - eq * dim.subDimensions.length).toFixed(2));
-          saveDB(db); renderRatingsTab(panel);
-          toast('已添加新子维度', 'success');
-        }
-      }, '+ 添加子维度（最多4条）');
-      addTd.appendChild(addBtn); addRow.appendChild(addTd); subTable.appendChild(addRow);
-    }
     dimCard.appendChild(subTable);
     configSec.appendChild(dimCard);
   });
-  panel.appendChild(configSec);
 
-  // ===== 自动评分开关（仅主管理）=====
+  // 自动评分开关（仅主管理，放在规则表格下方）
   if (isMaster) {
-    const aiSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-    aiSec.appendChild(h('h4', { style: { marginBottom:'8px', fontSize:'14px' } }, '自动评分'));
-    const aiRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center' } });
+    const aiRow = h('div', { style:{ display:'flex', gap:'12px', alignItems:'center', marginTop:'12px', paddingTop:'12px', borderTop:'1px solid var(--border)' } });
     aiRow.appendChild(h('span', { style:{ fontSize:'13px' } }, '启用自动评分：'));
     aiRow.appendChild(h('input', { type:'checkbox', checked: cfg.aiScoringEnabled, onchange: (e) => {
       cfg.aiScoringEnabled = e.target.checked;
@@ -7195,10 +7012,11 @@ function renderRatingsTab(panel) {
       saveDB(db); renderRatingsTab(panel);
       toast(e.target.checked ? '自动评分已启用' : '自动评分已关闭', 'success');
     }}));
-    aiSec.appendChild(aiRow);
-    aiSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, '系统根据专家学历、资历、履历等信息自动生成子维度评分。关闭后可手动调整每位专家的评分。'));
-    panel.appendChild(aiSec);
+    aiRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '系统根据专家学历、资历、履历等信息自动生成子维度评分。'));
+    configSec.appendChild(aiRow);
   }
+
+  panel.appendChild(configSec);
 
   // ===== 专家评分调整（所有管理员）=====
   const scoreIdx = isMaster ? '③' : '②';
@@ -7284,148 +7102,29 @@ function renderRatingsTab(panel) {
   }
   setTimeout(() => renderRatingTable(), 50);
 
-  // ===== ⑤ 评分规则与测算验证（仅主管理员：快速规则 + 赋分逻辑 + 详细文档入口）=====
-  // 设计意图：⑤ = 快速了解规则、核对赋分逻辑、辅助调分决策；完整留底靠嵌入文档链接
-  if (isMaster) {
-    const _profDim = cfg.dimensions.find(d => d.id === 'professional');
-    const _inflDim = cfg.dimensions.find(d => d.id === 'influence');
-    const profW = Math.round((_profDim?.weight || 0.6) * 100);
-    const inflW = Math.round((_inflDim?.weight || 0.4) * 100);
-
-    const docSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
-    docSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, '⑤ 评分规则与测算验证（v5.9.0 五星制）'));
-
-    const docBody = h('div', { className:'scoring-doc-body', style:{ fontSize:'12px', lineHeight:'1.7', color:'var(--text)' } });
-
-    docBody.innerHTML = `
-      <!-- ===== 文档入口卡片 ===== -->
-      <div style="margin-bottom:14px; padding:10px 14px; background:linear-gradient(135deg,#F0FDF4,#ECFDF5); border-radius:8px; border:1px solid #BBF7D0; display:flex; align-items:center; gap:10px;">
-        <div style="font-size:24px; flex-shrink:0;">📐</div>
-        <div style="flex:1;">
-          <div style="font-weight:600; font-size:13px; color:'#166534';">评分规则·五星制内部版（v5.9.0）</div>
-          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力2个维度，共5个评分项，计算综合得分 → 核对赋分逻辑 / 检验测算结果</div>
-        </div>
-        <a href="https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/docs/scoring-rules-five-star.md" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
-      </div>
-
-      <!-- ===== 第一部分：计算公式与逻辑 ===== -->
-      <div style="margin-bottom:16px; padding:12px 14px; background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border-radius:8px; border-left:4px solid #4338CA;">
-        <strong style="font-size:14px; color:#312E81;">📐 核心计算公式（五星制）</strong>
-        <div style="margin-top:8px; font-size:11.5px; background:#fff; padding:10px; border-radius:6px; line-height:1.9;">
-          <b>Step 1</b> — 取子维度分值（整数★）：<br>
-          &nbsp;&nbsp;有录入值 → 使用录入值；缺失(空/未公开/模糊) → 统一取 <b style="color:#DC2626">3★</b><br>
-          &nbsp;&nbsp;结果截断到 <b>[1, 5]</b>（超出封顶或低于1均修正）<br><br>
-          <b>Step 2</b> — 加权求大维度分：<br>
-          &nbsp;&nbsp;<b>专业度</b> = (学历 + 资质 + 成果) / 3<br>
-          &nbsp;&nbsp;<b>影响力</b> = (荣誉 + 职称) / 2<br><br>
-          <b>Step 3</b> — 加权求综合得分：<br>
-          &nbsp;&nbsp;<b>综合</b> = 专业度 × ${profW}% + 影响力 × ${inflW}%<br><br>
-          <b>Step 4</b> — 结果保留 1 位小数
-        </div>
-      </div>
-
-      <!-- ===== 第二部分：五子维度 1-5★ 速查 ===== -->
-      <h5 style="color:#312E81; margin:14px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">📊 五子维度 1-5★ 赋分表</h5>
-
-      <div style="margin-bottom:10px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #3B82F6;">
-        <b style="color:#1D4ED8;">① 学历与学术背景</b> <span style="color:#6B7280;font-size:11px;">（权重 1/3 | 封顶 5★ | 缺失 3★）</span>
-        <div style="font-size:11px;margin-top:4px;line-height:1.7;">
-          5★ 博士+顶尖院校（清北/C9/QS前50） | 4★ 名校硕士/普通博士 | 3★ 较好本科/普通硕士 | 2★ 普通本科 | 1★ 大专/中专及以下
-        </div>
-      </div>
-      <div style="margin-bottom:10px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #10B981;">
-        <b style="color:#059669;">② 行业资质与认证</b> <span style="color:#6B7280;font-size:11px;">（权重 1/3 | 封顶 5★ | 缺失 3★）</span>
-        <div style="font-size:11px;margin-top:4px;line-height:1.7;">
-          5★ 国际权威认证（CFA/CPA/ACCA等）或多顶国家级 | 4★ 国家级执业/行业权威（多领域） | 3★ 行业厂商认证或单一国家级执业 | 2★ 培训/通用认证 | 1★ 无相关认证
-        </div>
-      </div>
-      <div style="margin-bottom:10px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #F59E0B;">
-        <b style="color:#D97706;">③ 专业成果与经验</b> <span style="color:#6B7280;font-size:11px;">（权重 1/3 | 封顶 5★ | 缺失 3★）</span>
-        <div style="font-size:11px;margin-top:4px;line-height:1.7;">
-          5★ 标杆级（牵头国标行标/高被引/重大成果转化） | 4★ 战略级/国家级项目·顶刊 | 3★ 省级/行业级·SCI/EI | 2★ 参与级/普通论文 | 1★ 一般经验/仅演讲
-        </div>
-      </div>
-      <div style="margin-bottom:10px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #EF4444;">
-        <b style="color:#DC2626;">④ 社会荣誉与奖项</b> <span style="color:#6B7280;font-size:11px;">（权重 1/2 | 封顶 5★ | 缺失 3★）</span>
-        <div style="font-size:11px;margin-top:4px;line-height:1.7;">
-          5★ 顶尖人才（两院院士/国家级人才计划） | 4★ 国家级荣誉/称号 | 3★ 省部级荣誉/称号 | 2★ 地市级/国家级学会成员 | 1★ 无荣誉/一般协会
-        </div>
-      </div>
-      <div style="margin-bottom:12px; padding:10px; background:#F8FAFC; border-radius:6px; border-left:3px solid #8B5CF6;">
-        <b style="color:#7C3AED;">⑤ 职称、管理履历与行业地位</b> <span style="color:#6B7280;font-size:11px;">（权重 1/2 | 封顶 5★ | 缺失 3★）</span>
-        <div style="font-size:11px;margin-top:4px;line-height:1.7;">
-          5★ 教授/CEO/创始人（世界500强/央企/上市公司） | 4★ 教授/CEO/创始人（行业百强/大厂） | 3★ 副教授/总监/VP/合伙人 | 2★ 经理/高工/主管 | 1★ 无职称/基层
-        </div>
-      </div>
-
-      <!-- ===== 第三部分：关键测试案例 ===== -->
-      <h5 style="color:#312E81; margin:16px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">🧪 关键测试案例</h5>
-
-      <div style="padding:10px; background:#FEF2F2; border-radius:6px; border:1px solid #FECACA; margin-bottom:10px;">
-        <b style="color:#991B1B;">案例A：全缺失专家</b>
-        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
-          输入：5 个维度全部缺失 → 每个子维度统一取 <b>3★</b><br>
-          专业度 = (3+3+3)/3 = <b>3.0</b>；影响力 = (3+3)/2 = <b>3.0</b><br>
-          综合 = 3.0×${profW}% + 3.0×${inflW}% = <b>3.0</b>（恰好达到展示线）<br>
-          <span style="color:#991B1B;">✅ 验证：缺失默认 3★，不占优不拉低，综合=3.0 不进入观察库。</span>
-        </div>
-      </div>
-
-      <div style="padding:10px; background:#F0FDF4; border-radius:6px; border:1px solid #BBF7D0; margin-bottom:10px;">
-        <b style="color:#166534;">案例B：顶级专家</b>
-        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
-          输入：学历=5★ | 资质=5★ | 成果=5★ | 荣誉=5★ | 职称=5★<br>
-          专业度 = 5.0；影响力 = 5.0；综合 = <b>5.0</b><br>
-          <span style="color:#166534;">✅ 验证：全满星综合为 5.0。</span>
-        </div>
-      </div>
-
-      <div style="padding:10px; background:#EFF6FF; border-radius:6px; border:1px solid #BFDBFE; margin-bottom:10px;">
-        <b style="color:#1E40AF;">案例C：边界值</b>
-        <div style="font-size:11px;margin-top:4px;line-height:1.8;">
-          输入：某子维度手动输入 6 → 截断为 <b>5★（硬封顶）</b>；输入 0 → 截断为 <b>1★（硬下限）</b><br>
-          <span style="color:#1E40AF;">✅ 验证：子维度只能在 1-5★ 之间。</span>
-        </div>
-      </div>
-
-      <!-- ===== 第四部分：全局规则速查 ===== -->
-      <h5 style="color:#312E81; margin:16px 0 8px; font-size:13px; border-bottom:1px solid #E0E7FF; paddingBottom:4px;">⚙️ 全局规则汇总</h5>
-      <ul style="margin:0;padding-left:18px;font-size:11.5px;line-height:1.9;">
-        <li><b>信息缺失统一 3★</b>（五维度一致），不空置不占优</li>
-        <li><b>子维度硬封顶 5★、硬下限 1★</b></li>
-        <li><b>综合得分 &lt; 3★ 进入观察库</b>，不进入前端展示</li>
-        <li><b>管理员仅可调整 5 个评分项的整数星分</b>；专业度、影响力、综合得分由系统自动计算，不可直接编辑</li>
-      </ul>
-    `;
-    docSec.appendChild(docBody);
-    panel.appendChild(docSec);
-  }
-
-  // ===== 评分预警区（所有管理员，已整合观察库）=====
-  const warnIdx = isMaster ? '④' : '③';
-  panel.appendChild(h('h4', { style: { margin:'20px 0 8px', fontSize:'15px', color:'#dc2626' } }, warnIdx + ' 评分预警'));
-
-  // Use global autoSyncObservation
+  // ===== 评分预警（合并到专家评分调整下方，作为提示框）=====
   autoSyncObservationGlobal();
 
   const obsThreshold = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
   const lowExperts = db.experts.filter(ex => ex.status !== 'eliminated' && ex.scores.overall < obsThreshold);
 
-  // 简化：只保留高亮跳转框，统计和处理统一在观察库Tab
   if (lowExperts.length === 0) {
-    panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'14px', fontWeight:'600', color:'#059669' } }, '✅ 无预警 · 所有专家评分正常（≥ ' + obsThreshold + '★）'));
+    panel.appendChild(h('div', { style:{ marginTop:'12px', padding:'12px 16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'13px', color:'#059669' } }, '✅ 无评分预警 · 所有专家评分正常（≥ ' + obsThreshold + '★）'));
   } else {
-    const warnBox = h('div', { style:{ padding:'20px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', textAlign:'center' } });
-    warnBox.appendChild(h('div', { style:{ fontSize:'16px', fontWeight:'700', color:'#92400e', marginBottom:'8px' } }, '⚠️ 共 ' + lowExperts.length + ' 位专家综合评分低于' + obsThreshold + '★'));
-    warnBox.appendChild(h('div', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'14px' } }, '以上专家已自动同步至观察库，请前往观察库Tab进行查看和处理'));
+    const warnBox = h('div', { style:{ marginTop:'12px', padding:'14px 16px', background:'#fffbeb', borderRadius:'8px', border:'1px solid #fde68a', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'10px' } });
+    warnBox.appendChild(h('div', {},
+      h('div', { style:{ fontSize:'14px', fontWeight:'700', color:'#92400e' } }, '⚠️ 共 ' + lowExperts.length + ' 位专家综合评分低于 ' + obsThreshold + '★'),
+      h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px' } }, '已自动同步至观察库，可前往查看和处理。')
+    ));
     warnBox.appendChild(h('button', {
       className: 'btn btn-primary',
-      style: { background:'#d97706', color:'white', fontSize:'13px', padding:'8px 24px' },
+      style: { background:'#d97706', color:'white', fontSize:'12px', padding:'6px 16px' },
       onclick: () => { appState.adminTab = 'observation'; renderAdmin(); }
-    }, '🔍 前往观察库处理'));
+    }, '🔍 前往观察库'));
     panel.appendChild(warnBox);
   }
 }
+
 
 function renderSortTab(panel) {
   const db = appState.db;
