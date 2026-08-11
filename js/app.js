@@ -937,8 +937,8 @@ function h(tag, attrs={}, ...children) {
   return el;
 }
 
-// ===== v5.8.9 评分规则说明浮窗（前端"?"，简洁版 = 版本④） =====
-// 文案以 评分规则-④前端展示评分细则-v5.8.9.md 为准；权重从 ratingConfig 读取，确保与计算逻辑同步。
+// ===== v5.9.0 评分规则说明浮窗（前端"?"，五星制简洁版） =====
+// 文案与 DEFAULT_RATING_CONFIG 同步：权重从 ratingConfig 读取，确保与计算逻辑一致。
 function openScoringHelp() {
   const cfg = (appState && appState.db && appState.db.ratingConfig) || DEFAULT_RATING_CONFIG;
   const profDim = cfg.dimensions.find(d => d.id === 'professional') || {};
@@ -948,7 +948,7 @@ function openScoringHelp() {
   const html = `
     <div class="sh-head">
       <div class="sh-title">评分规则说明</div>
-      <div class="sh-ver">v5.8.9 · 10分制</div>
+      <div class="sh-ver">v5.9.0 · 五星制</div>
     </div>
     <div class="sh-body">
       <h4 class="sh-h">综合评分怎么算？</h4>
@@ -957,21 +957,20 @@ function openScoringHelp() {
         <li><b>专业度</b>：学历与学术背景 · 行业资质与认证 · 专业成果与经验</li>
         <li><b>影响力</b>：社会荣誉与奖项 · 职称 / 管理履历与行业地位</li>
       </ul>
-      <p class="sh-note">每个子项均为 <b>0–10 分</b>，由 ①主锚点（定基础分）+ ②次要角度（封顶 +0.5）+ ③额外加分（封顶 +1.0）相加而成。</p>
+      <p class="sh-note">每个子项均为 <b>1–5★</b>，由「主锚点定基础分 + 次要角度微调」综合评定；子维度硬封顶 5★、硬下限 1★。</p>
 
-      <h4 class="sh-h">分数含义（速览）</h4>
+      <h4 class="sh-h">星级含义（速览）</h4>
       <table class="sh-table">
-        <tr><td class="sh-range r-top">9–10</td><td>顶尖（清北博士、两院院士、世界500强掌舵人）</td></tr>
-        <tr><td class="sh-range r-hi">8–8.9</td><td>优秀（985硕士、省部级荣誉、行业百强高管）</td></tr>
-        <tr><td class="sh-range r-mid">6–7.9</td><td>良好 / 中等</td></tr>
-        <tr><td class="sh-range r-miss">5</td><td>信息不足（未公开 / 模糊，统一计 5 分）</td></tr>
-        <tr><td class="sh-range r-low">&lt;5</td><td>相对较弱</td></tr>
+        <tr><td class="sh-range r-top">5★</td><td>顶尖（清北博士、两院院士、世界500强掌舵人）</td></tr>
+        <tr><td class="sh-range r-hi">4★</td><td>优秀（985硕士、省部级荣誉、行业百强高管）</td></tr>
+        <tr><td class="sh-range r-mid">3★</td><td>良好 / 中等（信息缺失也统一计 3★）</td></tr>
+        <tr><td class="sh-range r-low">1–2★</td><td>相对较弱</td></tr>
       </table>
 
       <h4 class="sh-h">两点说明</h4>
       <ul class="sh-list">
-        <li>信息缺失<b>统一计 5 分</b>，不空置、不占优。</li>
-        <li>综合分 <b>低于 7 分不进入"观察库"</b>——只展示信息较完整、实力较明确的专家。</li>
+        <li>信息缺失<b>统一计 3★</b>，不空置、不占优。</li>
+        <li>综合分 <b>低于 3★ 不进入前端展示</b>，自动列入「观察库」。</li>
       </ul>
     </div>
     <div class="sh-foot">具体打分标准请联系对应管理员</div>
@@ -1398,7 +1397,7 @@ function renderFrontend() {
   const favGroup = h('div', { className: 'filter-group', id: 'fav-filter-group' });
   favGroup.appendChild(h('span', { className: 'filter-label' }, '收藏：'));
   const favFilters = h('div', { className: 'field-filters' });
-  ['全部', '⭐ 我的收藏'].forEach(label => {
+  ['全部', '♥ 我的收藏'].forEach(label => {
     const filterVal = label.includes('收藏');
     const isActive = appState.favoritesFilter === filterVal;
     favFilters.appendChild(h('span', {
@@ -1960,7 +1959,7 @@ function renderExpertGrid() {
     if (cardDisplayName !== expert.name) nameEl.title = expert.name;
     nameRow.appendChild(nameEl);
     
-    // v3.1: 收藏星标 ⭐ — 放在姓名右侧行内
+    // v5.9.0: 收藏图标改为 ❤️（与评分星级 ⭐ 区分），放在姓名右侧行内
     const favved = isFavorited(expert.id);
     const favStar = h('span', {
       className: 'card-fav-star' + (favved ? ' active' : ''),
@@ -1970,20 +1969,24 @@ function renderExpertGrid() {
         const nowFavved = await toggleFavorite(expert.id);
         favStar.className = 'card-fav-star' + (nowFavved ? ' active' : '');
         favStar.title = nowFavved ? '取消收藏' : '收藏专家';
-        favStar.textContent = nowFavved ? '⭐' : '☆';
+        favStar.textContent = nowFavved ? '♥' : '♡';
       }
-    }, favved ? '⭐' : '☆');
+    }, favved ? '♥' : '♡');
     nameRow.appendChild(favStar);
     
     if (db.ratingConfig.showScores !== false) {
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('div', { className: 'card-score-main' });
-      overallScore.appendChild(h('span', { className: 'star' }, '★'));
-      overallScore.appendChild(h('span', {}, expert.scores.overall.toFixed(1)));
+      overallScore.appendChild(makeStarRating(expert.scores.overall, 5));
+      overallScore.appendChild(h('span', { className: 'card-score-num' }, expert.scores.overall.toFixed(1)));
       scoreBox.appendChild(overallScore);
       const subScores = h('div', { className: 'card-score-subs' });
-      const profTag = h('span', { className: 'card-score-sub prof' }, '专业度 ' + expert.scores.professional.toFixed(0));
-      const inflTag = h('span', { className: 'card-score-sub infl' }, '影响力 ' + expert.scores.influence.toFixed(0));
+      const profTag = h('span', { className: 'card-score-sub prof' });
+      profTag.appendChild(document.createTextNode('专业 '));
+      profTag.appendChild(makeStarRating(expert.scores.professional, 5, 'sm'));
+      const inflTag = h('span', { className: 'card-score-sub infl' });
+      inflTag.appendChild(document.createTextNode('影响 '));
+      inflTag.appendChild(makeStarRating(expert.scores.influence, 5, 'sm'));
       subScores.appendChild(profTag);
       subScores.appendChild(inflTag);
       scoreBox.appendChild(subScores);
@@ -2276,7 +2279,7 @@ function showExpertDetail(expert) {
   const nameGroup = h('span', { className: 'modal-title-group' });
   const nameSpan = h('span', { className: 'modal-title', innerHTML: highlightText(expert.name, sq) });
   nameGroup.appendChild(nameSpan);
-  // v3.1: 收藏星标 — 姓名右侧，库内供应商标签左侧
+  // v5.9.0: 收藏图标 ❤️ — 姓名右侧，库内供应商标签左侧
   const detailFavved = isFavorited(expert.id);
   const detailFavStar = h('span', {
     className: 'card-fav-star detail-fav-star' + (detailFavved ? ' active' : ''),
@@ -2286,9 +2289,9 @@ function showExpertDetail(expert) {
       const nowFavved = toggleFavorite(expert.id);
       detailFavStar.className = 'card-fav-star detail-fav-star' + (nowFavved ? ' active' : '');
       detailFavStar.title = nowFavved ? '取消收藏' : '收藏专家';
-      detailFavStar.textContent = nowFavved ? '⭐' : '☆';
+      detailFavStar.textContent = nowFavved ? '♥' : '♡';
     }
-  }, detailFavved ? '⭐' : '☆');
+  }, detailFavved ? '♥' : '♡');
   nameGroup.appendChild(detailFavStar);
   // Supplier ribbon - inline after name and star
   if (expert.isSupplier) {
@@ -2317,19 +2320,28 @@ function showExpertDetail(expert) {
   
   // Overall score
   const overallCard = h('div', { className: 'detail-score-card' });
-  overallCard.appendChild(h('div', { className: 'detail-score-card-val overall' }, expert.scores.overall.toFixed(1)));
+  const overallVal = h('div', { className: 'detail-score-card-val overall' });
+  overallVal.appendChild(makeStarRating(expert.scores.overall, 5, 'lg'));
+  overallVal.appendChild(h('span', { className: 'detail-score-num' }, expert.scores.overall.toFixed(1)));
+  overallCard.appendChild(overallVal);
   overallCard.appendChild(h('div', { className: 'detail-score-card-label' }, '综合评分'));
   scoreRow.appendChild(overallCard);
   
   // Professional score
   const profCard = h('div', { className: 'detail-score-card' });
-  profCard.appendChild(h('div', { className: 'detail-score-card-val prof' }, expert.scores.professional.toFixed(0)));
+  const profVal = h('div', { className: 'detail-score-card-val prof' });
+  profVal.appendChild(makeStarRating(expert.scores.professional, 5, 'lg'));
+  profVal.appendChild(h('span', { className: 'detail-score-num' }, expert.scores.professional.toFixed(1)));
+  profCard.appendChild(profVal);
   profCard.appendChild(h('div', { className: 'detail-score-card-label' }, '专业度'));
   scoreRow.appendChild(profCard);
   
   // Influence score
   const inflCard = h('div', { className: 'detail-score-card' });
-  inflCard.appendChild(h('div', { className: 'detail-score-card-val infl' }, expert.scores.influence.toFixed(0)));
+  const inflVal = h('div', { className: 'detail-score-card-val infl' });
+  inflVal.appendChild(makeStarRating(expert.scores.influence, 5, 'lg'));
+  inflVal.appendChild(h('span', { className: 'detail-score-num' }, expert.scores.influence.toFixed(1)));
+  inflCard.appendChild(inflVal);
   inflCard.appendChild(h('div', { className: 'detail-score-card-label' }, '影响力'));
   scoreRow.appendChild(inflCard);
   
@@ -2555,13 +2567,23 @@ function formatRichText(text) {
   return result;
 }
 
+// v5.9.0: 分数统一用星星展示（支持小数星级，双层叠加技术）
+function makeStarRating(value, max, sizeClass) {
+  max = max || 5;
+  const pct = Math.max(0, Math.min(100, (value / max) * 100));
+  const wrap = h('span', { className: 'star-rating' + (sizeClass ? ' ' + sizeClass : '') });
+  wrap.appendChild(h('span', { className: 'star-empty' }, '★★★★★'));
+  wrap.appendChild(h('span', { className: 'star-fill', style: { width: pct + '%' } }, '★★★★★'));
+  return wrap;
+}
+
 function renderScoreBar(label, score, colorClass) {
-  const pct = Math.round(score / 10 * 100);
+  const pct = Math.round(score / 5 * 100);
   const item = h('div', { className: 'score-bar-item' });
   
   const infoRow = h('div', { className: 'score-bar-info' });
   infoRow.appendChild(h('span', { className: 'score-bar-label' }, label));
-  infoRow.appendChild(h('span', { className: 'score-bar-value ' + colorClass }, score + ' 分'));
+  infoRow.appendChild(h('span', { className: 'score-bar-value ' + colorClass }, score + '★'));
   item.appendChild(infoRow);
   
   const track = h('div', { className: 'score-bar-track' });
@@ -6919,7 +6941,7 @@ function renderRatingsTab(panel) {
     const canDo = h('div', { style:{ marginBottom:'12px' } });
     canDo.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#166534', marginBottom:'6px' } }, '✅ 你可以直接做的'));
     const canList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    ['在下方专家列表中，直接修改每个子维度（共 5 个评分项）的分数输入框，仅可填整数 1–10 分','修改后专业度/影响力/综合得分由系统按权重自动重新计算，无需也无法手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
+    ['在下方专家列表中，直接修改每个子维度（共 5 个评分项）的分数输入框，仅可填整数 1–5★','修改后专业度/影响力/综合得分由系统按权重自动重新计算，无需也无法手动改综合分','点击「重置为自动评分」可恢复系统自动算出的分值'].forEach(t => {
       canList.appendChild(h('li', {}, t));
     });
     canDo.appendChild(canList);
@@ -6928,10 +6950,10 @@ function renderRatingsTab(panel) {
     const note = h('div', { style:{ marginBottom:'12px' } });
     note.appendChild(h('div', { style:{ fontWeight:'600', fontSize:'12px', color:'#B45309', marginBottom:'6px' } }, '⚠️ 注意事项'));
     const noteList = h('ul', { style:{ margin:0, paddingLeft:'18px', fontSize:'12px', lineHeight:'1.8', color:'var(--text)' } });
-    noteList.appendChild(h('li', {}, '某个子维度信息缺失时，该子维度默认 5 分（中性值，不拉高也不压低）'));
-    noteList.appendChild(h('li', {}, '专业度、影响力、综合得分均为系统按权重自动计算的平均值，不可直接编辑，只能改 5 个评分项的整数分'));
-    noteList.appendChild(h('li', {}, '综合分低于 7 分的专家会自动进入观察库，不会在前端展示'));
-    noteList.appendChild(h('li', {}, '每个子维度最高 10 分，超过会自动截断'));
+    noteList.appendChild(h('li', {}, '某个子维度信息缺失时，该子维度默认 3★（中性值，不拉高也不压低）'));
+    noteList.appendChild(h('li', {}, '专业度、影响力、综合得分均为系统按权重自动计算的平均值，不可直接编辑，只能改 5 个评分项的整数分（1–5★）'));
+    noteList.appendChild(h('li', {}, '综合分低于 3★ 的专家会自动进入观察库，不会在前端展示'));
+    noteList.appendChild(h('li', {}, '每个子维度最高 5★，超过会自动截断'));
     note.appendChild(noteList);
     guide.appendChild(note);
 
@@ -6961,7 +6983,7 @@ function renderRatingsTab(panel) {
 
   // 评分说明提示（用 innerHTML 支持加粗标记）
   const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
-  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>5 分</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 10 分；综合分低于 7 分不进入观察库。自动评分仅供参考，管理员<b>仅可手动调整 5 个评分项（子维度）的整数分值（1–10 分）</b>；专业度 / 影响力 / 综合得分由系统按权重自动计算，不可直接编辑。';
+  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>3★</b>（未公开/模糊/不明确），五维度一致；子维度硬封顶 5★；综合分低于 3★ 不进入观察库。自动评分仅供参考，管理员<b>仅可手动调整 5 个评分项（子维度）的整数分值（1–5★）</b>；专业度 / 影响力 / 综合得分由系统按权重自动计算，不可直接编辑。';
   configSec.appendChild(hintDiv);
 
   // 遍历每个主维度

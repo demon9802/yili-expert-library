@@ -2,7 +2,7 @@
 // v5.8.0+ 独立文件，编辑此文件即可更新月度报告中的更新日志
 // 格式：{ version, date (YYYY-MM-DD), summary, module }
 var VERSION_CHANGELOG = [
-  { version: 'v5.9.0', date: '2026-08-10', summary: '五星制评分系统上线：评分重构为1-5★（缺失默认3★、展示线3★、权重60-40），五子维度结构化评分（学历/资质/成果/荣誉/职称履历）；subScores内嵌scores jsonb实现跨用户/设备同步；管理员控制台一键推送69位curated评分（含30位调分+字段补录）；前端评分卡片+子维度条+规则浮窗展示（showScores默认开启）', module: '评分系统' },
+  { version: 'v5.9.0', date: '2026-08-10', summary: '五星制评分系统上线+UI调优：评分重构为1-5★（缺失默认3★、展示线3★、权重60-40），五子维度结构化评分；subScores内嵌scores jsonb跨用户/设备同步；控制台一键推送69位curated评分。前端全站统一星级视觉（专家卡/详情页综合·专业·影响力/子维度进度条均改星级+数值，修复进度条原按10分宽度的半宽bug）；收藏图标⭐→♥避免与评分星混淆；规则「?」弹窗改五星制文案', module: '评分系统' },
   { version: 'v5.8.9', date: '2026-08-03', summary: '评分规则10分制重构部署：维度权重60/40、信息缺失统一5.0、子维度硬封顶10、五子维度新标准（学历矩阵T0-T4/资质A0-A3/成果双路径/荣誉H0-H3/职称J×C矩阵）结构化进ratingConfig，configVersion升3', module: '评分系统' },
   { version: 'v5.8.8.2-migration-test', date: '2026-07-30', summary: '迁移流程验证：个人账号→企业团队账号切换后，编辑→commit→push→EdgeOne 自动部署链路联调测试', module: '迁移测试' },
   { version: 'v5.8.8.2', date: '2026-07-29', summary: '修复前端详情分号显示（formatRichText+数据迁移）+ 月报仪表盘4卡横向并排（在职专家/专业度/影响力/综合评分）', module: '紧急修复' },

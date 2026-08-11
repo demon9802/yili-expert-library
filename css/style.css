@@ -641,6 +641,35 @@ body {
 .card-score-sub.prof { color: #3B82F6; }
 .card-score-sub.infl { color: #F59E0B; }
 .card-score .star { color: #f59e0b; font-size: 14px; }
+
+/* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
+.star-rating {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  white-space: nowrap;
+  font-size: 14px;
+  letter-spacing: 1px;
+  vertical-align: middle;
+}
+.star-rating .star-empty { color: #d1d5db; }
+.star-rating .star-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #F59E0B;
+  width: 0;
+}
+.star-rating.sm { font-size: 11px; letter-spacing: 0; }
+.star-rating.lg { font-size: 26px; letter-spacing: 2px; }
+.card-score-main .star-rating { font-size: 13px; }
+.card-score-sub .star-rating { font-size: 11px; }
+.card-score-num { margin-left: 4px; font-size: 12px; font-weight: 700; color: #92400e; }
+.detail-score-card-val { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.detail-score-num { font-size: 13px; font-weight: 700; color: var(--text-muted); margin-top: 2px; }
+.detail-score-card-val.overall .star-fill { color: #8B5CF6; }
 .card-edu {
   font-size: 13px;
   color: #1e293b;
@@ -793,19 +822,19 @@ body {
 /* 移除旧折叠阴影伪元素 */
 .card-supplier-bookmark::after { display: none; }
 
-/* v3.1: 收藏星标 — 行内显示，在姓名右侧 */
+/* v5.9.0: 收藏图标改为爱心 ♥/♡，与评分星级 ⭐ 区分 */
 .card-fav-star {
   font-size: 18px;
   cursor: pointer;
-  color: #d1d5db;
+  color: #cbd5e1;
   transition: all 0.2s ease;
   user-select: none;
   line-height: 1;
   flex-shrink: 0;
   margin-left: 2px;
 }
-.card-fav-star:hover { color: #F59E0B; transform: scale(1.15); }
-.card-fav-star.active { color: #FFB700; filter: none; }
+.card-fav-star:hover { color: #EF4444; transform: scale(1.15); }
+.card-fav-star.active { color: #EF4444; filter: none; }
 /* 详情弹窗中的星标稍大 */
 .detail-fav-star { font-size: 22px; vertical-align: middle; margin: 0 4px; }
 /* 书签折叠阴影 */
@@ -1436,10 +1465,7 @@ input[type="color"] {
   line-height: 1.2;
 }
 .detail-score-card-val.overall {
-  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #8B5CF6;
 }
 .detail-score-card-val.prof { color: #3B82F6; }
 .detail-score-card-val.infl { color: #F59E0B; }
