@@ -6502,7 +6502,10 @@ function renderObservationOpsTable(ops, options) {
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  return table;
+  // v5.9.3 手机端调优：表格包裹横向滚动容器，避免窄屏溢出
+  const wrap = h('div', { className: 'table-scroll-wrapper', style: { width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' } });
+  wrap.appendChild(table);
+  return wrap;
 }
 
 // 弹窗：展示单个专家的操作记录（历次修改痕迹）

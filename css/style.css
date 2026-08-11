@@ -1409,14 +1409,51 @@ input[type="color"] {
   .stats-bar { flex-direction: column; align-items: stretch; }
   .stat-chart-card { min-width: auto !important; }
   .search-bar { flex-wrap: wrap; }
-  .search-input-wrapper { max-width: 100%; }
+  .search-input-wrapper { max-width: 100%; flex: 1 1 100%; }
   .filter-bar { flex-direction: column; align-items: flex-start; }
   .header-title { font-size: 14px; }
-  .header-inner { flex-direction: column; }
-  .admin-nav { overflow-x: auto; flex-wrap: nowrap; }
+  .header-inner { flex-direction: column; align-items: stretch; }
+  .header-actions { gap: 6px; flex-wrap: wrap; }
+  .admin-nav { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
   .score-numeric-grid { grid-template-columns: 1fr; }
   .page-navigation { right: 2px; min-width: 36px; }
   .page-nav-item { padding: 3px 6px; font-size: 10px; }
+  /* 手机端调优（v5.9.3）：补齐移动端体验，无需手动切换手机版也可获得良好窄屏布局 */
+  .table-scroll-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .modal-content { max-width: 100%; }
+  .modal-overlay { padding: 10px; }
+  .modal-body input, .modal-body select, .modal-body textarea { font-size: 16px; width: 100%; box-sizing: border-box; }
+  .detail-score-row { flex-direction: row; gap: 8px; }
+  .detail-score-sub-area { grid-template-columns: 1fr; }
+  .expert-card { padding: 16px 16px 14px 16px; }
+  .card-avatar { width: 48px; height: 48px; min-width: 48px; font-size: 20px; }
+  .admin-panel { padding: 16px; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .stat-card { min-width: auto; }
+  .btn { min-height: 36px; }
+  .admin-nav-item { padding: 10px 14px; }
+}
+/* ===== v5.9.3 手机端细调（≤480px 真机） ===== */
+@media (max-width: 480px) {
+  .header-inner { padding: 0 10px; gap: 6px; }
+  .header-actions { width: 100%; justify-content: flex-start; }
+  .header-title { font-size: 13px; }
+  .expert-grid { padding: 0 10px 56px 10px; gap: 10px; }
+  .expert-card { padding: 12px 14px 10px 14px; }
+  .card-name { font-size: 15px; }
+  .card-avatar { width: 42px; height: 42px; min-width: 42px; font-size: 18px; }
+  .stats-bar { padding: 0 10px; gap: 10px; }
+  .search-bar, .filter-bar { padding: 0 10px; }
+  .modal-overlay { padding: 0; align-items: stretch; }
+  .modal-content { max-width: 100% !important; max-height: 100vh; border-radius: 0; min-height: 100vh; }
+  .modal-header { padding: 14px 16px; }
+  .modal-title { font-size: 18px; }
+  .modal-body { padding: 16px; }
+  .admin-nav-item { padding: 9px 11px; font-size: 12px; }
+  .admin-panel { padding: 14px; }
+  .page-navigation { right: 0; }
+  .detail-score-card-val { font-size: 22px; }
+  .detail-score-card-label { font-size: 10px; }
 }
 
 /* Admin filter row */
