@@ -614,26 +614,29 @@ body {
   gap: 2px;
   margin-left: auto;
 }
-/* v5.9.3: 专家卡评分改为带材质填充星 + 轻量标签，提升卡片质感与辨识度 */
+/* v5.9.3-fix: 专家卡评分重设计——综合分深紫实底徽章+金星(清晰醒目有质感)，子分高对比蓝/橙描边胶囊 */
 .card-score-main {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px 9px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
-  color: #6d28d9;
-  font-size: 14px;
-  font-weight: 800;
+  gap: 4px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
   white-space: nowrap;
-  line-height: 1.2;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
-}
-.card-score-main::after {
-  content: '★';
-  font-size: 11px;
-  color: #7c3aed;
   line-height: 1;
+  box-shadow: 0 2px 6px rgba(109,40,217,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.card-score-main::before {
+  content: '★';
+  font-size: 12px;
+  color: #fbbf24;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
 }
 .card-score-subs {
   display: flex;
@@ -642,22 +645,17 @@ body {
 .card-score-sub {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 1px 5px;
-  border-radius: 9px;
+  padding: 2px 7px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.2px;
   white-space: nowrap;
+  line-height: 1.4;
+  border: 1px solid transparent;
 }
-.card-score-sub::after {
-  content: '★';
-  font-size: 9px;
-  line-height: 1;
-}
-.card-score-sub.prof { background: #dbeafe; color: #1d4ed8; }
-.card-score-sub.prof::after { color: #2563eb; }
-.card-score-sub.infl { background: #ffedd5; color: #c2410c; }
-.card-score-sub.infl::after { color: #ea580c; }
+.card-score-sub.prof { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.card-score-sub.infl { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 
 /* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
 .star-rating {

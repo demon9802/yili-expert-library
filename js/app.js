@@ -6398,6 +6398,24 @@ function getOperatorInfo() {
   return { id: user.account || user.email || 'sub', name: user.account || user.email || '子管理员', role: 'sub' };
 }
 
+// 观察期截止时间：默认 observationDate + 18 个月；若已设置 observationDeadline 则以其为准
+function getObservationDeadline(expert) {
+  if (expert.observationDeadline) return new Date(expert.observationDeadline);
+  var d = expert.observationDate ? new Date(expert.observationDate) : new Date();
+  d.setMonth(d.getMonth() + 18);
+  return d;
+}
+
+function formatObservationDeadline(expert) {
+  var deadline = getObservationDeadline(expert);
+  var now = new Date();
+  var days = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+  var dateStr = deadline.toLocaleDateString('zh-CN');
+  if (days < 0) return { text: '已超期（截止 ' + dateStr + '）', color: '#dc2626', warning: true };
+  if (days <= 30) return { text: '即将到期：' + days + ' 天后（' + dateStr + '）', color: '#d97706', warning: true };
+  return { text: '观察截止：' + dateStr, color: 'var(--text-secondary)', warning: false };
+}
+
 function recordObservationOperation(db, expert, operation, before, after, note, tags, operator) {
   if (!db.observationOperations) db.observationOperations = [];
   const opInfo = operator || getOperatorInfo();
@@ -6463,7 +6481,7 @@ function promptObservationNote(title, defaultNote, onConfirm) {
 // 渲染观察库操作记录表格（复用：全局审计 + 单专家弹窗）
 function renderObservationOpsTable(ops, options) {
   options = options || {};
-  const typeMap = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分' };
+  const typeMap = { adjust:'调分', release:'移出观察库', eliminate:'淘汰', auto_in:'自动入库', auto_out:'自动出库', ai_reset:'重置为自动评分', extend:'延后观察' };
   if (!ops || ops.length === 0) {
     return h('div', { style: { padding:'20px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px' } }, '暂无操作记录');
   }
@@ -6582,6 +6600,22 @@ function autoSyncObservationGlobal() {
         systemOperator
       );
       changed = true;
+    }
+    // v5.9.3: 观察期满仍低于展示线 → 系统自动淘汰（默认淘汰，留痕，数据保留可恢复）
+    if (e.status === 'observation' && e.observationStatus !== 'eliminated' && e.scores.overall < obsThreshold) {
+      const deadline = getObservationDeadline(e);
+      if (new Date() >= deadline) {
+        const before = snapshotExpertScores(e);
+        e.observationStatus = 'eliminated'; e.status = 'eliminated';
+        e.observationDate = new Date().toISOString();
+        const after = snapshotExpertScores(e);
+        recordObservationOperation(db, e, 'eliminate', before, after,
+          '观察期满（截止 ' + deadline.toLocaleDateString('zh-CN') + '）仍低于 ' + obsThreshold + '★，系统自动淘汰',
+          ['淘汰', '系统默认'],
+          systemOperator
+        );
+        changed = true;
+      }
     }
   });
   if (changed) saveDB(db);
@@ -7207,7 +7241,7 @@ function renderRatingsTab(panel) {
         <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.3）</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
       </div>
-      <a href="./docs/scoring-rules-five-star.html" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+      <a href="./docs/scoring-rules-five-star.html?v=5932" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
     `;
     configSec.appendChild(docLink);
   }
@@ -7316,7 +7350,7 @@ function renderRatingsTab(panel) {
     tableDiv.innerHTML = '';
     const table = h('table', { className: 'data-table', style: { minWidth:'700px' } });
     const thead = h('thead'); const hr = h('tr');
-    ['姓名', '专业度', '影响力', '综合'].forEach(hdr => { hr.appendChild(h('th', { style:{ whiteSpace:'nowrap' } }, hdr)); });
+    ['姓名', '专业度', '影响力'].forEach(hdr => { hr.appendChild(h('th', { style:{ whiteSpace:'nowrap' } }, hdr)); });
     (profDim?.subDimensions || []).forEach(sd => { hr.appendChild(h('th', { style:{ whiteSpace:'nowrap', fontSize:'11px', color:'#3B82F6' } }, sd.name)); });
     (inflDim?.subDimensions || []).forEach(sd => { hr.appendChild(h('th', { style:{ whiteSpace:'nowrap', fontSize:'11px', color:'#F59E0B' } }, sd.name)); });
     hr.appendChild(h('th', { style:{ whiteSpace:'nowrap' } }, '操作'));
@@ -7328,7 +7362,6 @@ function renderRatingsTab(panel) {
       row.appendChild(h('td', { style:{ fontWeight:'600' } }, e.name));
       row.appendChild(h('td', { style:{ color:'#3B82F6', fontWeight:'600' } }, String(e.scores.professional)));
       row.appendChild(h('td', { style:{ color:'#F59E0B', fontWeight:'600' } }, String(e.scores.influence)));
-      row.appendChild(h('td', { style:{ fontWeight:'bold', color: e.scores.overall >= 4 ? '#059669' : (e.scores.overall >= 3 ? '#d97706' : '#dc2626') } }, e.scores.overall.toFixed(1)));
 
       const allSubs = [
         ...(profDim?.subDimensions || []).map(sd => ({ dim:'professional', ...sd })),
@@ -8178,7 +8211,7 @@ function renderObservationTab(panel) {
   panel.appendChild(h('h3', {}, '观察库'));
   panel.appendChild(h('p', { style:{ fontSize:'13px', color:'var(--text-secondary)', marginBottom:'8px' } }, '综合评分 < 3★ 自动列入观察库（评分系统自动同步），或手动移入的待观察专家。'));
   panel.appendChild(h('div', { style:{ padding:'10px 14px', background:'#f5f5f5', borderRadius:'8px', border:'1px solid #e5e5e5', fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.7', marginBottom:'16px' } },
-    '📌 观察库中的专家将不在前端展示。此处可对专家评分进行复核与手动调整，判断分值是否准确，并决定是否持续评估或淘汰。'
+    '📌 观察库中的专家将不在前端展示。在此可连续修改子维度评分，完成后点“确认调分”并填写意见；临近淘汰节点可“延后观察”（顺延 6 个月）；确认不符合入库标准则“淘汰”。所有操作均留痕。'
   ));
 
   const cfg = db.ratingConfig;
@@ -8222,17 +8255,25 @@ function renderObservationTab(panel) {
 
     // Status buttons (toggle)
     var isEliminated = expert.observationStatus === 'eliminated';
-    var evalBtn = h('button', {
+    var extendBtn = h('button', {
       className: 'btn btn-sm',
-      style: { fontSize:'11px', padding:'4px 12px', background: !isEliminated ? '#3B82F6' : 'white', color: !isEliminated ? 'white' : '#3B82F6', border:'1px solid #3B82F6', borderRadius:'6px', cursor:'pointer' },
+      style: { fontSize:'11px', padding:'4px 12px', background:'#3B82F6', color:'white', border:'1px solid #3B82F6', borderRadius:'6px', cursor:'pointer' },
       onclick: function() {
-        expert.observationStatus = 'evaluating';
-        expert.status = 'observation';
-        saveDB(db);
-        renderObservationTab(panel);
-        toast(expert.name + ' 已设为持续评估', 'success');
+        var before = snapshotExpertScores(expert);
+        promptObservationNote('延后观察确认：' + expert.name, '', function(note) {
+          var base = getObservationDeadline(expert);
+          base.setMonth(base.getMonth() + 6);
+          expert.observationDeadline = base.toISOString();
+          expert.observationStatus = 'evaluating';
+          expert.status = 'observation';
+          var after = snapshotExpertScores(expert);
+          recordObservationOperation(db, expert, 'extend', before, after, note, ['延后观察']);
+          saveDB(db);
+          renderObservationTab(panel);
+          toast(expert.name + ' 已延后观察，淘汰倒计时顺延 6 个月', 'success');
+        });
       }
-    }, '持续评估');
+    }, '延后观察');
 
     var elimBtn = h('button', {
       className: 'btn btn-sm',
@@ -8262,7 +8303,7 @@ function renderObservationTab(panel) {
         entryBadge
       ),
       h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
-        evalBtn,
+        extendBtn,
         elimBtn,
         h('button', { className:'btn btn-danger btn-sm', style:{ fontSize:'11px' }, onclick: function() {
           if (confirm('确认永久删除' + expert.name + '？此操作不可撤销。')) {
@@ -8275,15 +8316,36 @@ function renderObservationTab(panel) {
       )
     ));
 
-    card.appendChild(h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' } },
+    var deadlineInfo = formatObservationDeadline(expert);
+    var statusLine = h('div', { style:{ fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px' } },
       '专业度：' + expert.scores.professional + ' | 影响力：' + expert.scores.influence +
-      (expert.observationDate ? ' | 录入日期：' + formatDate(expert.observationDate) : '') +
-      (isEliminated ? ' | ⚠️ 状态：已淘汰' : ' | 状态：持续评估')
-    ));
+      (expert.observationDate ? ' | 录入日期：' + formatDate(expert.observationDate) : '')
+    );
+    if (isEliminated) {
+      statusLine.appendChild(h('span', {}, ' | ⚠️ 状态：已淘汰'));
+    } else {
+      statusLine.appendChild(h('span', {}, ' | 状态：观察中'));
+      statusLine.appendChild(h('span', { style:{ color: deadlineInfo.color, fontWeight: deadlineInfo.warning ? '700' : '400' } }, ' | ' + deadlineInfo.text));
+    }
+    card.appendChild(statusLine);
 
-    // Sub-dimension score editing
+    // Sub-dimension score editing —— v5.9.3-fix: 批量暂存，改完多项后统一"确认调分"填一次意见
     var scoreBox = h('div', { style:{ marginTop:'10px', padding:'10px', background:'white', borderRadius:'6px', border:'1px solid var(--border)' } });
-    scoreBox.appendChild(h('div', { style:{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', marginBottom:'6px' } }, '子维度评分（可编辑，修改后自动重算综合评分）'));
+    scoreBox.appendChild(h('div', { style:{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', marginBottom:'6px' } }, '子维度评分（可连续修改多项，完成后点"确认调分"并填写意见）'));
+
+    // 待确认的调分暂存：key = dimId::name
+    var pending = {};
+    var confirmBtn = null;
+
+    function refreshConfirmState() {
+      var count = Object.keys(pending).length;
+      if (confirmBtn) {
+        confirmBtn.textContent = count > 0 ? ('确认调分（' + count + ' 项）') : '确认调分';
+        confirmBtn.disabled = count === 0;
+        confirmBtn.style.opacity = count === 0 ? '0.5' : '1';
+        confirmBtn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
+      }
+    }
 
     function renderSubDimInputs(dim, dimId, color) {
       if (!dim || !dim.subDimensions) return;
@@ -8291,37 +8353,24 @@ function renderObservationTab(panel) {
         var row = h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'3px 0' } });
         row.appendChild(h('span', { style:{ fontSize:'11px', color: color, minWidth:'120px', flex:'1' } }, sd.name));
         var val = (expert.subScores && expert.subScores[dimId] && expert.subScores[dimId][sd.name] !== undefined) ? expert.subScores[dimId][sd.name] : cfg.missingScore;
+        var key = dimId + '::' + sd.name;
         var inp = h('input', {
           type: 'number', value: String(val), min: 1, max: 5, step: 1,
           style: { width:'50px', padding:'3px 4px', border:'1px solid var(--border)', borderRadius:'4px', fontSize:'11px', textAlign:'center' },
           onchange: function(ev) {
             var ns = Math.round(Number(ev.target.value));
-            if (isNaN(ns) || ns < 1 || ns > 5) { toast('分值1-5★', 'error'); ev.target.value = String(val); return; }
-            // v5.9.2: 调分必须填写操作意见，先回填旧值再弹窗确认
-            ev.target.value = String(val);
-            var before = snapshotExpertScores(expert);
-            promptObservationNote('调分确认：' + expert.name + ' · ' + sd.name, '', function(note) {
-              if (!expert.subScores) expert.subScores = {};
-              if (!expert.subScores[dimId]) expert.subScores[dimId] = {};
-              expert.subScores[dimId][sd.name] = ns;
-              recalcExpertFromSubscores(expert);
-              var thr = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
-              var released = expert.scores.overall >= thr && expert.observationStatus !== 'eliminated';
-              if (released) {
-                expert.status = 'active';
-                expert.observationStatus = '';
-              }
-              var after = snapshotExpertScores(expert);
-              recordObservationOperation(db, expert, released ? 'release' : 'adjust', before, after,
-                note + '（调整：' + sd.name + ' ' + val + ' → ' + ns + '）',
-                released ? ['调分', '移出观察库'] : ['调分']
-              );
-              saveDB(db);
-              renderObservationTab(panel);
-              toast(expert.name + ' 评分已更新（综合：' + expert.scores.overall.toFixed(1) + '）', 'success');
-            });
+            if (isNaN(ns) || ns < 1 || ns > 5) { toast('分值1-5★', 'error'); ev.target.value = String(val); refreshInpStyle(); return; }
+            ev.target.value = String(ns);
+            if (ns === val) { delete pending[key]; }
+            else { pending[key] = { dimId: dimId, name: sd.name, oldVal: val, newVal: ns }; }
+            refreshInpStyle();
+            refreshConfirmState();
           }
         });
+        function refreshInpStyle() {
+          if (pending[key]) { inp.style.border = '2px solid #d97706'; inp.style.background = '#fffbeb'; }
+          else { inp.style.border = '1px solid var(--border)'; inp.style.background = 'white'; }
+        }
         row.appendChild(inp);
         row.appendChild(h('span', { style:{ fontSize:'10px', color:'var(--text-muted)' } }, '/5★'));
         scoreBox.appendChild(row);
@@ -8331,8 +8380,40 @@ function renderObservationTab(panel) {
     renderSubDimInputs(profDim, 'professional', '#3B82F6');
     renderSubDimInputs(inflDim, 'influence', '#F59E0B');
 
-    // Reset AI button + 历次调分记录入口
-    scoreBox.appendChild(h('div', { style:{ marginTop:'8px', display:'flex', gap:'10px', alignItems:'center' } },
+    // 确认调分（批量一次意见）+ 重置为自动评分 + 历次调分记录
+    confirmBtn = h('button', {
+      className:'btn btn-primary btn-sm', style:{ fontSize:'11px', padding:'4px 14px', opacity:'0.5', cursor:'not-allowed' }, disabled: true,
+      onclick: function() {
+        var keys = Object.keys(pending);
+        if (keys.length === 0) { toast('没有待确认的调分', 'warning'); return; }
+        var before = snapshotExpertScores(expert);
+        promptObservationNote('调分确认：' + expert.name + '（' + keys.length + ' 项）', '', function(note) {
+          var changeDesc = [];
+          keys.forEach(function(k) {
+            var p = pending[k];
+            if (!expert.subScores) expert.subScores = {};
+            if (!expert.subScores[p.dimId]) expert.subScores[p.dimId] = {};
+            expert.subScores[p.dimId][p.name] = p.newVal;
+            changeDesc.push(p.name + ' ' + p.oldVal + '→' + p.newVal);
+          });
+          recalcExpertFromSubscores(expert);
+          var thr = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
+          var released = expert.scores.overall >= thr && expert.observationStatus !== 'eliminated';
+          if (released) { expert.status = 'active'; expert.observationStatus = ''; }
+          var after = snapshotExpertScores(expert);
+          recordObservationOperation(db, expert, released ? 'release' : 'adjust', before, after,
+            note + '（调整：' + changeDesc.join('、') + '）',
+            released ? ['调分', '移出观察库'] : ['调分']
+          );
+          saveDB(db);
+          renderObservationTab(panel);
+          toast(expert.name + ' 评分已更新（综合：' + expert.scores.overall.toFixed(1) + '）', 'success');
+        });
+      }
+    }, '确认调分');
+
+    scoreBox.appendChild(h('div', { style:{ marginTop:'8px', display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' } },
+      confirmBtn,
       h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'10px', padding:'2px 10px' }, onclick: function() {
         var before = snapshotExpertScores(expert);
         promptObservationNote('重置为自动评分确认：' + expert.name, '', function(note) {
