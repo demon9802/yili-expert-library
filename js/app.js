@@ -952,6 +952,23 @@ function getCardDisplayName(name) {
   return name.replace(/[（(][^）)]*[）)]/g, '').trim() || name;
 }
 
+// v5.9.15: 极窄屏专家卡领域标签语义缩略
+// 规则：①含括号（中英）取括号前+…；②含"/"取第一段前2字+…；③其余超长(>6字)截断前6字+…
+// 仅用于极窄屏专家卡，详情页仍显示完整领域名
+function abbreviateFieldName(name) {
+  if (!name) return '';
+  var s = String(name);
+  var bIdx = s.indexOf('（'); if (bIdx === -1) bIdx = s.indexOf('(');
+  if (bIdx !== -1) return s.slice(0, bIdx) + '…';
+  var sIdx = s.indexOf('/');
+  if (sIdx !== -1) {
+    var first = s.slice(0, sIdx);
+    return (first.length > 2 ? first.slice(0, 2) : first) + '…';
+  }
+  if (s.length > 6) return s.slice(0, 6) + '…';
+  return s;
+}
+
 // v4.18: 搜索高亮 — 含HTML的富文本（只替换标签外的文本内容）
 function highlightHtml(html, query) {
   if (!query || !html) return html;
@@ -2086,16 +2103,21 @@ function renderExpertGrid() {
     }
     
     // Row 2: fields (v4.18: with search highlight)
+    // v5.9.15: 极窄屏（视口≤400px）下领域标签语义缩略，避免长标签换行/重叠；详情页不受影响
+    const isNarrowScreen = (typeof window !== 'undefined' && window.innerWidth <= 400);
     const fieldsRow = h('div', { className: 'card-fields-row' });
     expert.fields.forEach(fName => {
       const fieldMeta = db.fields.find(f => f.name === fName);
       const color = fieldMeta ? fieldMeta.color : '#64748b';
       const textColor = fieldMeta ? (fieldMeta.textColor || getTextColorForBg(color)) : '#ffffff';
-      fieldsRow.appendChild(h('span', {
+      const displayName = isNarrowScreen ? abbreviateFieldName(fName) : fName;
+      const tagEl = h('span', {
         className: 'card-field-tag',
         style: { background: color, color: textColor },
-        innerHTML: highlightText(fName, sq)
-      }));
+        innerHTML: highlightText(displayName, sq)
+      });
+      if (isNarrowScreen && displayName !== fName) tagEl.title = fName;
+      fieldsRow.appendChild(tagEl);
     });
     headerInfo.appendChild(fieldsRow);
     
