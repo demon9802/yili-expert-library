@@ -134,3 +134,6 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_page_view` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_view_date` (`view_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='页面访问记录表';
+
+-- 注意：初始管理员账号由 DataInitializer 在应用启动时自动创建，
+-- 避免在 SQL 中硬编码 BCrypt hash。

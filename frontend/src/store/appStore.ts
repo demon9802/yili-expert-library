@@ -57,22 +57,23 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== Getters =====
   const filteredExperts = computed(() => {
-    let result = [...experts.value]
+    // 基础过滤：排除已淘汰专家（V5 getFilteredExperts 逻辑）
+    let result = experts.value.filter(e => e.status !== 'eliminated')
 
-    // 领域筛选
+    // 评分筛选：默认 >=7（V5 观察库阈值），有显式筛选时用显式值
+    const minScore = scoreFilter.value !== null ? scoreFilter.value : 7
+    result = result.filter(e => {
+      const overall = e.scores?.overall
+      if (overall === null || overall === undefined) return false
+      return overall >= minScore
+    })
+
+    // 领域筛选（V5 使用 AND 逻辑：专家必须包含所有选中领域）
     if (fieldFilter.value.size > 0) {
+      const selectedFields = Array.from(fieldFilter.value)
       result = result.filter(e =>
-        e.fields?.some(f => fieldFilter.value.has(f))
+        selectedFields.every(f => e.fields?.includes(f))
       )
-    }
-
-    // 评分筛选
-    if (scoreFilter.value !== null) {
-      result = result.filter(e => {
-        const overall = e.scores?.overall
-        if (overall === null || overall === undefined) return false
-        return overall >= scoreFilter.value!
-      })
     }
 
     // 供应商筛选

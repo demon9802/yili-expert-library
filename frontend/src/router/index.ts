@@ -8,6 +8,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/FrontendView.vue'),
   },
   {
+    path: '/admin-login',
+    name: 'admin-login',
+    component: () => import('@/views/AdminLoginView.vue'),
+  },
+  {
     path: '/admin',
     name: 'admin',
     component: () => import('@/views/AdminView.vue'),

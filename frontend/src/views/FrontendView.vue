@@ -19,7 +19,7 @@
             v-if="!store.currentUser"
             class="btn btn-sm"
             style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
-            @click="showLogin = true"
+            @click="goAdminLogin"
           >
             管理员入口
           </button>
@@ -44,7 +44,9 @@
           </div>
           <span style="font-size:12px;color:var(--primary);background:var(--primary-light);padding:3px 12px;border-radius:12px;font-weight:600">共{{ activeExpertCount }}位专家</span>
         </div>
-        <div id="main-field-chart-inline" style="width:100%"></div>
+        <div id="main-field-chart-inline" style="width:100%">
+          <FieldChartInline />
+        </div>
       </div>
     </div>
 
@@ -161,7 +163,7 @@
             {{ item.label }}
           </span>
         </div>
-        <button v-if="!store.currentUser" class="fav-login-btn" style="font-size:12px;padding:4px 12px;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:8px" @click="showLogin = true">
+        <button v-if="!store.currentUser" class="fav-login-btn" style="font-size:12px;padding:4px 12px;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:8px" @click="goAdminLogin">
           🔐 登录同步
         </button>
         <span v-else style="font-size:12px;color:#059669;margin-left:8px;background:#ECFDF5;padding:4px 10px;border-radius:6px;border:1px solid #A7F3D0;white-space:nowrap;cursor:pointer" @click="handleLogout">
@@ -191,8 +193,6 @@
       />
     </div>
 
-    <!-- Login Modal -->
-    <LoginModal v-if="showLogin" @close="showLogin = false" @success="onLoginSuccess" />
 
     <!-- Expert Detail Modal -->
     <ExpertDetailModal
@@ -215,14 +215,13 @@ import { debounce, formatDate } from '@/utils/helpers'
 import FieldFilterBar from '@/components/FieldFilterBar.vue'
 import ExpertCard from '@/components/ExpertCard.vue'
 import PaginationControl from '@/components/PaginationControl.vue'
-import LoginModal from '@/components/LoginModal.vue'
 import ExpertDetailModal from '@/components/ExpertDetailModal.vue'
 import DashboardModal from '@/components/DashboardModal.vue'
+import FieldChartInline from '@/components/FieldChartInline.vue'
 
 const store = useAppStore()
 const router = useRouter()
 
-const showLogin = ref(false)
 const showHistory = ref(false)
 const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
@@ -261,7 +260,7 @@ const updateTimeText = computed(() => {
 })
 
 const activeExpertCount = computed(() =>
-  store.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation').length
+  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 7).length
 )
 
 const userName = computed(() => {
@@ -364,15 +363,12 @@ function goAdmin() {
   router.push('/admin')
 }
 
-function handleLogout() {
-  store.logout()
+function goAdminLogin() {
+  router.push('/admin-login')
 }
 
-function onLoginSuccess() {
-  showLogin.value = false
-  if (store.isAdmin) {
-    router.push('/admin')
-  }
+function handleLogout() {
+  store.logout()
 }
 
 function showDashboard() {
