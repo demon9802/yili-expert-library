@@ -996,14 +996,7 @@ function openScoringHelp() {
   const cfg = (appState && appState.db && appState.db.ratingConfig) || DEFAULT_RATING_CONFIG;
   const profDim = cfg.dimensions.find(d => d.id === 'professional') || {};
   const inflDim = cfg.dimensions.find(d => d.id === 'influence') || {};
-  const rows = [];
-  (profDim.subDimensions || []).forEach(sd => {
-    rows.push(`<tr><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#3B82F6;font-weight:600;white-space:nowrap;width:80px">专业度</td><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${escapeHtml(sd.name)}</td></tr>`);
-  });
-  (inflDim.subDimensions || []).forEach(sd => {
-    rows.push(`<tr><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#F59E0B;font-weight:600;white-space:nowrap;width:80px">影响力</td><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${escapeHtml(sd.name)}</td></tr>`);
-  });
-  // 简化评分规则矩阵（1★-5★）——与后台评分规则表同源，仅压缩措辞
+  // 简化评分规则矩阵（1★-5★）——与后台评分规则表同源，仅压缩措辞（前端无需再列评分项清单）
   const ruleMatrix = [
     { item: '① 学历与学术背景', dim: '专业度', stars: ['大专/中专及以下', '普通本科', '较好本科(211/双一流)或普通硕士', '名校硕士(985/双一流)或普通博士', '博士+顶尖院校(清北/C9/QS50)'] },
     { item: '② 行业资质与认证', dim: '专业度', stars: ['无相关认证', '培训/通用认证', '厂商认证或国家级执业资格', '国家级执业/行业权威认证', '国际权威认证(CFA/CPA等)'] },
@@ -1012,35 +1005,24 @@ function openScoringHelp() {
     { item: '⑤ 职称·管理履历·行业地位', dim: '影响力', stars: ['无职称/基层', '经理/高工/主管', '副教授/总监/VP/合伙人', '教授/CEO/创始人(百强)', '教授/CEO(世界500强/央企)'] }
   ];
   const ruleRows = ruleMatrix.map(r => `<tr>
-    <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:11px;font-weight:600;color:${r.dim==='专业度'?'#3B82F6':'#F59E0B'};white-space:nowrap">${r.item}</td>
-    ${r.stars.map(s => `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#475569;text-align:center;line-height:1.3">${s}</td>`).join('')}
+    <td style="padding:7px 9px;border-bottom:1px solid #f1f5f9;font-size:11px;font-weight:600;color:${r.dim==='专业度'?'#3B82F6':'#F59E0B'};white-space:nowrap">${r.item}</td>
+    ${r.stars.map(s => `<td style="padding:7px 9px;border-bottom:1px solid #f1f5f9;font-size:10.5px;color:#475569;text-align:center;line-height:1.35">${s}</td>`).join('')}
   </tr>`).join('');
   const html = `
     <div class="sh-head">
       <div class="sh-title">评分规则说明</div>
       <div class="sh-ver">五星制</div>
     </div>
-    <div class="sh-body" style="padding-top:8px">
-      <div style="font-size:12px;font-weight:600;color:#334155;margin:4px 0 6px">一、评分项</div>
-      <table class="sh-table" style="margin:0 0 12px">
+    <div class="sh-body" style="padding-top:10px">
+      <table class="sh-table" style="margin:0">
         <thead>
           <tr style="background:#f8fafc">
-            <th style="padding:8px 10px;text-align:left;font-size:12px;color:#64748b;font-weight:600;width:80px">维度</th>
-            <th style="padding:8px 10px;text-align:left;font-size:12px;color:#64748b;font-weight:600">评分项</th>
-          </tr>
-        </thead>
-        <tbody>${rows.join('')}</tbody>
-      </table>
-      <div style="font-size:12px;font-weight:600;color:#334155;margin:4px 0 6px">二、评分规则（简化）</div>
-      <table class="sh-table" style="margin:0 0 4px">
-        <thead>
-          <tr style="background:#f8fafc">
-            <th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748b;font-weight:600">评分项</th>
-            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">1★</th>
-            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">2★</th>
-            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">3★</th>
-            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">4★</th>
-            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">5★</th>
+            <th style="padding:7px 9px;text-align:left;font-size:11px;color:#64748b;font-weight:600">评分项</th>
+            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">1★</th>
+            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">2★</th>
+            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">3★</th>
+            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">4★</th>
+            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">5★</th>
           </tr>
         </thead>
         <tbody>${ruleRows}</tbody>
@@ -2878,7 +2860,7 @@ function showDashboard() {
   if (db.ratingConfig.showScores !== false && dc.showCharts.includes('scoreDist')) {
     const distCard = h('div', { className: 'dashboard-card' });
     distCard.appendChild(h('h4', {}, '分值分布'));
-    const distChart = h('div', { className: 'chart-container', style: 'height:220px' });
+    const distChart = h('div', { className: 'chart-container', style: 'height:250px' });
     distChart.id = 'chart-score-dist';
     distCard.appendChild(distChart);
     grid.appendChild(distCard);
@@ -3082,13 +3064,13 @@ function renderDoughnutChart(containerId, labels, data) {
   // v5.9.6: 分值分布使用绿→黄→红连续渐变（高分绿、低分红，直观映射评分质量）
   const colors = ['#22C55E', '#84CC16', '#EAB308', '#F97316', '#EF4444'];
   const total = data.reduce((a,b) => a+b, 0);
-  const h = Math.max(280, container.clientHeight);
-  const w = container.clientWidth || 400;
-  
+  const h = container.clientHeight || 250;
+  const w = container.clientWidth || 360;
+
   let svg = '<svg width="100%" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="overflow:visible">';
-  
-  const cx = w * 0.33, cy = h * 0.48, r = Math.min(w * 0.21, 85);
-  const innerR = r * 0.55;
+
+  const cx = w * 0.34, cy = h * 0.5, r = Math.min(w * 0.22, h * 0.36, 88);
+  const innerR = r * 0.62;
   let startAngle = -Math.PI / 2;
   
   data.forEach((val, i) => {
@@ -3106,7 +3088,7 @@ function renderDoughnutChart(containerId, labels, data) {
     const y2i = cy + innerR * Math.sin(endAngle);
     const largeArc = angle > Math.PI ? 1 : 0;
     
-    svg += '<path d="M' + x1o.toFixed(1) + ',' + y1o.toFixed(1) + ' A' + r + ',' + r + ' 0 ' + largeArc + ' 1 ' + x2o.toFixed(1) + ',' + y2o.toFixed(1) + ' L' + x2i.toFixed(1) + ',' + y2i.toFixed(1) + ' A' + innerR + ',' + innerR + ' 0 ' + largeArc + ' 0 ' + x1i.toFixed(1) + ',' + y1i.toFixed(1) + ' Z" fill="' + colors[i] + '" opacity="0.9"/>';
+    svg += '<path d="M' + x1o.toFixed(1) + ',' + y1o.toFixed(1) + ' A' + r + ',' + r + ' 0 ' + largeArc + ' 1 ' + x2o.toFixed(1) + ',' + y2o.toFixed(1) + ' L' + x2i.toFixed(1) + ',' + y2i.toFixed(1) + ' A' + innerR + ',' + innerR + ' 0 ' + largeArc + ' 0 ' + x1i.toFixed(1) + ',' + y1i.toFixed(1) + ' Z" fill="' + colors[i] + '" stroke="#ffffff" stroke-width="2" opacity="0.95"/>';
     
     // Percentage label on slice
     const midAngle = startAngle + angle / 2;
@@ -3126,7 +3108,7 @@ function renderDoughnutChart(containerId, labels, data) {
   svg += '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>';
   
   // Legend (two-line layout per item to prevent text overlap)
-  const legendX = w * 0.55;
+  const legendX = w * 0.58;
   const itemH = 44;
   const legendStartY = (h - data.filter(v => v > 0).length * itemH) / 2;
   let li = 0;
@@ -4006,98 +3988,7 @@ function renderAdmin() {
   header.appendChild(headerInner);
   app.appendChild(header);
 
-  // v5.9.5-fix: 数据维护提示更精致；子管理员仅当其已管理过专家（创建/操作）时才显示关联提醒
-  var reminders = getObservationReminders(db);
-  var me = getOperatorInfo();
-  // 子管理员管理的专家集合：自己创建 或 在观察库/评分操作中有记录
-  var managedIds = new Set();
-  if (!isMaster && me.id) {
-    db.experts.forEach(function(e) { if (e.createdBy === me.id) managedIds.add(e.id); });
-    (db.observationOperations || []).forEach(function(op) { if (op.operatorId === me.id && op.expertId) managedIds.add(op.expertId); });
-  }
-  function reminderVisible(r) {
-    if (isMaster) return true;
-    if (r.assignee.type !== 'sub' || r.assignee.account !== me.id) return false;
-    return managedIds.has(r.expert.id);
-  }
-  var halfCount = 0, oneCount = 0, overCount = 0;
-  [].concat(reminders.halfYear).forEach(function(r) { if (reminderVisible(r)) halfCount++; });
-  [].concat(reminders.oneYear).forEach(function(r) { if (reminderVisible(r)) oneCount++; });
-  [].concat(reminders.overdue).forEach(function(r) { if (reminderVisible(r)) overCount++; });
-  var visibleObsExperts = isMaster ? db.experts.filter(function(e) { return e.status === 'observation'; })
-    : db.experts.filter(function(e) { return e.status === 'observation' && managedIds.has(e.id); });
-  var myReminderCount = halfCount + oneCount + overCount;
-  var hasReminders = myReminderCount > 0;
-  // v5.9.6: 数据维护提醒（替代旧的数据统计横幅）——定期提醒管理员维护专家/项目数据，主管理员看全部、子管理员只看相关
-  db.maintenance = db.maintenance || { expertMaintainedAt: {}, projectMaintainedAt: {} };
-  var MDAY = 90; // 季度周期
-  function _isDue(ts) { return !ts || (Date.now() - new Date(ts).getTime()) > MDAY * 86400000; }
-  function _respExpert(e) { return isMaster ? true : managedIds.has(e.id); }
-  var dueExperts = db.experts.filter(function(e) {
-    if (e.status === 'eliminated') return false;
-    if (!_respExpert(e)) return false;
-    return _isDue(db.maintenance.expertMaintainedAt[e.id]);
-  });
-  var dueProjects = (db.yiliProjects || []).filter(function(p) {
-    if (!p.visible || !p.id) return false;
-    if (!isMaster && managedIds.size && !managedIds.has(p.expertId)) return false;
-    return _isDue(db.maintenance.projectMaintainedAt[p.id]);
-  });
-  var totalDue = dueExperts.length + dueProjects.length + visibleObsExperts.length;
-  if (totalDue > 0) {
-    var mCard = h('div', { style:{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', padding:'14px 16px', marginBottom:'16px' } });
-    mCard.appendChild(h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' } },
-      h('span', { style:{ fontSize:'15px' } }, '📋'),
-      h('div', { style:{ fontWeight:'700', fontSize:'14px', color:'#334155' } }, '数据维护提醒'),
-      h('span', { style:{ fontSize:'11px', color:'#64748b', marginLeft:'auto' } }, '每季度核对一次 · ' + (isMaster ? '全部专家/项目' : '仅与我相关'))
-    ));
-    function _addSec(title, items, renderItem) {
-      if (!items.length) return;
-      mCard.appendChild(h('div', { style:{ fontSize:'12px', fontWeight:'600', color:'#475569', margin:'10px 0 4px' } }, title + '（' + items.length + '）'));
-      var list = h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } });
-      items.slice(0, 6).forEach(function(it) { list.appendChild(renderItem(it)); });
-      mCard.appendChild(list);
-      if (items.length > 6) mCard.appendChild(h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' } }, '…等共 ' + items.length + ' 项，可在对应管理中标记'));
-    }
-    _addSec('专家信息待核对', dueExperts, function(e) {
-      var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff', border:'1px solid #eef2f7', borderRadius:'6px', padding:'6px 10px' } });
-      row.appendChild(h('div', { style:{ fontSize:'13px' } },
-        h('span', { style:{ fontWeight:'600' } }, e.name),
-        h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginLeft:'8px' } }, '录入：' + (e.createdBy || '主管理员') + (e.createdAt ? ' · ' + String(e.createdAt).substring(0,10) : ''))
-      ));
-      row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff', flexShrink:0 }, onclick: function() {
-        db.maintenance.expertMaintainedAt[e.id] = new Date().toISOString();
-        saveDB(db); renderAdmin();
-      } }, '标记已维护'));
-      return row;
-    });
-    _addSec('合作项目待更新', dueProjects, function(p) {
-      var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff', border:'1px solid #eef2f7', borderRadius:'6px', padding:'6px 10px' } });
-      var expName = (db.experts.find(function(x){ return x.id === p.expertId; }) || {}).name || p.pendingExpertName || '待关联';
-      row.appendChild(h('div', { style:{ fontSize:'13px' } },
-        h('span', { style:{ fontWeight:'600' } }, p.title),
-        h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginLeft:'8px' } }, expName + ' · ' + p.year + '年')
-      ));
-      row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff', flexShrink:0 }, onclick: function() {
-        db.maintenance.projectMaintainedAt[p.id] = new Date().toISOString();
-        saveDB(db); renderAdmin();
-      } }, '标记已维护'));
-      return row;
-    });
-    if (visibleObsExperts.length) {
-      mCard.appendChild(h('div', { style:{ fontSize:'12px', fontWeight:'600', color:'#475569', margin:'10px 0 4px' } }, '观察库待处理（' + visibleObsExperts.length + '）'));
-      var obsList = h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } });
-      visibleObsExperts.slice(0, 6).forEach(function(e) {
-        var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:'6px', padding:'6px 10px' } });
-        row.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600' } }, e.name));
-        row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', background:'#d97706', color:'#fff', border:'none', flexShrink:0 }, onclick: function() { appState.adminTab = 'observation'; renderAdmin(); } }, '去处理'));
-        obsList.appendChild(row);
-      });
-      mCard.appendChild(obsList);
-      if (visibleObsExperts.length > 6) mCard.appendChild(h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' } }, '…等共 ' + visibleObsExperts.length + ' 位'));
-    }
-    app.appendChild(mCard);
-  }
+  // v5.9.6-follow: 数据维护提醒功能已下线（用户要求恢复管理后台原样，改为下次规划时再实现为真正的“功能”而非横幅/看板）
 
   // Container
   const container = h('div', { className: 'admin-container' });
@@ -6523,6 +6414,9 @@ function aiScoreExpert(expert) {
     if (/仅.*演讲|只.*演讲|一般.*经验|无.*成果|无.*项目/i.test(txt)) return 1;
     if (/牵头.*国标|牵头.*行标|牵头.*标准|制定.*国家标准|制定.*行业标准|高被引|重大.*成果转化|国家.*重大.*专项/i.test(txt)) return 5;
     if (/国家级.*项目|国家.*项目|战略.*项目|顶刊|nature|science|cell|sci.*一作|sci.*通讯|top.*期刊/i.test(txt)) return 4;
+    // v5.9.7: 资深行业实战派（非学术路线）——多年实战/操盘、头部企业高管、品牌/营销负责人、服务头部客户，按战略级成果赋分
+    if (/(\d{2,})\s*年(实战|经验|操盘|从业|培训)|品牌(营销)?总经理|营销总经理|首席(营销|品牌|增长)|国际顶级4A|世界500强.*(高管|总经理)|头部企业高管|知名大厂高管/i.test(txt)) return 4;
+    if (/核心课程|主讲|授课|服务(过)?(联想|三星|海尔|华为|伊利|京东|腾讯|阿里|字节|美团|百度|小米|红牛|青岛啤酒|长虹|海信|奥组委)/i.test(txt)) return 3;
     const softMatch = txt.match(/(\d+)\s*项?\s*软著|软著\s*(\d+)\s*项?/g);
     let softCount = 0;
     if (softMatch) {
@@ -6666,7 +6560,7 @@ function snapshotExpertScores(expert) {
 
 function getOperatorInfo() {
   const user = appState.currentUser;
-  if (!user) return { id: 'anonymous', name: '未登录用户', role: 'system' };
+  if (!user) return { id: 'system', name: '系统', role: 'system' };
   if (user.role === 'master') return { id: user.email || 'master', name: user.email || '主管理员', role: 'master' };
   return { id: user.account || user.email || 'sub', name: user.account || user.email || '子管理员', role: 'sub' };
 }
@@ -6825,7 +6719,7 @@ function renderObservationOpsTable(ops, options) {
     if (options.showExpert) {
       tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap', fontWeight:'600' } }, op.expertName || '-'));
     }
-    tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, op.operatorName + (op.operatorRole === 'master' ? '（主）' : op.operatorRole === 'sub' ? '（子）' : op.operatorRole === 'system' ? '（系统）' : '')));
+    tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, op.operatorRole === 'system' ? '系统' : op.operatorName + (op.operatorRole === 'master' ? '（主）' : op.operatorRole === 'sub' ? '（子）' : '')));
     tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap' } }, typeMap[op.operation] || op.operation));
     tr.appendChild(h('td', { style: { padding:'8px', whiteSpace:'nowrap', fontFamily:'monospace' } }, beforeOverall + ' → ' + afterOverall));
     tr.appendChild(h('td', { style: { padding:'8px', color:'var(--text-secondary)', lineHeight:'1.4', maxWidth:'200px' } }, detail || '-'));
@@ -7582,7 +7476,7 @@ function renderRatingsTab(panel) {
         <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.3）</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
       </div>
-      <a href="./docs/scoring-rules-five-star.html?v=5932" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+      <a href="./docs/scoring-rules-five-star.html?v=5961" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
     `;
     configSec.appendChild(docLink);
   }
@@ -7600,14 +7494,14 @@ function renderRatingsTab(panel) {
   const overviewTable = h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px', marginBottom:'16px' } });
   const overviewHead = h('thead');
   const ohr = h('tr', { style:{ borderBottom:'2px solid var(--border)' } });
-  ['维度', '评分项', '占比'].forEach((hdr, hi) => {
+  ['维度', '评分项', '评分项构成'].forEach((hdr, hi) => {
     ohr.appendChild(h('th', { style:{ padding:'8px 10px', textAlign: hi === 2 ? 'center' : 'left', fontSize:'11px', color:'var(--text-muted)', fontWeight:'600', background:'#f8fafc' } }, hdr));
   });
   overviewHead.appendChild(ohr); overviewTable.appendChild(overviewHead);
   const overviewBody = h('tbody');
   [
-    { dim: '专业度', items: '① 学历与学术背景 · ② 行业资质与认证 · ③ 专业成果与经验', weight: '60%（各项各 20%）' },
-    { dim: '影响力', items: '④ 社会荣誉与奖项 · ⑤ 职称、管理履历与行业地位', weight: '40%（各项各 20%）' }
+      { dim: '专业度', items: '① 学历与学术背景 · ② 行业资质与认证 · ③ 专业成果与经验', weight: '共 3 项评分' },
+      { dim: '影响力', items: '④ 社会荣誉与奖项 · ⑤ 职称、管理履历与行业地位', weight: '共 2 项评分' }
   ].forEach((row, ri) => {
     const tr = h('tr', { style:{ borderBottom:'1px solid #f1f5f9', background: ri === 0 ? '#eff6ff' : '#fffbeb' } });
     tr.appendChild(h('td', { style:{ padding:'8px 10px', fontWeight:'700', color: ri === 0 ? '#1e40af' : '#92400e' } }, row.dim));
@@ -8722,6 +8616,13 @@ function renderObservationTab(panel) {
         });
       }
     }, '淘汰');
+
+    // v5.9.7: 观察库操作列同样提供「从云端恢复」（以 Supabase 为准，覆盖本地被误改的评分/状态）
+    var restoreBtn = h('button', {
+      className: 'btn btn-sm',
+      style: { fontSize:'11px', padding:'4px 12px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff', borderRadius:'6px', cursor:'pointer' },
+      onclick: async function() { await restoreExpertFromCloud(expert, panel); }
+    }, '从云端恢复');
 
     // v5.9.4-fix: 观察库卡片信息布局——姓名+三项分值/入库状态/入库原因置顶，评分与操作分居下方和右侧
     var deadlineInfo = formatObservationDeadline(expert);

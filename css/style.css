@@ -617,38 +617,48 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 5px;
   flex-shrink: 0;
   z-index: 2;
+  padding: 7px 11px;
+  background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%);
+  border: 1px solid rgba(255,255,255,0.42);
+  border-radius: 13px;
+  box-shadow: 0 6px 18px rgba(124,58,237,0.30), inset 0 1px 0 rgba(255,255,255,0.28);
 }
-/* v5.9.5-fix: 专家卡三项评分形式完全统一——同一行「维度X★」圆角实底徽章，仅颜色区分；配色与详情页一致 */
-.card-score-main,
-.card-score-sub {
+.card-score-main {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  line-height: 1;
-  border: 1px solid transparent;
-  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.22);
 }
-.card-score-main { background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%); border-color: #6D28D9; }
-.card-score-sub.prof { background: #3B82F6; border-color: #2563EB; }
-.card-score-sub.infl { background: #F59E0B; border-color: #D97706; }
-.card-score-main .score-star,
-.card-score-sub .score-star {
-  font-size: 0.85em;
-}
+.card-score-main .score-star { font-size: 0.85em; }
 .card-score-subs {
   display: flex;
   gap: 5px;
 }
+.card-score-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.24);
+}
+.card-score-sub .score-star { font-size: 0.85em; }
 
 /* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
 .star-rating {
@@ -2012,7 +2022,7 @@ body.mobile-mode .page-nav-inline-num {
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .scoring-help-modal {
-  width: 460px; max-width: 100%; max-height: 86vh; overflow-y: auto;
+  width: 580px; max-width: 100%; max-height: 86vh; overflow-y: auto;
   background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25);
   font-family: inherit;
 }
