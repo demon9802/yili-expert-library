@@ -2074,12 +2074,12 @@ function renderExpertGrid() {
     headerInfo.appendChild(nameRow);
 
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.12: 评分徽章扁平化——右上角纯文字，与左侧顶部水平对齐，不用卡片套卡片
+      // v5.9.13: 评分徽章荣誉小徽章——金色/琥珀色系，⭐+分值，体现专业性与荣誉感
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('span', { className: 'card-score-main' });
-      overallScore.textContent = '综合 ' + expert.scores.overall.toFixed(1);
+      overallScore.innerHTML = '<span class="score-star">★</span> ' + expert.scores.overall.toFixed(1);
       const subRow = h('div', { className: 'card-score-subs' });
-      subRow.textContent = '专业 ' + expert.scores.professional.toFixed(1) + ' · 影响 ' + expert.scores.influence.toFixed(1);
+      subRow.innerHTML = '<span class="card-score-sub">专业 ' + expert.scores.professional.toFixed(1) + '<span class="score-star">★</span></span><span class="card-score-divider">·</span><span class="card-score-sub">影响 ' + expert.scores.influence.toFixed(1) + '<span class="score-star">★</span></span>';
       scoreBox.appendChild(overallScore);
       scoreBox.appendChild(subRow);
       cardHeader.appendChild(scoreBox);
