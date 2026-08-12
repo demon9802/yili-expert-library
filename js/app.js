@@ -990,44 +990,38 @@ function h(tag, attrs={}, ...children) {
   return el;
 }
 
-// ===== v5.9.0 评分规则说明浮窗（前端"?"，五星制简洁版） =====
-// 文案与 DEFAULT_RATING_CONFIG 同步：权重从 ratingConfig 读取，确保与计算逻辑一致。
+// ===== v5.9.5 评分规则说明浮窗（前端"?"，极简版） =====
+// 只展示评分项列表与核心说明，不再解释计算公式与星级含义。
 function openScoringHelp() {
   const cfg = (appState && appState.db && appState.db.ratingConfig) || DEFAULT_RATING_CONFIG;
   const profDim = cfg.dimensions.find(d => d.id === 'professional') || {};
   const inflDim = cfg.dimensions.find(d => d.id === 'influence') || {};
-  const profW = Math.round((profDim.weight || 0.6) * 100);
-  const inflW = Math.round((inflDim.weight || 0.4) * 100);
+  const rows = [];
+  (profDim.subDimensions || []).forEach(sd => {
+    rows.push(`<tr><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#3B82F6;font-weight:600;white-space:nowrap;width:80px">专业度</td><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${escapeHtml(sd.name)}</td></tr>`);
+  });
+  (inflDim.subDimensions || []).forEach(sd => {
+    rows.push(`<tr><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#F59E0B;font-weight:600;white-space:nowrap;width:80px">影响力</td><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${escapeHtml(sd.name)}</td></tr>`);
+  });
   const html = `
     <div class="sh-head">
       <div class="sh-title">评分规则说明</div>
-      <div class="sh-ver">v5.9.0 · 五星制</div>
+      <div class="sh-ver">五星制</div>
     </div>
-    <div class="sh-body">
-      <h4 class="sh-h">综合评分怎么算？</h4>
-      <p class="sh-formula">综合分 = <b>专业度 × ${profW}%</b> + <b>影响力 × ${inflW}%</b></p>
-      <ul class="sh-list">
-        <li><b>专业度</b>：学历与学术背景 · 行业资质与认证 · 专业成果与经验</li>
-        <li><b>影响力</b>：社会荣誉与奖项 · 职称 / 管理履历与行业地位</li>
-      </ul>
-      <p class="sh-note">每个子项均为 <b>1–5★</b>，由「主锚点定基础分 + 次要角度微调」综合评定；子维度硬封顶 5★、硬下限 1★。</p>
-
-      <h4 class="sh-h">星级含义（速览）</h4>
-      <table class="sh-table">
-        <tr><td class="sh-range r-top">5★</td><td>顶尖（清北博士、两院院士、世界500强掌舵人）</td></tr>
-        <tr><td class="sh-range r-hi">4★</td><td>优秀（985硕士、省部级荣誉、行业百强高管）</td></tr>
-        <tr><td class="sh-range r-mid">3★</td><td>良好</td></tr>
-        <tr><td class="sh-range r-low">2★</td><td>中等 / 信息缺失默认</td></tr>
-        <tr><td class="sh-range r-low">1★</td><td>相对较弱</td></tr>
+    <div class="sh-body" style="padding-top:8px">
+      <table class="sh-table" style="margin:0">
+        <thead>
+          <tr style="background:#f8fafc">
+            <th style="padding:8px 10px;text-align:left;font-size:12px;color:#64748b;font-weight:600;width:80px">维度</th>
+            <th style="padding:8px 10px;text-align:left;font-size:12px;color:#64748b;font-weight:600">评分项</th>
+          </tr>
+        </thead>
+        <tbody>${rows.join('')}</tbody>
       </table>
-
-      <h4 class="sh-h">两点说明</h4>
-      <ul class="sh-list">
-        <li>信息缺失<b>统一计 2★</b>，不空置、不占优。</li>
-        <li>综合分 <b>低于 3★ 不进入前端展示</b>，自动列入「观察库」。</li>
-      </ul>
+      <div class="sh-foot" style="margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;color:#475569;line-height:1.7">
+        信息缺失统一记为 2★，专家评分根据补充信息动态维护。
+      </div>
     </div>
-    <div class="sh-foot">具体打分标准请联系对应管理员</div>
   `;
   const overlay = h('div', { className: 'scoring-help-overlay', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
   overlay.appendChild(h('div', { className: 'scoring-help-modal', innerHTML: html }));
@@ -2031,19 +2025,17 @@ function renderExpertGrid() {
     headerInfo.appendChild(nameRow);
 
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.4-fix: 三项评分形式统一为「维度X★」圆角徽章，仅颜色区分；整体位于 card-header 右上角
+      // v5.9.5-fix: 三项评分同一行「维度X★」圆角实底徽章，配色与详情页一致，位于 card-header 右上角
       const scoreBox = h('div', { className: 'card-score-box' });
-      const overallScore = h('div', { className: 'card-score-main' });
+      const overallScore = h('span', { className: 'card-score-main' });
       overallScore.textContent = '综合' + expert.scores.overall.toFixed(1) + '★';
-      scoreBox.appendChild(overallScore);
-      const subScores = h('div', { className: 'card-score-subs' });
       const profTag = h('span', { className: 'card-score-sub prof' });
       profTag.textContent = '专业' + expert.scores.professional.toFixed(1) + '★';
       const inflTag = h('span', { className: 'card-score-sub infl' });
       inflTag.textContent = '影响' + expert.scores.influence.toFixed(1) + '★';
-      subScores.appendChild(profTag);
-      subScores.appendChild(inflTag);
-      scoreBox.appendChild(subScores);
+      scoreBox.appendChild(overallScore);
+      scoreBox.appendChild(profTag);
+      scoreBox.appendChild(inflTag);
       cardHeader.appendChild(scoreBox);
     }
     
@@ -2860,9 +2852,6 @@ function showDashboard() {
     const distChart = h('div', { className: 'chart-container', style: 'height:220px' });
     distChart.id = 'chart-score-dist';
     distCard.appendChild(distChart);
-    distCard.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'-6px' } },
-      '最高分段 4.5–5.0★ 为闭区间，其余为左闭右开（如 4.0–4.5★ 表示 ≥4.0 且 <4.5）'
-    ));
     grid.appendChild(distCard);
   }
   
@@ -3061,8 +3050,8 @@ function renderDoughnutChart(containerId, labels, data) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
-  // v5.9.4-fix: 分值分布使用金色→蓝色→灰色的评分质感配色，不再带评价词
-  const colors = ['#D97706', '#F59E0B', '#3B82F6', '#64748B', '#9CA3AF'];
+  // v5.9.5-fix: 分值分布使用金色→灰色评分质感配色（避免蓝绿）
+  const colors = ['#B45309', '#D97706', '#F59E0B', '#94A3B8', '#CBD5E1'];
   const total = data.reduce((a,b) => a+b, 0);
   const h = Math.max(280, container.clientHeight);
   const w = container.clientWidth || 400;
@@ -3130,12 +3119,12 @@ function renderScoreDistChart(containerId, experts) {
   const cfg = appState.db.ratingConfig || DEFAULT_RATING_CONFIG;
   const cap = cfg.cap || 5;
   const scored = experts.filter(e => e.scores && e.scores.overall > 0);
-  // v5.9.3-fix: 按 0.5★ 细分为 5 个不重叠区间，去掉“优秀/良好”等评价词，避免 2-3★ 与 <3★ 重合
+  // v5.9.5-fix: 按 0.5★ 细分为 5 个不重叠区间；标签中直接标注不含区间，不再额外写底部说明
   const buckets = [
     { label: '4.5-5.0★', min: 4.5, max: cap, includeMax: true },
-    { label: '4.0-4.5★', min: 4.0, max: 4.5 },
-    { label: '3.5-4.0★', min: 3.5, max: 4.0 },
-    { label: '3.0-3.5★', min: 3.0, max: 3.5 },
+    { label: '4.0-4.5★（不含4.5）', min: 4.0, max: 4.5 },
+    { label: '3.5-4.0★（不含4.0）', min: 3.5, max: 4.0 },
+    { label: '3.0-3.5★（不含3.5）', min: 3.0, max: 3.5 },
     { label: '<3.0★', min: 0, max: 3.0 }
   ];
   const counts = buckets.map(b => {
@@ -3988,25 +3977,40 @@ function renderAdmin() {
   header.appendChild(headerInner);
   app.appendChild(header);
 
-  // v5.9.4-fix: 全局数据维护提示始终可见，汇总观察库状态（主管理员看全部，子管理员看分配）
+  // v5.9.5-fix: 数据维护提示更精致；子管理员仅当其已管理过专家（创建/操作）时才显示关联提醒
   var reminders = getObservationReminders(db);
   var me = getOperatorInfo();
-  var obsExperts = db.experts.filter(function(e) { return e.status === 'observation'; });
+  // 子管理员管理的专家集合：自己创建 或 在观察库/评分操作中有记录
+  var managedIds = new Set();
+  if (!isMaster && me.id) {
+    db.experts.forEach(function(e) { if (e.createdBy === me.id) managedIds.add(e.id); });
+    (db.observationOperations || []).forEach(function(op) { if (op.operatorId === me.id && op.expertId) managedIds.add(op.expertId); });
+  }
+  function reminderVisible(r) {
+    if (isMaster) return true;
+    if (r.assignee.type !== 'sub' || r.assignee.account !== me.id) return false;
+    return managedIds.has(r.expert.id);
+  }
   var halfCount = 0, oneCount = 0, overCount = 0;
-  [].concat(reminders.halfYear).forEach(function(r) { if (isMaster || (r.assignee.type === 'sub' && r.assignee.account === me.id)) halfCount++; });
-  [].concat(reminders.oneYear).forEach(function(r) { if (isMaster || (r.assignee.type === 'sub' && r.assignee.account === me.id)) oneCount++; });
-  [].concat(reminders.overdue).forEach(function(r) { if (isMaster || (r.assignee.type === 'sub' && r.assignee.account === me.id)) overCount++; });
+  [].concat(reminders.halfYear).forEach(function(r) { if (reminderVisible(r)) halfCount++; });
+  [].concat(reminders.oneYear).forEach(function(r) { if (reminderVisible(r)) oneCount++; });
+  [].concat(reminders.overdue).forEach(function(r) { if (reminderVisible(r)) overCount++; });
+  var visibleObsExperts = isMaster ? db.experts.filter(function(e) { return e.status === 'observation'; })
+    : db.experts.filter(function(e) { return e.status === 'observation' && managedIds.has(e.id); });
   var myReminderCount = halfCount + oneCount + overCount;
   var hasReminders = myReminderCount > 0;
   var banner = h('div', { style:{
-    background: hasReminders ? '#fffbeb' : '#f8fafc',
-    borderBottom: hasReminders ? '1px solid #fde68a' : '1px solid #e2e8f0',
-    padding:'8px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap'
+    background: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
+    padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap'
   }});
-  banner.appendChild(h('div', { style:{ fontSize:'12px', color: hasReminders ? '#92400e' : '#475569', lineHeight:'1.6' } },
-    (hasReminders ? '⚠️ ' : '📋 ') +
-    '数据维护：观察库 ' + obsExperts.length + ' 位 · 半年提醒 ' + halfCount + ' · 一年提醒 ' + oneCount + ' · 已超期 ' + overCount
-  ));
+  var bannerLeft = h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } });
+  bannerLeft.appendChild(h('span', { style:{ fontSize:'12px', fontWeight:'600', color:'#334155' } }, '📋 数据维护'));
+  bannerLeft.appendChild(h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '观察库 ' + visibleObsExperts.length + ' 位'));
+  if (halfCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#f0fdf4', color:'#15803d', borderRadius:'999px' } }, '半年提醒 ' + halfCount));
+  if (oneCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#fffbeb', color:'#b45309', borderRadius:'999px' } }, '一年提醒 ' + oneCount));
+  if (overCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#fef2f2', color:'#dc2626', borderRadius:'999px' } }, '已超期 ' + overCount));
+  banner.appendChild(bannerLeft);
   if (hasReminders) {
     banner.appendChild(h('button', { className:'btn btn-sm', style:{ background:'#f59e0b', color:'white', border:'none', flexShrink:0 }, onclick: function() {
       appState.adminTab = 'observation';
@@ -6033,7 +6037,7 @@ function parseSingleContact(raw) {
   if (/^1[3-9]\d{9}$/.test(digits)) {
     return { kind: 'mobile', display: mobileClean, href: 'tel:' + digits, copy: digits };
   }
-  // 4. 座机（0 + 区号 + 号码，兼容 8610 等国际写法与带前缀数据）
+  // 4. 座机（统一强制带区号显示）
   const hasLandlineKeyword = /电话|座机|办公|固话/i.test(s);
   const landlineClean = s.replace(/^(办公电话|电话|座机|固话)[:：]?\s*/i, '');
   const landlineDigits = landlineClean.replace(/\D/g, '');
@@ -6054,19 +6058,49 @@ function parseSingleContact(raw) {
   function formatLandlineDisplay(d, areaCodeLen) {
     return d.slice(0, areaCodeLen) + '-' + d.slice(areaCodeLen);
   }
+  // v5.9.5: 对无区号 7-8 位座机，按常见号段推断区号；推断失败默认 010 并提示核对
+  function guessAreaCodeForNumber(num) {
+    const prefixMap = {
+      '10':'010','20':'020','21':'021','22':'022','23':'023','24':'024','25':'025','27':'027','28':'028','29':'029',
+      '310':'0310','311':'0311','312':'0312','313':'0313','314':'0314','315':'0315','316':'0316','317':'0317','318':'0318','319':'0319',
+      '351':'0351','352':'0352','353':'0353','354':'0354','355':'0355','356':'0356','357':'0357','358':'0358','359':'0359',
+      '371':'0371','372':'0372','373':'0373','374':'0374','375':'0375','376':'0376','377':'0377','378':'0378','379':'0379',
+      '391':'0391','392':'0392','393':'0393','394':'0394','395':'0395','396':'0396','397':'0397','398':'0398','399':'0399',
+      '431':'0431','432':'0432','433':'0433','434':'0434','435':'0435','436':'0436','437':'0437','438':'0438','439':'0439',
+      '451':'0451','452':'0452','453':'0453','454':'0454','455':'0455','456':'0456','457':'0457','458':'0458','459':'0459',
+      '471':'0471','472':'0472','473':'0473','474':'0474','475':'0475','476':'0476','477':'0477','478':'0478','479':'0479',
+      '491':'0491','492':'0492','493':'0493','494':'0494','495':'0495','496':'0496','497':'0497','498':'0498','499':'0499',
+      '512':'0512','513':'0513','514':'0514','515':'0515','516':'0516','517':'0517','518':'0518','519':'0519',
+      '510':'0510','527':'0527','523':'0523','525':'0525',
+      '531':'0531','532':'0532','533':'0533','534':'0534','535':'0535','536':'0536','537':'0537','538':'0538','539':'0539',
+      '551':'0551','552':'0552','553':'0553','554':'0554','555':'0555','556':'0556','557':'0557','558':'0558','559':'0559',
+      '571':'0571','572':'0572','573':'0573','574':'0574','575':'0575','576':'0576','577':'0577','578':'0578','579':'0579',
+      '591':'0591','592':'0592','593':'0593','594':'0594','595':'0595','596':'0596','597':'0597','598':'0598','599':'0599',
+      '731':'0731','732':'0732','733':'0733','734':'0734','735':'0735','736':'0736','737':'0737','738':'0738','739':'0739',
+      '760':'0760','762':'0762','763':'0763','768':'0768','769':'0769',
+      '750':'0750','751':'0751','752':'0752','753':'0753','754':'0754','755':'0755','756':'0756','757':'0757','758':'0758','759':'0759',
+      '898':'0898'
+    };
+    for (var p = 3; p >= 2; p--) {
+      var prefix = num.slice(0, p);
+      if (prefixMap[prefix]) return prefixMap[prefix];
+    }
+    return null;
+  }
 
   var norm = normalizeLandlineDigits(landlineDigits);
   if (norm) {
     var display = formatLandlineDisplay(norm.digits, norm.areaCodeLen);
     return { kind: 'landline', display: display, href: 'tel:' + norm.digits, copy: norm.digits };
   }
-  // 5. 无区号座机/办公电话（7-8 位数字，且出现电话/座机/办公字样）
-  if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && hasLandlineKeyword) {
-    return { kind: 'landline', display: landlineDigits, href: 'tel:' + landlineDigits, copy: landlineDigits, noAreaCode: true };
-  }
-  // 6. 兜底：联系方式场景下，7-8 位纯数字也视为座机，避免信息丢失
-  if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && /^\d[\d\s-]*\d$/.test(landlineClean)) {
-    return { kind: 'landline', display: landlineDigits, href: 'tel:' + landlineDigits, copy: landlineDigits, noAreaCode: true };
+  // 5. 无区号座机（7-8 位数字）：推断区号，推断失败默认 010，强制显示为 区号-号码
+  if (landlineDigits.length >= 7 && landlineDigits.length <= 8 && (hasLandlineKeyword || /^\d[\d\s-]*\d$/.test(landlineClean))) {
+    var guessed = guessAreaCodeForNumber(landlineDigits);
+    var inferred = false;
+    if (!guessed) { guessed = '010'; inferred = true; }
+    var fullDigits = guessed + landlineDigits;
+    var display = guessed + '-' + landlineDigits;
+    return { kind: 'landline', display: display, href: 'tel:' + fullDigits, copy: fullDigits, inferredAreaCode: inferred };
   }
   return { kind: 'unknown', display: s, href: null, copy: s };
 }
@@ -6753,19 +6787,66 @@ function renderObservationAuditLog(container, db) {
   if (!isMaster) {
     ops = ops.filter(function(op) { return op && op.operatorId === me.id; });
   }
-  // 默认按时间倒序，最多显示 100 条
-  ops.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); }).slice(0, 100);
+  // v5.9.5: 子管理员无操作记录时不显示该区域
+  if (!isMaster && ops.length === 0) return;
+  // 默认按时间倒序
+  ops.sort(function(a, b) { return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); });
+
+  const pageSize = 5;
+  const stateKey = 'obsAuditPage';
+  var page = Math.max(1, appState[stateKey] || 1);
+  var totalPages = Math.max(1, Math.ceil(ops.length / pageSize));
+  if (page > totalPages) page = totalPages;
+  appState[stateKey] = page;
+  var pagedOps = ops.slice((page - 1) * pageSize, page * pageSize);
 
   const box = h('div', { style: { background:'var(--bg)', borderRadius:'var(--radius-sm)', padding:'16px', border:'1px solid var(--border)', marginBottom:'16px' } });
   box.appendChild(h('div', { style: { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', flexWrap:'wrap', gap:'8px' } },
     h('div', { style: { fontSize:'14px', fontWeight:'600', color:'var(--primary)' } }, '📋 观察库操作记录'),
     h('div', { style: { fontSize:'11px', color:'var(--text-muted)' } }, isMaster ? '主管理员可见全部操作记录' : '子管理员仅可见自己的操作记录')
   ));
-  box.appendChild(h('div', { style: { fontSize:'12px', color:'var(--text-secondary)', marginBottom:'12px', lineHeight:'1.6' } },
-    '记录所有观察库相关操作：系统自动进出库、管理员调分、淘汰、重置为自动评分等。每条记录包含专家、调整内容、操作者、操作意见与时间。'
-  ));
-  box.appendChild(renderObservationOpsTable(ops, { showExpert: true }));
+  box.appendChild(renderObservationOpsTable(pagedOps, { showExpert: true }));
+  var pagination = renderPaginationControl(page, totalPages, function(newPage) {
+    appState[stateKey] = newPage;
+    renderObservationTab(container);
+  });
+  if (pagination) box.appendChild(pagination);
   container.appendChild(box);
+}
+
+// v5.9.5: 通用轻量分页控件（用于观察库专家列表、操作记录等）
+function renderPaginationControl(currentPage, totalPages, onChange) {
+  if (totalPages <= 1) return null;
+  var wrap = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', marginTop:'12px', flexWrap:'wrap' } });
+  wrap.appendChild(h('button', {
+    className:'btn btn-sm', style:{ fontSize:'11px', padding:'3px 10px' },
+    disabled: currentPage <= 1,
+    onclick: function() { if (currentPage > 1) onChange(currentPage - 1); }
+  }, '上一页'));
+  for (var p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
+      (function(pageNum) {
+        var btn = h('button', {
+          className:'btn btn-sm', style:{ fontSize:'11px', padding:'3px 10px', minWidth:'30px' },
+          disabled: pageNum === currentPage,
+          onclick: function() { if (pageNum !== currentPage) onChange(pageNum); }
+        }, String(pageNum));
+        if (pageNum === currentPage) {
+          btn.style.background = '#3B82F6'; btn.style.color = 'white'; btn.style.borderColor = '#3B82F6';
+        }
+        wrap.appendChild(btn);
+      })(p);
+    } else if (p === currentPage - 2 || p === currentPage + 2) {
+      wrap.appendChild(h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '…'));
+    }
+  }
+  wrap.appendChild(h('button', {
+    className:'btn btn-sm', style:{ fontSize:'11px', padding:'3px 10px' },
+    disabled: currentPage >= totalPages,
+    onclick: function() { if (currentPage < totalPages) onChange(currentPage + 1); }
+  }, '下一页'));
+  wrap.appendChild(h('span', { style:{ fontSize:'11px', color:'#64748b', marginLeft:'6px' } }, currentPage + ' / ' + totalPages + ' 页'));
+  return wrap;
 }
 
 // Global autoSyncObservation function
@@ -7370,11 +7451,6 @@ function renderRatingsTab(panel) {
   const isMaster = isMasterAdmin();
   const showScores = cfg.showScores !== false;
 
-  panel.appendChild(h('p', { style: { fontSize:'13px', color:'var(--text-secondary)', marginBottom:'16px' } },
-    isMaster ? '管理评分的展示开关、查看评分规则，以及调整所有专家的子维度分值。'
-             : '查看评分规则、调整各专家分值。维度配置和权重调整仅主管理员可操作。'
-  ));
-
   // ===== 辅助函数 =====
   function recalcAllExperts() {
     db.experts.forEach(e => {
@@ -7397,7 +7473,7 @@ function renderRatingsTab(panel) {
       toast(e.target.checked ? '评分信息将在前端展示' : '评分信息已在前端隐藏', 'success');
     }}));
     toggleSec.appendChild(toggleRow);
-    toggleSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, '关闭后，专家卡片和详情页将不再显示任何评分数字及子维度信息，仅管理员在后台可见评分。'));
+    toggleSec.appendChild(h('p', { style:{ fontSize:'12px', color:'var(--text-muted)', marginTop:'6px' } }, '关闭后，专家卡片和详情页将不再显示任何评分数字及评分项信息，仅管理员在后台可见评分。'));
     panel.appendChild(toggleSec);
   }
 
@@ -7416,11 +7492,6 @@ function renderRatingsTab(panel) {
   const configSec = h('div', { style: { background:'var(--bg)', padding:'16px', borderRadius:'var(--radius-sm)', marginBottom:'16px', border:'1px solid var(--border)' } });
   const configTitle = isMaster ? '② 评分配置（规则及文档）' : '① 评分规则';
   configSec.appendChild(h('h4', { style: { marginBottom:'12px', fontSize:'14px', color:'var(--primary)' } }, configTitle));
-
-  // 顶部简明提示
-  const hintDiv = h('div', { style:{ marginBottom:'14px', padding:'8px 12px', background:'#f0f7ff', borderRadius:'6px', fontSize:'11px', color:'var(--primary)', lineHeight:'1.6' } });
-  hintDiv.innerHTML = '💡 信息缺失统一默认 <b>2★</b>，子维度分值范围 <b>1–5★</b>，综合分低于 <b>3★</b> 进入观察库。管理员仅可调整 5 个评分项的整数分值；专业度 / 影响力 / 综合得分由系统自动计算。';
-  configSec.appendChild(hintDiv);
 
   // 完整文档入口（仅主管理员）
   if (isMaster) {
@@ -7501,7 +7572,7 @@ function renderRatingsTab(panel) {
       saveDB(db); renderRatingsTab(panel);
       toast(e.target.checked ? '自动评分已启用' : '自动评分已关闭', 'success');
     }}));
-    aiRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '系统根据专家学历、资历、履历等信息自动生成子维度评分。'));
+    aiRow.appendChild(h('span', { style:{ fontSize:'12px', color:'var(--text-muted)' } }, '系统根据专家学历、资历、履历等信息自动生成评分项分值。'));
     configSec.appendChild(aiRow);
   }
 
@@ -7575,17 +7646,33 @@ function renderRatingsTab(panel) {
             recalcExpertFromSubscores(e);
             saveDB(db);
             renderRatingsTab(panel);
-            toast(e.name + ' 子维度已更新', 'success');
+            toast(e.name + ' 评分项已更新', 'success');
           }
         });
         td.appendChild(inp); row.appendChild(td);
       });
 
       const act = h('td', {});
-      act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+      act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px', marginRight:'6px' }, onclick: () => {
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); saveDB(db);
         renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
       } }, '重置为自动评分'));
+      // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲）
+      if (e.status !== 'observation') {
+        act.appendChild(h('button', { className:'btn btn-warning btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+          promptObservationNote('移入观察库：' + e.name, '', function(note) {
+            var before = snapshotExpertScores(e);
+            e.status = 'observation';
+            e.observationStatus = 'evaluating';
+            e.observationDate = new Date().toISOString();
+            var after = snapshotExpertScores(e);
+            recordObservationOperation(db, e, 'manual_in', before, after, note, ['手动移入']);
+            saveDB(db);
+            renderRatingsTab(panel);
+            toast(e.name + ' 已移入观察库', 'success');
+          });
+        } }, '移入观察库'));
+      }
       row.appendChild(act);
       tbody.appendChild(row);
     });
@@ -7751,9 +7838,6 @@ function renderDashboardTab(panel) {
     sdc.appendChild(h('h4', {}, '分值分布'));
     const sdd = h('div', { className: 'chart-container', style: 'height:280px', id: 'admin-chart-score-dist' });
     sdc.appendChild(sdd);
-    sdc.appendChild(h('div', { style:{ fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'-6px' } },
-      '最高分段 4.5–5.0★ 为闭区间，其余为左闭右开'
-    ));
     previewGrid.appendChild(sdc);
   }
   
@@ -8409,7 +8493,7 @@ function renderObservationTab(panel) {
   panel.innerHTML = '';
   panel.appendChild(h('h3', {}, '观察库'));
   panel.appendChild(h('div', { style:{ padding:'10px 14px', background:'#f8fafc', borderRadius:'8px', border:'1px solid #e2e8f0', fontSize:'12px', color:'var(--text-secondary)', lineHeight:'1.7', marginBottom:'16px' } },
-    '综合评分 < 3★ 自动列入观察库，也可手动移入。观察库专家不在前端展示；可连续修改子维度评分，完成后点“确认调分”并填写意见；确认不符合标准则“淘汰”。临近淘汰节点可点“延后观察”：在当前淘汰截止日基础上往后顺延 6 个月（不是从入库日重新计算 18 个月）。所有操作留痕。'
+    '综合评分 < 3★ 自动列入观察库，手动移入请至评分管理操作，观察库专家不在前端展示，观察期为移入观察库后 18 个月，期满未做调整的，将自动淘汰。操作分数调整，完成后点击“确认调分”并填写意见；确认不符合标准，点击“淘汰”并填写意见；观察期截止前，点击“延后观察”，可为该专家在当前观察截止日基础上往后顺延 6 个月。'
   ));
 
   // v5.9.3-fix2: 观察库维护提醒（半年 / 一年 / 超期），按创建者分配，子管理员回收则归主管理员
@@ -8447,6 +8531,14 @@ function renderObservationTab(panel) {
   // Only show experts with status === 'observation'
   var obsExperts = db.experts.filter(function(e) { return e.status === 'observation'; });
 
+  // v5.9.5: 观察库专家列表分页，每页 5 个
+  var obsPageSize = 5;
+  var obsPage = Math.max(1, appState.obsPage || 1);
+  var obsTotalPages = Math.max(1, Math.ceil(obsExperts.length / obsPageSize));
+  if (obsPage > obsTotalPages) obsPage = obsTotalPages;
+  appState.obsPage = obsPage;
+  var pagedExperts = obsExperts.slice((obsPage - 1) * obsPageSize, obsPage * obsPageSize);
+
   if (obsExperts.length === 0) {
     panel.appendChild(h('div', { style:{ padding:'16px', background:'#f0fdf4', borderRadius:'8px', border:'1px solid #bbf7d0', fontSize:'13px', color:'#059669' } }, '观察库为空 · 所有专家评分正常'));
     return;
@@ -8463,10 +8555,7 @@ function renderObservationTab(panel) {
     h('span', { style:{ padding:'4px 10px', background: elimCount > 0 ? '#fef2f2' : '#f0fdf4', borderRadius:'6px', border:'1px solid ' + (elimCount > 0 ? '#fecaca' : '#bbf7d0') } }, '已淘汰: ' + elimCount + ' 位')
   ));
 
-  // v5.9.3: 全局观察库操作记录审计区
-  renderObservationAuditLog(panel, db);
-
-  obsExperts.forEach(function(expert) {
+  pagedExperts.forEach(function(expert) {
     var card = h('div', { className: 'observation-card' + (expert.observationStatus === 'eliminated' ? ' eliminated' : '') });
 
     // Ensure subScores exist
@@ -8581,7 +8670,7 @@ function renderObservationTab(panel) {
 
     // Sub-dimension score editing —— v5.9.3-fix: 批量暂存，改完多项后统一"确认调分"填一次意见
     var scoreBox = h('div', { style:{ marginTop:'10px', padding:'10px', background:'white', borderRadius:'6px', border:'1px solid var(--border)' } });
-    scoreBox.appendChild(h('div', { style:{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', marginBottom:'6px' } }, '子维度评分（可连续修改多项，完成后点"确认调分"并填写意见）'));
+    scoreBox.appendChild(h('div', { style:{ fontSize:'11px', fontWeight:'600', color:'var(--text-muted)', marginBottom:'6px' } }, '评分项（可连续修改多项，完成后点"确认调分"并填写意见）'));
 
     // 待确认的调分暂存：key = dimId::name
     var pending = {};
@@ -8703,6 +8792,16 @@ function renderObservationTab(panel) {
 
     panel.appendChild(card);
   });
+
+  // v5.9.5: 观察库专家列表分页控件
+  var obsPagination = renderPaginationControl(obsPage, obsTotalPages, function(newPage) {
+    appState.obsPage = newPage;
+    renderObservationTab(panel);
+  });
+  if (obsPagination) panel.appendChild(obsPagination);
+
+  // v5.9.5: 全局观察库操作记录审计区挪到专家列表底部
+  renderObservationAuditLog(panel, db);
 }
 
 function renderPermissionsTab(panel) {
