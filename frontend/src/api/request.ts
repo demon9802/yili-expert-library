@@ -6,6 +6,7 @@ import type { ApiResponse } from '@/types'
 
 const BASE_URL = '/api'
 const TOKEN_KEY = 'yili_expert_token'
+const REQUEST_TIMEOUT = 6000
 
 export function getToken(): string | null {
   try {
@@ -45,26 +46,39 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${BASE_URL}${url}`, {
-    ...options,
-    headers,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
-  if (!response.ok && response.status !== 400) {
-    if (response.status === 401) {
-      removeToken()
-      throw new Error('登录已过期，请重新登录')
+  try {
+    const response = await fetch(`${BASE_URL}${url}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+
+    if (!response.ok && response.status !== 400) {
+      if (response.status === 401) {
+        removeToken()
+        throw new Error('登录已过期，请重新登录')
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+
+    const result: ApiResponse<T> = await response.json()
+
+    if (result.code !== 200) {
+      throw new Error(result.message || '请求失败')
+    }
+
+    return result.data
+  } catch (e: any) {
+    clearTimeout(timeoutId)
+    if (e?.name === 'AbortError') {
+      throw new Error('请求超时，请检查后端服务')
+    }
+    throw e
   }
-
-  const result: ApiResponse<T> = await response.json()
-
-  if (result.code !== 200) {
-    throw new Error(result.message || '请求失败')
-  }
-
-  return result.data
 }
 
 export const api = {

@@ -200,6 +200,9 @@
       :expert="selectedExpert"
       @close="selectedExpert = null"
     />
+
+    <!-- Dashboard Modal -->
+    <DashboardModal v-if="showDashboardModal" @close="showDashboardModal = false" />
   </div>
 </template>
 
@@ -214,6 +217,7 @@ import ExpertCard from '@/components/ExpertCard.vue'
 import PaginationControl from '@/components/PaginationControl.vue'
 import LoginModal from '@/components/LoginModal.vue'
 import ExpertDetailModal from '@/components/ExpertDetailModal.vue'
+import DashboardModal from '@/components/DashboardModal.vue'
 
 const store = useAppStore()
 const router = useRouter()
@@ -222,6 +226,7 @@ const showLogin = ref(false)
 const showHistory = ref(false)
 const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
+const showDashboardModal = ref(false)
 
 const scoreLabels = ['全部', '5★', '4★+', '3★+']
 const scoreValues: (number | null)[] = [null, 5, 4, 3]
@@ -371,8 +376,7 @@ function onLoginSuccess() {
 }
 
 function showDashboard() {
-  // TODO: implement dashboard modal or route
-  alert('数据仪表盘功能开发中')
+  showDashboardModal.value = true
 }
 
 function toggleMobileMode() {

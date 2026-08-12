@@ -101,7 +101,10 @@ export const useAppStore = defineStore('app', () => {
       result = result.filter(e =>
         e.name?.toLowerCase().includes(q) ||
         e.fields?.some(f => f.toLowerCase().includes(q)) ||
-        e.advantages?.some(a => a.toLowerCase().includes(q)) ||
+        e.advantages?.some(a => {
+          const text = typeof a === 'string' ? a : ((a as any).title || '') + ((a as any).desc || '')
+          return text.toLowerCase().includes(q)
+        }) ||
         e.education?.toLowerCase().includes(q) ||
         e.qualifications?.toLowerCase().includes(q)
       )

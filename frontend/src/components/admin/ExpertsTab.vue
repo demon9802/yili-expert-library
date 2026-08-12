@@ -95,13 +95,18 @@ const filteredExperts = computed(() => {
   return store.experts.filter(expert =>
     expert.name?.toLowerCase().includes(query) ||
     expert.fields?.some(field => field.toLowerCase().includes(query)) ||
-    expert.advantages?.some(item => item.toLowerCase().includes(query))
+    expert.advantages?.some(item => {
+      const text = typeof item === 'string' ? item : `${item.title || ''}${item.desc || ''}`
+      return text.toLowerCase().includes(query)
+    })
   )
 })
 
 function resetForm(data: Partial<Expert> = emptyForm()) {
   Object.assign(form, emptyForm(), data, { fields: [...(data.fields || [])] })
-  advantagesText.value = (data.advantages || []).join('\n')
+  advantagesText.value = (data.advantages || [])
+    .map(a => typeof a === 'string' ? a : (a.title && a.desc ? `${a.title}：${a.desc}` : (a.desc || a.title || '')))
+    .join('\n')
 }
 
 function openCreate() {

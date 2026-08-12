@@ -4,11 +4,16 @@
  */
 
 // ===== 专家 =====
+export interface AdvantageItem {
+  title?: string
+  desc?: string
+}
+
 export interface Expert {
   id: number
   name: string
   fields: string[]
-  advantages: string[]
+  advantages: Array<string | AdvantageItem>
   education: string
   qualifications: string
   courses: string

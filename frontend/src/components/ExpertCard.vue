@@ -205,7 +205,12 @@ const qualItems = computed(() => {
 
 const advItems = computed(() => {
   if (!props.expert.advantages?.length) return []
-  return props.expert.advantages.slice(0, 3)
+  return props.expert.advantages.slice(0, 3).map(a => {
+    if (typeof a === 'string') return a
+    const title = (a as any).title || ''
+    const desc = (a as any).desc || ''
+    return title && desc ? `${title}：${desc}` : (desc || title)
+  })
 })
 
 const truncatedEducation = computed(() => {
