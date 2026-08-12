@@ -1045,8 +1045,8 @@ function openScoringHelp() {
     { item: '⑤ 职称·管理履历·行业地位', dim: '影响力', stars: ['无职称/基层', '经理/高工/主管', '副教授/总监/VP/合伙人', '教授/CEO/创始人(百强)', '教授/CEO(世界500强/央企)'] }
   ];
   const ruleRows = ruleMatrix.map(r => `<tr>
-    <td style="padding:7px 9px;border-bottom:1px solid #f1f5f9;font-size:11px;font-weight:600;color:${r.dim==='专业度'?'#3B82F6':'#F59E0B'};white-space:nowrap">${r.item}</td>
-    ${r.stars.map(s => `<td style="padding:7px 9px;border-bottom:1px solid #f1f5f9;font-size:10.5px;color:#475569;text-align:center;line-height:1.35">${s}</td>`).join('')}
+    <td class="sh-item-cell" style="color:${r.dim==='专业度'?'#3B82F6':'#F59E0B'}">${r.item}</td>
+    ${r.stars.map(s => `<td class="sh-star-cell">${s}</td>`).join('')}
   </tr>`).join('');
   const html = `
     <div class="sh-head">
@@ -1057,12 +1057,12 @@ function openScoringHelp() {
       <table class="sh-table" style="margin:0">
         <thead>
           <tr style="background:#f8fafc">
-            <th style="padding:7px 9px;text-align:left;font-size:11px;color:#64748b;font-weight:600">评分项</th>
-            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">1★</th>
-            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">2★</th>
-            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">3★</th>
-            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">4★</th>
-            <th style="padding:7px 9px;font-size:11px;color:#64748b;font-weight:600;text-align:center">5★</th>
+            <th class="sh-item-header">评分项</th>
+            <th class="sh-star-header">1★</th>
+            <th class="sh-star-header">2★</th>
+            <th class="sh-star-header">3★</th>
+            <th class="sh-star-header">4★</th>
+            <th class="sh-star-header">5★</th>
           </tr>
         </thead>
         <tbody>${ruleRows}</tbody>
@@ -2074,15 +2074,15 @@ function renderExpertGrid() {
     headerInfo.appendChild(nameRow);
 
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.6: 评分徽章回到卡片右上角，综合第一行、专业/影响第二行（同尺寸，仅颜色区分，与详情页一致）
+      // v5.9.11: 评分徽章质感化——右上角绝对定位，渐变卡片+层次阴影+星级图标
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('span', { className: 'card-score-main' });
-      overallScore.textContent = '综合 ' + expert.scores.overall.toFixed(1) + '★';
+      overallScore.innerHTML = '<span class="score-crown">★</span> 综合 ' + expert.scores.overall.toFixed(1) + '<span class="score-star">★</span>';
       const subRow = h('div', { className: 'card-score-subs' });
       const profTag = h('span', { className: 'card-score-sub prof' });
-      profTag.textContent = '专业 ' + expert.scores.professional.toFixed(1) + '★';
+      profTag.innerHTML = '专业 ' + expert.scores.professional.toFixed(1) + '<span class="score-star">★</span>';
       const inflTag = h('span', { className: 'card-score-sub infl' });
-      inflTag.textContent = '影响 ' + expert.scores.influence.toFixed(1) + '★';
+      inflTag.innerHTML = '影响 ' + expert.scores.influence.toFixed(1) + '<span class="score-star">★</span>';
       subRow.appendChild(profTag);
       subRow.appendChild(inflTag);
       scoreBox.appendChild(overallScore);
@@ -3215,8 +3215,8 @@ function showAdminLogin() {
   hintP.appendChild(document.createTextNode('子管理员：输入主管理员分发的账号和密码。'));
   loginBox.appendChild(hintP);
 
-  // v5.9.10: 手机端管理员登录提示
-  loginBox.appendChild(h('p', { style: { fontSize: '12px', color: '#B45309', marginBottom: '16px', lineHeight: '1.5', padding: '8px 12px', background: '#FFFBEB', borderRadius: '6px', border: '1px solid #FDE68A' } }, '💡 建议使用电脑端操作，手机端仅适合临时查看。'));
+  // v5.9.11: 管理员登录提示（仅手机端显示，文案按用户要求）
+  loginBox.appendChild(h('p', { className: 'login-mobile-hint' }, '建议使用电脑登录管理后台'));
   
   // Account input
   loginBox.appendChild(h('input', { type: 'text', placeholder: '账号（主管理员留空）', id: 'login-account' }));

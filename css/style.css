@@ -564,8 +564,11 @@ body {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  /* v5.9.10: 评分徽章回归右上角绝对定位，预留空间防重叠 */
-  padding-right: 88px;
+  /* v5.9.11: 为右上角质感评分徽章预留空间 */
+  padding-right: 108px;
+}
+@media (max-width: 480px) {
+  .card-header-info { padding-right: 92px; }
 }
 /* Row 1: name + scores */
 .card-name-row {
@@ -610,53 +613,74 @@ body {
   font-size: 13px;
   font-weight: 700;
 }
-/* v5.9.10: 评分徽章固定在卡片右上角，垂直堆叠（综合+专业/影响），保持轻盈且与领域标签区分 */
+/* v5.9.11: 评分徽章——右上角质感卡片（渐变+层次阴影+星级图标） */
 .card-score-box {
   position: absolute;
   top: 12px;
   right: 12px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  padding: 6px 10px;
-  background: #ffffff;
-  border: 1px solid #E9D5FF;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.10);
+  align-items: center;
+  gap: 5px;
+  min-width: 76px;
+  padding: 8px 10px;
+  background: linear-gradient(145deg, #ffffff 0%, #f7f3ff 100%);
+  border: 1px solid rgba(124, 58, 237, 0.16);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 14px rgba(124, 58, 237, 0.12),
+    0 1px 3px rgba(0,0,0,0.05),
+    inset 0 1px 0 rgba(255,255,255,0.9);
   z-index: 2;
 }
 .card-score-main {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: 13px;
+  gap: 3px;
+  font-size: 14px;
   font-weight: 800;
-  color: #7C3AED;
-  letter-spacing: 0.3px;
+  color: #6D28D9;
+  letter-spacing: 0.2px;
   line-height: 1.1;
 }
-.card-score-main .score-star { font-size: 0.85em; }
+.card-score-main .score-crown {
+  font-size: 0.82em;
+  color: #F59E0B;
+  filter: drop-shadow(0 1px 1px rgba(245,158,11,0.25));
+}
+.card-score-main .score-star,
+.card-score-sub .score-star {
+  font-size: 0.82em;
+  color: #F59E0B;
+}
 .card-score-subs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
 }
 .card-score-sub {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
+  padding: 2px 6px;
+  border-radius: 10px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.2px;
-  white-space: nowrap;
   line-height: 1.2;
-  color: #64748B;
-  background: transparent;
-  border: none;
+  white-space: nowrap;
+  background: rgba(241,245,249,0.85);
+  color: #475569;
 }
-.card-score-sub .score-star { font-size: 0.85em; }
+.card-score-sub.prof { background: rgba(59,130,246,0.10); color: #2563EB; }
+.card-score-sub.infl { background: rgba(245,158,11,0.10); color: #D97706; }
+
+@media (max-width: 480px) {
+  .card-score-box { min-width: 64px; padding: 6px 7px; gap: 3px; border-radius: 10px; top: 10px; right: 10px; }
+  .card-score-main { font-size: 12px; }
+  .card-score-sub { font-size: 9px; padding: 1px 4px; }
+}
 
 /* v5.9.9: 评分管理操作列下拉菜单 */
 /* v5.9.10: 评分管理操作菜单（body 挂载，fixed 定位，突破表格裁剪） */
@@ -1142,6 +1166,22 @@ body {
   color: var(--danger);
   font-size: 13px;
   margin-bottom: 12px;
+}
+
+/* v5.9.11: 管理员登录提示仅手机端显示 */
+.login-mobile-hint {
+  font-size: 12px;
+  color: #B45309;
+  margin-bottom: 16px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: #FFFBEB;
+  border-radius: 6px;
+  border: 1px solid #FDE68A;
+  text-align: left;
+}
+@media (min-width: 769px) {
+  .login-mobile-hint { display: none !important; }
 }
 
 .btn {
@@ -2070,9 +2110,20 @@ body.mobile-mode .page-nav-inline-num {
   background: var(--bg); padding: 8px 12px; border-radius: 8px; margin: 4px 0 0;
 }
 .sh-note b { color: var(--text); }
-.sh-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.sh-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+/* v5.9.11: 评分规则弹窗表格优化——第一列可压缩换行，5个分值列均分 */
+.sh-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.sh-table th, .sh-table td {
+  padding: 7px 7px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  word-break: break-word;
+  line-height: 1.4;
+}
 .sh-table tr:last-child td { border-bottom: none; }
+.sh-table th:first-child, .sh-table td:first-child { width: 18%; min-width: 70px; }
+.sh-table th:not(:first-child), .sh-table td:not(:first-child) { width: 16.4%; min-width: 48px; text-align: center; }
+.sh-table .sh-item-cell { font-weight: 600; font-size: 11px; }
+.sh-table .sh-star-cell { font-size: 10.5px; color: #475569; }
 .sh-range { font-weight: 700; white-space: nowrap; width: 62px; text-align: center; border-radius: 6px; }
 .r-top  { background: #DBEAFE; color: #1D4ED8; }
 .r-hi   { background: #D1FAE5; color: #065F46; }
@@ -2082,4 +2133,12 @@ body.mobile-mode .page-nav-inline-num {
 .sh-foot {
   padding: 12px 22px 18px; font-size: 12px; color: var(--text-muted);
   border-top: 1px solid var(--border); margin-top: 8px;
+}
+@media (max-width: 480px) {
+  .scoring-help-overlay { padding: 10px; align-items: flex-end; }
+  .scoring-help-modal { width: 100%; max-height: 92vh; border-radius: 14px 14px 0 0; }
+  .sh-body { padding: 12px 14px 4px; }
+  .sh-table { font-size: 11px; }
+  .sh-table th, .sh-table td { padding: 5px 4px; font-size: 10px; }
+  .sh-table th:first-child, .sh-table td:first-child { min-width: 58px; }
 }
