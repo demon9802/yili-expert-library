@@ -55,6 +55,7 @@
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
             <scope>runtime</scope>
         </dependency>
 
@@ -140,13 +141,19 @@
 
     <profiles>
         <profile>
-            <id>dev</id>
+            <id>local</id>
             <properties>
-                <active.profile>dev</active.profile>
+                <active.profile>local</active.profile>
             </properties>
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
+        </profile>
+        <profile>
+            <id>dev</id>
+            <properties>
+                <active.profile>dev</active.profile>
+            </properties>
         </profile>
         <profile>
             <id>sit</id>
