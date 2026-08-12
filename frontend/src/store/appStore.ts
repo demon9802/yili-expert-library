@@ -280,13 +280,36 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 收藏 =====
   async function toggleFavorite(expertId: number) {
-    if (favorites.value.includes(expertId)) {
-      await favoriteApi.removeFavorite(expertId)
+    const isFav = favorites.value.includes(expertId)
+    if (isFav) {
       favorites.value = favorites.value.filter(id => id !== expertId)
     } else {
-      await favoriteApi.addFavorite(expertId)
       favorites.value.push(expertId)
     }
+    // 如果已登录，同步到后端；否则仅存 localStorage
+    if (currentUser.value) {
+      try {
+        if (isFav) {
+          await favoriteApi.removeFavorite(expertId)
+        } else {
+          await favoriteApi.addFavorite(expertId)
+        }
+      } catch {
+        // 后端同步失败，回滚本地状态
+        if (isFav) {
+          favorites.value.push(expertId)
+        } else {
+          favorites.value = favorites.value.filter(id => id !== expertId)
+        }
+      }
+    }
+    // 持久化到 localStorage（无论是否登录）
+    lsSet(STORAGE_KEY, {
+      experts: experts.value,
+      fields: fields.value,
+      yiliProjects: yiliProjects.value,
+      favorites: favorites.value,
+    })
   }
 
   function isFavorited(expertId: number): boolean {

@@ -52,9 +52,10 @@ async function handleLogin() {
   loading.value = true
   error.value = ''
   try {
-    // V6 后端使用邮箱作为账号；若 account 为空，尝试用主密码逻辑（当前后端无 masterPassword，使用 email 登录）
-    const email = account.value || 'admin@yili.com'
-    await store.login(email, password.value)
+    // V6: 主管理员账号为空 → master@yili.local，密码 yili2026
+    const email = account.value.trim() || 'master@yili.local'
+    const resolvedEmail = email.includes('@') ? email : email + '@yili.local'
+    await store.login(resolvedEmail, password.value)
     emit('success')
   } catch (e: any) {
     error.value = e.message || '登录失败'

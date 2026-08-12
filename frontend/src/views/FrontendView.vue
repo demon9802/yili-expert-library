@@ -163,7 +163,7 @@
             {{ item.label }}
           </span>
         </div>
-        <button v-if="!store.currentUser" class="fav-login-btn" style="font-size:12px;padding:4px 12px;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:8px" @click="goAdminLogin">
+        <button v-if="!store.currentUser" class="fav-login-btn" style="font-size:12px;padding:4px 12px;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:8px" @click="showUserLogin = true">
           🔐 登录同步
         </button>
         <span v-else style="font-size:12px;color:#059669;margin-left:8px;background:#ECFDF5;padding:4px 10px;border-radius:6px;border:1px solid #A7F3D0;white-space:nowrap;cursor:pointer" @click="handleLogout">
@@ -203,6 +203,9 @@
 
     <!-- Dashboard Modal -->
     <DashboardModal v-if="showDashboardModal" @close="showDashboardModal = false" />
+
+    <!-- User Login Modal -->
+    <UserLoginModal v-if="showUserLogin" @close="showUserLogin = false" @success="onUserLoginSuccess" />
   </div>
 </template>
 
@@ -217,6 +220,7 @@ import ExpertCard from '@/components/ExpertCard.vue'
 import PaginationControl from '@/components/PaginationControl.vue'
 import ExpertDetailModal from '@/components/ExpertDetailModal.vue'
 import DashboardModal from '@/components/DashboardModal.vue'
+import UserLoginModal from '@/components/UserLoginModal.vue'
 import FieldChartInline from '@/components/FieldChartInline.vue'
 
 const store = useAppStore()
@@ -226,6 +230,7 @@ const showHistory = ref(false)
 const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
 const showDashboardModal = ref(false)
+const showUserLogin = ref(false)
 
 const scoreLabels = ['全部', '9+', '8+', '7+']
 const scoreValues: (number | null)[] = [null, 9, 8, 7]
@@ -369,6 +374,12 @@ function goAdminLogin() {
 
 function handleLogout() {
   store.logout()
+}
+
+function onUserLoginSuccess() {
+  showUserLogin.value = false
+  // Reload app data to sync favorites from backend
+  store.loadAppData()
 }
 
 function showDashboard() {
