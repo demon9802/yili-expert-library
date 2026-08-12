@@ -227,8 +227,8 @@ const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
 const showDashboardModal = ref(false)
 
-const scoreLabels = ['全部', '5★', '4★+', '3★+']
-const scoreValues: (number | null)[] = [null, 5, 4, 3]
+const scoreLabels = ['全部', '9+', '8+', '7+']
+const scoreValues: (number | null)[] = [null, 9, 8, 7]
 
 const sortOptions = [
   { id: 'default', name: '默认排序' },

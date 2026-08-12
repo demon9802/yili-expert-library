@@ -42,14 +42,21 @@ export interface Scores {
   subScores?: SubScores
 }
 
-export interface SubScores {
+export interface DimensionSubScores {
   [key: string]: number | null
+}
+
+export interface SubScores {
+  professional?: DimensionSubScores
+  influence?: DimensionSubScores
 }
 
 export interface ContactInfo {
   type: string
-  label: string
+  label?: string
   value: string
+  person?: string
+  info?: string
 }
 
 // ===== 合作项目 =====

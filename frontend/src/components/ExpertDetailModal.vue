@@ -20,7 +20,7 @@
         <div v-if="expert.scores" class="detail-section">
           <div class="detail-section-title score-title-row">
             评分信息
-            <button class="score-help-btn" type="button" title="评分规则说明（点击查看）" @click="openScoringHelp">?</button>
+            <button class="score-help-btn" type="button" title="评分规则说明（点击查看）" @click="showHelp = true">?</button>
           </div>
           <div class="detail-score-row">
             <div class="detail-score-card">
@@ -43,6 +43,38 @@
                 <span class="detail-score-num">{{ (expert.scores.influence || 0).toFixed(1) }}</span>
               </div>
               <div class="detail-score-card-label">影响力</div>
+            </div>
+          </div>
+
+          <!-- 子维度评分 -->
+          <div v-if="hasSubScores && subScores" class="detail-score-sub-area">
+            <div v-if="subScores.professional" class="detail-score-sub-block">
+              <div class="detail-score-sub-title prof">专业度 · 细分标准</div>
+              <div class="score-bar-list">
+                <div v-for="(val, label) in subScores.professional" :key="label" class="score-bar-item">
+                  <div class="score-bar-info">
+                    <span class="score-bar-label">{{ label }}</span>
+                    <span class="score-bar-value blue">{{ (val || 0).toFixed(1) }}★</span>
+                  </div>
+                  <div class="score-bar-track">
+                    <div class="score-bar-fill blue" :style="{ width: Math.min(100, ((val || 0) / 5) * 100) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="subScores.influence" class="detail-score-sub-block">
+              <div class="detail-score-sub-title infl">影响力 · 细分标准</div>
+              <div class="score-bar-list">
+                <div v-for="(val, label) in subScores.influence" :key="label" class="score-bar-item">
+                  <div class="score-bar-info">
+                    <span class="score-bar-label">{{ label }}</span>
+                    <span class="score-bar-value amber">{{ (val || 0).toFixed(1) }}★</span>
+                  </div>
+                  <div class="score-bar-track">
+                    <div class="score-bar-fill amber" :style="{ width: Math.min(100, ((val || 0) / 5) * 100) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -77,19 +109,19 @@
         <!-- 资历资质 -->
         <div v-if="expert.qualifications && expert.qualifications !== '未公开'" class="detail-section">
           <div class="detail-section-title">资历资质</div>
-          <div class="detail-text">{{ expert.qualifications }}</div>
+          <div class="detail-text" v-html="formatRichText(expert.qualifications)"></div>
         </div>
 
         <!-- 参考案例 -->
         <div v-if="expert.courses" class="detail-section">
           <div class="detail-section-title">参考案例</div>
-          <div class="detail-text">{{ expert.courses }}</div>
+          <div class="detail-text" v-html="formatRichText(expert.courses)"></div>
         </div>
 
         <!-- 优势展示 -->
         <div v-if="expert.advDisplay" class="detail-section">
           <div class="detail-section-title">优势展示</div>
-          <div class="detail-text">{{ expert.advDisplay }}</div>
+          <div class="detail-text" v-html="formatRichText(expert.advDisplay)"></div>
         </div>
 
         <!-- 合作项目 -->
@@ -112,25 +144,45 @@
         </div>
 
         <!-- 联系方式 -->
-        <div v-if="expert.contactPerson || expert.contactInfo || expert.referrer" class="detail-section">
+        <div v-if="contacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
-          <div v-if="expert.contactPerson || expert.contactInfo" class="detail-text detail-contact-line">
-            联系人：{{ expert.contactPerson || '-' }} {{ contactLabel }}: {{ expert.contactInfo || '-' }}
+          <div
+            v-for="(c, idx) in contacts"
+            :key="idx"
+            class="detail-contact-line detail-text"
+          >
+            <span v-if="contacts.length > 1">联系人{{ idx + 1 }}：</span>
+            <span v-else>联系人：</span>
+            <span v-if="c.person" class="contact-person">{{ c.person }}</span>
+            <span v-if="c.info" class="contact-info">
+              <span class="contact-type-label">{{ typeLabel(c.type) }}：</span>
+              <span class="contact-value">{{ c.info }}</span>
+            </span>
+            <span class="contact-actions">
+              <button class="contact-action-btn" title="复制联系方式" @click="copyContact(c.info)">📋 复制</button>
+              <button v-if="c.type === 'phone'" class="contact-action-btn" title="拨号" @click="callPhone(c.info)">📞 拨号</button>
+              <button v-if="c.type === 'email'" class="contact-action-btn" title="发邮件" @click="sendEmail(c.info)">✉️ 邮件</button>
+            </span>
           </div>
-          <div v-if="expert.referrer" class="detail-text detail-contact-line">
-            推荐人：{{ expert.referrer }}
+          <div v-if="expert.referrer" class="detail-text detail-referrer">
+            内部推荐人：{{ expert.referrer }}
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 评分规则弹窗 -->
+  <ScoringHelpModal v-if="showHelp" @close="showHelp = false" />
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
-import type { Expert } from '@/types'
+import type { Expert, ContactInfo, SubScores } from '@/types'
+import { formatRichText, copyText } from '@/utils/helpers'
 import StarRating from '@/components/StarRating.vue'
+import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
 
 const props = defineProps<{
   expert: Expert
@@ -141,6 +193,7 @@ defineEmits<{
 }>()
 
 const store = useAppStore()
+const showHelp = ref(false)
 
 const isFav = computed(() => store.favorites.includes(props.expert.id))
 
@@ -154,19 +207,47 @@ const advantageItems = computed(() => {
   })
 })
 
+const subScores = computed(() => {
+  const raw: SubScores | null | undefined = props.expert.subScores
+    || (props.expert.scores as any)?.subScores
+  if (!raw) return null
+  return {
+    professional: raw.professional || null,
+    influence: raw.influence || null,
+  }
+})
+
+const hasSubScores = computed(() => {
+  return subScores.value && (subScores.value.professional || subScores.value.influence)
+})
+
 const cooperationProjects = computed(() =>
   store.yiliProjects
     .filter(p => p.expertId === props.expert.id && p.visible !== false)
     .sort((a, b) => b.year - a.year || (b.month || 0) - (a.month || 0))
 )
 
-const contactLabel = computed(() => {
-  switch (props.expert.contactType) {
-    case 'wechat': return '微信'
-    case 'email': return '邮箱'
-    default: return '电话'
+const contacts = computed(() => {
+  const list: ContactInfo[] = props.expert.contacts || []
+  if (!list.length && props.expert.contactInfo) {
+    list.push({
+      type: props.expert.contactType || 'phone',
+      label: typeLabel(props.expert.contactType || 'phone'),
+      value: props.expert.contactInfo,
+      person: props.expert.contactPerson,
+    } as ContactInfo)
   }
+  return list
 })
+
+function typeLabel(type?: string): string {
+  switch (type) {
+    case 'email': return '邮箱'
+    case 'wechat': return '微信'
+    case 'phone': return '电话'
+    default: return '联系方式'
+  }
+}
 
 function getFieldStyle(fieldName: string) {
   const field = store.fields.find(f => f.name === fieldName)
@@ -187,12 +268,8 @@ async function toggleFav() {
 
 function satisfactionStars(s: any): string {
   const val = typeof s === 'object' ? (s.value || 0) : (Number(s) || 0)
-  const rounded = Math.round(val)
-  let stars = ''
-  for (let i = 0; i < 5; i++) {
-    stars += i < rounded ? '★' : '☆'
-  }
-  return stars
+  const full = Math.round(val / 2)
+  return '★'.repeat(full) + '☆'.repeat(5 - full)
 }
 
 function satisfactionDisplay(s: any): string {
@@ -200,8 +277,65 @@ function satisfactionDisplay(s: any): string {
   return val.toFixed(1)
 }
 
-function openScoringHelp() {
-  // TODO: 打开评分规则说明弹窗或文档
-  alert('评分规则说明：信息缺失统一记为 2★，子维度封顶 5★，综合评分 = 专业度 60% + 影响力 40%。')
+function copyContact(info?: string) {
+  if (!info) return
+  copyText(info).then(() => {
+    alert('已复制：' + info)
+  }).catch(() => {
+    alert('复制失败')
+  })
+}
+
+function callPhone(info?: string) {
+  if (!info) return
+  const num = info.replace(/[^0-9\-]/g, '').replace(/-/g, '')
+  window.location.href = 'tel:' + num
+}
+
+function sendEmail(info?: string) {
+  if (!info) return
+  window.location.href = 'mailto:' + info
 }
 </script>
+
+<style scoped>
+.detail-contact-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+}
+.contact-person {
+  font-weight: 600;
+}
+.contact-info {
+  color: var(--text-secondary);
+}
+.contact-type-label {
+  color: var(--text-secondary);
+}
+.contact-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.contact-action-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.contact-action-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.detail-referrer {
+  margin-top: 8px;
+}
+</style>

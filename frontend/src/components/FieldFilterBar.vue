@@ -52,16 +52,23 @@ const visibleFields = computed(() => {
 })
 
 function tagStyle(field: Field) {
-  if (store.fieldFilter.has(field.name)) {
-    return {
-      backgroundColor: field.color,
-      color: field.textColor,
-      borderColor: field.color,
-      transform: 'scale(1.05)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-    }
+  // 与 V5 一致：未选中时半透明背景 + 领域色边框，选中时领域色背景
+  const active = store.fieldFilter.has(field.name)
+  return {
+    backgroundColor: active ? field.color : hexToRgba(field.color, 0.13),
+    color: active ? field.textColor : '#4A4A4A',
+    borderColor: field.color,
+    transform: active ? 'scale(1.05)' : undefined,
+    boxShadow: active ? '0 2px 8px rgba(0,0,0,0.15)' : undefined
   }
-  return {}
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.substring(0, 2), 16)
+  const g = parseInt(clean.substring(2, 4), 16)
+  const b = parseInt(clean.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 function displayName(name: string) {
