@@ -187,22 +187,29 @@
 
 ---
 
-## 七、验收建议
+## 七、构建验证结果（2026-08-12 已完成）
 
-### 7.1 后端验证步骤
+### 7.1 前端构建 ✅ 已通过
+| 检查项 | 结果 |
+|--------|------|
+| `npm install` | ✅ 依赖安装完成（node_modules 就绪） |
+| `vue-tsc --noEmit` | ✅ TypeScript 类型检查零错误 |
+| `vite build` | ✅ 92 模块构建成功，3.68s 完成 |
+| 产物大小 | 主 JS 110KB (gzip 42.7KB) + 主 CSS 39.5KB (gzip 7.9KB) |
+| 开发服务器 | ✅ `http://localhost:3000` 可访问 (HTTP 200) |
+
+**修复记录**：
+- `appStore.ts:257` — `field.name` 添加非空断言 `!`（`Partial<Field>` 类型安全）
+- `vite.config.ts` — 移除 SCSS `additionalData`，避免与 `main.scss` 中 `@use` 重复导入
+
+### 7.2 后端验证步骤（待用户执行）
 1. 安装 JDK 1.8 + Maven
 2. 替换 `backend/settings.xml` 到 Maven 配置目录
 3. 执行 `mvn clean compile` 验证编译
 4. 执行 `mvn spring-boot:run` 启动服务
 5. 访问 `http://localhost:8080/api/app-data` 验证 API
 
-### 7.2 前端验证步骤
-1. `cd frontend && npm install`
-2. `npm run dev` 启动开发服务器
-3. 访问 `http://localhost:3000` 验证页面
-4. 对比旧版页面，检查 UI 和功能一致性
-
-### 7.3 UI 对照清单
+### 7.3 UI 对照清单（待用户验证）
 - [ ] 前台 Header 样式
 - [ ] 搜索框 + 搜索历史
 - [ ] 领域筛选条
@@ -213,6 +220,14 @@
 - [ ] 登录/注册弹窗
 - [ ] 管理后台各标签页
 
+### 7.4 Git 提交状态
+| 提交 | 说明 | 状态 |
+|------|------|------|
+| `373b440` | V6.0.0 技术栈改写（126文件，8453行） | ✅ 已提交本地 |
+| `354a3b8` | fix: TypeScript类型错误 + SCSS重复@use | ✅ 已提交本地 |
+| `896e4d1` | chore: 清理Vite临时文件 + .gitignore | ✅ 已提交本地 |
+| `git push origin main` | 推送到 GitHub | ⚠️ 待用户手动推送（当前环境认证不可用） |
+
 ---
 
 ## 八、回滚方案
@@ -220,10 +235,11 @@
 如改写后出现问题，可立即回滚至 V5.9.15：
 1. 旧代码完整保留在根目录 (index.html, js/, css/)
 2. EdgeOne 部署仍指向旧 index.html
-3. 删除 `backend/` 和 `frontend/` 目录即可恢复原状
+3. `git revert` V6 提交即可恢复
 4. Supabase 数据库未做任何修改
 
 ---
 
 **报告生成时间**: 2026-08-12 23:15
+**更新时间**: 2026-08-12 23:55（补充构建验证结果）
 **改写人**: AI Agent (WorkBuddy)
