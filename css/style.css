@@ -568,7 +568,8 @@ body {
   padding-right: 90px;
 }
 @media (max-width: 480px) {
-  .card-header-info { padding-right: 78px; }
+  /* v5.9.14: 手机端为右上角评分徽章留出足够空间，避免与领域标签重叠 */
+  .card-header-info { padding-right: 108px; }
 }
 /* Row 1: name + scores */
 .card-name-row {
@@ -668,9 +669,13 @@ body {
 }
 
 @media (max-width: 480px) {
-  .card-score-box { gap: 3px; }
-  .card-score-main { font-size: 12px; padding: 2px 8px 2px 6px; border-radius: 10px; }
-  .card-score-subs { font-size: 10px; gap: 4px; }
+  /* v5.9.14: 手机端徽章整体缩小，避免与下方领域标签重叠 */
+  .card-score-box { gap: 2px; top: 2px; right: 2px; }
+  .card-score-main { font-size: 11px; padding: 2px 6px 2px 5px; border-radius: 9px; gap: 2px; }
+  .card-score-main .score-star { font-size: 0.85em; }
+  .card-score-subs { font-size: 9px; gap: 3px; }
+  .card-score-sub .score-star { font-size: 0.8em; }
+  .card-score-divider { margin: 0 2px; }
 }
 
 /* v5.9.9: 评分管理操作列下拉菜单 */
