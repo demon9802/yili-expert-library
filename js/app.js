@@ -990,6 +990,46 @@ function h(tag, attrs={}, ...children) {
   return el;
 }
 
+// v5.9.10: 评分管理操作列 body 挂载下拉菜单（避免被表格裁剪）
+function openRatingActionMenu(triggerBtn, items) {
+  closeRatingActionMenu();
+  const menu = document.createElement('div');
+  menu.id = 'rating-action-menu-open';
+  menu.className = 'rating-action-menu';
+  menu.style.position = 'fixed';
+  menu.style.zIndex = '10000';
+  items.forEach(function(it) {
+    const btn = document.createElement('button');
+    btn.className = 'rating-action-menu-item ' + (it.cls || '');
+    btn.style.color = it.color || '#374151';
+    btn.textContent = it.label;
+    btn.onclick = function(ev) {
+      ev.stopPropagation();
+      closeRatingActionMenu();
+      it.onClick();
+    };
+    menu.appendChild(btn);
+  });
+  document.body.appendChild(menu);
+  const rect = triggerBtn.getBoundingClientRect();
+  const mRect = menu.getBoundingClientRect();
+  let top = rect.bottom + 4;
+  let left = rect.right - mRect.width;
+  if (left < 8) left = 8;
+  if (top + mRect.height > window.innerHeight - 8) top = rect.top - mRect.height - 4;
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+  setTimeout(function() {
+    document.addEventListener('click', closeRatingActionMenu, { once: true });
+    window.addEventListener('scroll', closeRatingActionMenu, { once: true });
+    window.addEventListener('resize', closeRatingActionMenu, { once: true });
+  }, 0);
+}
+function closeRatingActionMenu() {
+  const existing = document.getElementById('rating-action-menu-open');
+  if (existing) existing.remove();
+}
+
 // ===== v5.9.5 评分规则说明浮窗（前端"?"，极简版） =====
 // 只展示评分项列表与核心说明，不再解释计算公式与星级含义。
 function openScoringHelp() {
@@ -3174,6 +3214,9 @@ function showAdminLogin() {
   hintP.appendChild(h('br'));
   hintP.appendChild(document.createTextNode('子管理员：输入主管理员分发的账号和密码。'));
   loginBox.appendChild(hintP);
+
+  // v5.9.10: 手机端管理员登录提示
+  loginBox.appendChild(h('p', { style: { fontSize: '12px', color: '#B45309', marginBottom: '16px', lineHeight: '1.5', padding: '8px 12px', background: '#FFFBEB', borderRadius: '6px', border: '1px solid #FDE68A' } }, '💡 建议使用电脑端操作，手机端仅适合临时查看。'));
   
   // Account input
   loginBox.appendChild(h('input', { type: 'text', placeholder: '账号（主管理员留空）', id: 'login-account' }));
@@ -7626,20 +7669,10 @@ function renderRatingsTab(panel) {
         td.appendChild(inp); row.appendChild(td);
       });
 
-      // v5.9.9: 操作列改为下拉菜单，压缩行高；不新增列、不产生横向滚动
+      // v5.9.10: 操作列改为 body 挂载的下拉菜单，避免被表格/容器裁剪
       const act = h('td', { style:{ minWidth:'70px', verticalAlign:'middle', textAlign:'center' } });
-      const details = h('details', { className: 'rating-action-dropdown' });
-      const summary = h('summary', { className:'btn btn-secondary btn-sm', style:{ fontSize:'12px', padding:'5px 10px', cursor:'pointer' } }, '操作 ▼');
-      const menu = h('div', { className: 'rating-action-menu' });
-      const addMenuItem = function(label, cls, color, onClick) {
-        const item = h('button', { className: 'rating-action-menu-item ' + cls, style:{ color: color }, onclick: function(ev) {
-          ev.stopPropagation();
-          details.open = false;
-          onClick();
-        } }, label);
-        menu.appendChild(item);
-      };
-      addMenuItem('🔄 重置为自动评分', '', '#374151', function() {
+      const menuItems = [];
+      menuItems.push({ label: '🔄 重置为自动评分', color: '#374151', onClick: function() {
         if (!confirm('重置为自动评分将用系统自动估算覆盖「' + e.name + '」当前的人工调分，确定继续？')) return;
         var before = snapshotExpertScores(e);
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e);
@@ -7647,10 +7680,10 @@ function renderRatingsTab(panel) {
         recordObservationOperation(db, e, 'ai_reset', before, after, '管理员手动重置为自动评分（覆盖人工调分）', ['重置为自动评分']);
         saveDB(db);
         renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
-      });
+      }});
       // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲；不改分值，仅改状态留痕）
       if (e.status !== 'observation') {
-        addMenuItem('⚠️ 移入观察库', 'warning', '#B45309', function() {
+        menuItems.push({ label: '⚠️ 移入观察库', cls: 'warning', color: '#B45309', onClick: function() {
           promptObservationNote('移入观察库：' + e.name, '', function(note) {
             var before = snapshotExpertScores(e);
             e.status = 'observation';
@@ -7662,15 +7695,17 @@ function renderRatingsTab(panel) {
             renderRatingsTab(panel);
             toast(e.name + ' 已移入观察库（分值不变）', 'success');
           });
-        });
+        }});
       }
       // v5.9.6: 从云端恢复（以 Supabase 为准，覆盖本地被误改的评分/状态）
-      addMenuItem('☁️ 从云端恢复', '', '#0e7490', async function() {
+      menuItems.push({ label: '☁️ 从云端恢复', color: '#0e7490', onClick: async function() {
         await restoreExpertFromCloud(e, panel);
-      });
-      details.appendChild(summary);
-      details.appendChild(menu);
-      act.appendChild(details);
+      }});
+      const actionBtn = h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'12px', padding:'5px 10px' }, onclick: function(ev) {
+        ev.stopPropagation();
+        openRatingActionMenu(actionBtn, menuItems);
+      } }, '操作 ▼');
+      act.appendChild(actionBtn);
       row.appendChild(act);
       tbody.appendChild(row);
     });

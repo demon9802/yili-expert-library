@@ -564,8 +564,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  /* v5.9.9: 评分改为姓名行内联，不再需要右侧留白 */
-  padding-right: 0;
+  /* v5.9.10: 评分徽章回归右上角绝对定位，预留空间防重叠 */
+  padding-right: 88px;
 }
 /* Row 1: name + scores */
 .card-name-row {
@@ -610,44 +610,43 @@ body {
   font-size: 13px;
   font-weight: 700;
 }
-/* v5.9.9: 评分改为姓名行内联展示：去药丸/去背景/去绝对定位，避免与领域标签同类、避免移动端重叠 */
+/* v5.9.10: 评分徽章固定在卡片右上角，垂直堆叠（综合+专业/影响），保持轻盈且与领域标签区分 */
 .card-score-box {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 10px;
-  padding: 0;
-  margin-left: auto;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  z-index: auto;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 6px 10px;
+  background: #ffffff;
+  border: 1px solid #E9D5FF;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.10);
+  z-index: 2;
 }
 .card-score-main {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
-  color: #B45309;
+  color: #7C3AED;
   letter-spacing: 0.3px;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 .card-score-main .score-star { font-size: 0.85em; }
 .card-score-subs {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 .card-score-sub {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 0;
-  border-radius: 0;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.2px;
@@ -660,14 +659,10 @@ body {
 .card-score-sub .score-star { font-size: 0.85em; }
 
 /* v5.9.9: 评分管理操作列下拉菜单 */
-.rating-action-dropdown { position: relative; display: inline-block; }
-.rating-action-dropdown summary { list-style: none; }
-.rating-action-dropdown summary::-webkit-details-marker { display: none; }
+/* v5.9.10: 评分管理操作菜单（body 挂载，fixed 定位，突破表格裁剪） */
 .rating-action-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 100;
+  position: fixed;
+  z-index: 10000;
   min-width: 150px;
   background: #fff;
   border: 1px solid #e2e8f0;
