@@ -4,120 +4,192 @@
     <header class="header">
       <div class="header-inner">
         <div class="header-left">
-          <h1 class="header-title">伊利集团·数智化赋能优质专家资源库</h1>
-          <p class="header-subtitle">汇聚行业精英，赋能数智化转型</p>
+          <div class="header-title">伊利集团·数智化赋能优质专家资源库</div>
+          <div class="header-subtitle"></div>
         </div>
         <div class="header-actions">
-          <button v-if="!store.currentUser" class="btn btn-outline" @click="showLogin = true">
-            管理员登录
+          <div class="header-update">数据更新：{{ updateTimeText }}</div>
+          <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="showDashboard">
+            📊 数据仪表盘
           </button>
-          <template v-if="store.isAdmin">
-            <button class="btn btn-outline" @click="goAdmin">管理后台</button>
-            <button class="btn btn-outline" @click="handleLogout">退出</button>
+          <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="toggleMobileMode">
+            {{ isMobile ? '💻 桌面版' : '📱 手机版' }}
+          </button>
+          <button
+            v-if="!store.currentUser"
+            class="btn btn-sm"
+            style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
+            @click="showLogin = true"
+          >
+            管理员入口
+          </button>
+          <template v-else>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="goAdmin">
+              管理后台
+            </button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="handleLogout">
+              退出后台
+            </button>
           </template>
         </div>
       </div>
     </header>
 
-    <!-- Search & Filter Bar -->
-    <div class="filter-section">
-      <div class="filter-inner">
-        <!-- Search -->
-        <div class="search-box">
-          <input
-            v-model="store.searchQuery"
-            type="text"
-            placeholder="搜索专家姓名、领域、优势..."
-            @input="onSearch"
-            @focus="showHistory = true"
-            @blur="hideHistoryDelayed"
-          />
-          <button v-if="store.searchQuery" class="search-clear" @click="clearSearch">×</button>
-          <!-- Search History Dropdown -->
-          <div v-if="showHistory && store.searchHistory.length > 0" class="search-history">
-            <div
-              v-for="item in store.searchHistory"
-              :key="item"
-              class="search-history-item"
-              @mousedown="useHistory(item)"
-            >
-              {{ item }}
-              <span class="remove" @mousedown.stop="store.removeSearchHistoryItem(item)">×</span>
-            </div>
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-card stat-chart-card" style="flex:1;min-width:400px;padding:16px 20px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <span class="inline-chart-mini-title" style="font-size:13px">领域人数分布</span>
           </div>
+          <span style="font-size:12px;color:var(--primary);background:var(--primary-light);padding:3px 12px;border-radius:12px;font-weight:600">共{{ activeExpertCount }}位专家</span>
         </div>
-
-        <!-- Field Filter -->
-        <FieldFilterBar />
-
-        <!-- Sort & Filter Controls -->
-        <div class="filter-controls">
-          <select v-model="store.currentSort" class="sort-select">
-            <option value="default">默认排序</option>
-            <option value="score">评分最高</option>
-            <option value="name">姓名排序</option>
-            <option value="cooperation">合作最多</option>
-          </select>
-
-          <button
-            class="filter-chip"
-            :class="{ active: store.supplierFilter === true }"
-            @click="toggleSupplier"
-          >
-            在库
-          </button>
-          <button
-            class="filter-chip"
-            :class="{ active: store.favoritesFilter === true }"
-            @click="toggleFavorites"
-          >
-            收藏
-          </button>
-          <button
-            class="filter-chip"
-            :class="{ active: store.cooperationFilter === true }"
-            @click="toggleCooperation"
-          >
-            已合作
-          </button>
-          <button
-            v-if="hasActiveFilters"
-            class="filter-chip clear"
-            @click="store.clearFilters()"
-          >
-            清除筛选
-          </button>
-        </div>
+        <div id="main-field-chart-inline" style="width:100%"></div>
       </div>
     </div>
 
-    <!-- Expert Grid -->
-    <main class="main-content">
-      <div class="main-inner">
-        <div v-if="store.loading" class="loading">加载中...</div>
-        <div v-else-if="store.paginatedExperts.length === 0" class="empty-state">
-          <p>暂无匹配的专家</p>
-        </div>
-        <div v-else class="expert-grid">
-          <ExpertCard
-            v-for="expert in store.paginatedExperts"
-            :key="expert.id"
-            :expert="expert"
-            :is-favorite="store.isFavorited(expert.id)"
-            @click="openDetail(expert)"
-            @toggle-favorite="store.toggleFavorite(expert.id)"
-          />
-        </div>
-
-        <!-- Pagination -->
-        <PaginationControl
-          v-if="store.totalPages > 1"
-          :current-page="store.currentPage"
-          :total-pages="store.totalPages"
-          @change="onPageChange"
+    <!-- Search Bar -->
+    <div class="search-bar">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input
+          v-model="store.searchQuery"
+          class="search-input"
+          type="text"
+          placeholder="搜索专家姓名或关键词（如：AI、产品、清华...）"
+          @input="onSearch"
+          @focus="onSearchFocus"
+          @blur="hideHistoryDelayed"
         />
+        <span
+          v-if="store.searchQuery"
+          class="search-inline-clear"
+          @click="clearSearch"
+        >×</span>
+        <!-- Search History Dropdown -->
+        <div v-if="showHistory && store.searchHistory.length > 0" class="search-history-dropdown">
+          <div class="search-history-header">
+            <span>搜索历史</span>
+            <span class="search-history-clear-all" @click="store.clearSearchHistory()">清空</span>
+          </div>
+          <div
+            v-for="item in store.searchHistory"
+            :key="item"
+            class="search-history-item"
+            @mousedown="useHistory(item)"
+          >
+            <span class="search-history-text">{{ item }}</span>
+            <span class="search-history-delete" @mousedown.stop="store.removeSearchHistoryItem(item)">×</span>
+          </div>
+        </div>
       </div>
-    </main>
+      <button class="search-btn" @click="doSearch">搜索</button>
+      <button v-if="store.searchQuery" class="search-clear-btn" @click="clearSearch">✕ 清除</button>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">分值：</span>
+        <div class="score-filters">
+          <button
+            v-for="(label, i) in scoreLabels"
+            :key="label"
+            class="score-btn"
+            :class="{ active: scoreValues[i] === store.scoreFilter }"
+            @click="setScoreFilter(scoreValues[i])"
+          >
+            {{ label }}
+          </button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">排序：</span>
+        <select v-model="store.currentSort" class="filter-select" @change="store.currentPage = 1">
+          <option v-for="opt in sortOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
+        </select>
+        <span class="sort-hint">默认排序按照姓名字母排序，不区分排名先后</span>
+      </div>
+    </div>
+
+    <!-- Field Filter Bar -->
+    <FieldFilterBar />
+
+    <!-- Merged Filter Bar -->
+    <div class="filter-bar merged-bar-wrapper" style="margin-top:8px">
+      <div id="supplier-filter-group" class="filter-group">
+        <span class="filter-label">是否在库：</span>
+        <div class="field-filters">
+          <span
+            v-for="item in supplierOptions"
+            :key="String(item.value)"
+            class="field-tag field-tag-all"
+            :class="{ active: store.supplierFilter === item.value }"
+            :style="activeSupplierStyle(item.value)"
+            @click="setSupplierFilter(item.value)"
+          >
+            {{ item.label }}
+          </span>
+        </div>
+      </div>
+      <div id="coop-filter-group" class="filter-group">
+        <span class="filter-label">合作经历：</span>
+        <div class="field-filters">
+          <span
+            v-for="item in cooperationOptions"
+            :key="String(item.value)"
+            class="field-tag field-tag-all"
+            :class="{ active: store.cooperationFilter === item.value }"
+            :style="activeCooperationStyle(item.value)"
+            @click="setCooperationFilter(item.value)"
+          >
+            {{ item.label }}
+          </span>
+        </div>
+      </div>
+      <div id="fav-filter-group" class="filter-group">
+        <span class="filter-label">收藏：</span>
+        <div class="field-filters">
+          <span
+            v-for="item in favoriteOptions"
+            :key="String(item.value)"
+            class="field-tag field-tag-all favourite-tag"
+            :class="{ active: store.favoritesFilter === item.value }"
+            :style="activeFavoriteStyle(item.value)"
+            @click="setFavoritesFilter(item.value)"
+          >
+            {{ item.label }}
+          </span>
+        </div>
+        <button v-if="!store.currentUser" class="fav-login-btn" style="font-size:12px;padding:4px 12px;background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;cursor:pointer;white-space:nowrap;margin-left:8px" @click="showLogin = true">
+          🔐 登录同步
+        </button>
+        <span v-else style="font-size:12px;color:#059669;margin-left:8px;background:#ECFDF5;padding:4px 10px;border-radius:6px;border:1px solid #A7F3D0;white-space:nowrap;cursor:pointer" @click="handleLogout">
+          ✅ {{ userName }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Expert Count -->
+    <div id="expert-count" class="expert-count-info" v-html="countInfoHtml"></div>
+
+    <!-- Expert Grid -->
+    <div id="expert-grid" class="expert-grid">
+      <div v-if="store.loading" class="loading" style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-secondary)">加载中...</div>
+      <ExpertCard
+        v-for="expert in store.paginatedExperts"
+        :key="expert.id"
+        :expert="expert"
+        :search-query="store.searchQuery"
+        @click="openDetail(expert)"
+      />
+      <PaginationControl
+        v-if="store.totalPages > 1"
+        :current-page="store.currentPage"
+        :total-pages="store.totalPages"
+        @change="onPageChange"
+      />
+    </div>
 
     <!-- Login Modal -->
     <LoginModal v-if="showLogin" @close="showLogin = false" @success="onLoginSuccess" />
@@ -136,7 +208,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import type { Expert } from '@/types'
-import { debounce } from '@/utils/helpers'
+import { debounce, formatDate } from '@/utils/helpers'
 import FieldFilterBar from '@/components/FieldFilterBar.vue'
 import ExpertCard from '@/components/ExpertCard.vue'
 import PaginationControl from '@/components/PaginationControl.vue'
@@ -149,22 +221,74 @@ const router = useRouter()
 const showLogin = ref(false)
 const showHistory = ref(false)
 const selectedExpert = ref<Expert | null>(null)
+const isMobile = ref(false)
 
-const hasActiveFilters = computed(() =>
-  store.fieldFilter.size > 0 ||
-  store.scoreFilter !== null ||
-  store.supplierFilter !== null ||
-  store.favoritesFilter !== null ||
-  store.cooperationFilter !== null ||
-  store.searchQuery !== ''
+const scoreLabels = ['全部', '5★', '4★+', '3★+']
+const scoreValues: (number | null)[] = [null, 5, 4, 3]
+
+const sortOptions = [
+  { id: 'default', name: '默认排序' },
+  { id: 'score', name: '评分最高' },
+  { id: 'name', name: '姓名排序' },
+  { id: 'cooperation', name: '合作最多' }
+]
+
+const supplierOptions = [
+  { label: '全部', value: null },
+  { label: '是', value: true },
+  { label: '否', value: false }
+]
+
+const cooperationOptions = [
+  { label: '全部', value: null },
+  { label: '已合作', value: true },
+  { label: '尚未合作', value: false }
+]
+
+const favoriteOptions = [
+  { label: '全部', value: null },
+  { label: '♥ 我的收藏', value: true }
+]
+
+const updateTimeText = computed(() => {
+  // Use a static fallback; real update time should come from backend/settings
+  return formatDate(new Date().toISOString())
+})
+
+const activeExpertCount = computed(() =>
+  store.experts.filter(e => e.status !== 'eliminated' && e.status !== 'observation').length
 )
+
+const userName = computed(() => {
+  const email = store.currentUser?.email || ''
+  return email.split('@')[0] || ''
+})
+
+const countInfoHtml = computed(() => {
+  const total = store.filteredExperts.length
+  const totalPages = store.totalPages
+  const pageInfo = totalPages > 1 ? `（第 ${store.currentPage}/${totalPages} 页）` : ''
+  const searchHint = store.searchQuery ? ` <span class="search-results-hint">（搜索："${store.searchQuery}"）</span>` : ''
+  return `共 <span>${total}</span> 位专家${pageInfo}${searchHint}`
+})
 
 const onSearch = debounce(() => {
   store.currentPage = 1
   if (store.searchQuery.trim()) {
     store.saveSearchHistory(store.searchQuery)
   }
-}, 300)
+}, 350)
+
+function doSearch() {
+  store.currentPage = 1
+  if (store.searchQuery.trim()) {
+    store.saveSearchHistory(store.searchQuery)
+  }
+}
+
+function onSearchFocus() {
+  if (store.searchQuery) showHistory.value = true
+}
 
 function clearSearch() {
   store.searchQuery = ''
@@ -181,24 +305,50 @@ function hideHistoryDelayed() {
   setTimeout(() => { showHistory.value = false }, 200)
 }
 
-function toggleSupplier() {
-  store.supplierFilter = store.supplierFilter === true ? null : true
+function setScoreFilter(v: number | null) {
+  store.scoreFilter = store.scoreFilter === v ? null : v
   store.currentPage = 1
 }
 
-function toggleFavorites() {
-  store.favoritesFilter = store.favoritesFilter === true ? null : true
+function setSupplierFilter(v: boolean | null) {
+  store.supplierFilter = store.supplierFilter === v ? null : v
   store.currentPage = 1
 }
 
-function toggleCooperation() {
-  store.cooperationFilter = store.cooperationFilter === true ? null : true
+function setCooperationFilter(v: boolean | null) {
+  store.cooperationFilter = store.cooperationFilter === v ? null : v
+  store.currentPage = 1
+}
+
+function setFavoritesFilter(v: boolean | null) {
+  store.favoritesFilter = store.favoritesFilter === v ? null : v
   store.currentPage = 1
 }
 
 function onPageChange(page: number) {
   store.currentPage = page
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  const grid = document.getElementById('expert-grid')
+  if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function activeSupplierStyle(v: boolean | null) {
+  if (store.supplierFilter !== v) return {}
+  if (v === true) return { background: '#dcfce7', borderColor: '#22c55e', color: '#166534' }
+  if (v === false) return { background: '#fef2f2', borderColor: '#fca5a5', color: '#991b1b' }
+  return { background: '#475569', color: '#fff', borderColor: '#475569' }
+}
+
+function activeCooperationStyle(v: boolean | null) {
+  if (store.cooperationFilter !== v) return {}
+  if (v === true) return { background: '#dcfce7', borderColor: '#22c55e', color: '#166534' }
+  if (v === false) return { background: '#fef2f2', borderColor: '#fca5a5', color: '#991b1b' }
+  return { background: '#475569', color: '#fff', borderColor: '#475569' }
+}
+
+function activeFavoriteStyle(v: boolean | null) {
+  if (store.favoritesFilter !== v) return {}
+  if (v === true) return { background: '#FEF3C7', borderColor: '#F59E0B', color: '#92400E' }
+  return { background: '#475569', color: '#fff', borderColor: '#475569' }
 }
 
 function openDetail(expert: Expert) {
@@ -218,5 +368,15 @@ function onLoginSuccess() {
   if (store.isAdmin) {
     router.push('/admin')
   }
+}
+
+function showDashboard() {
+  // TODO: implement dashboard modal or route
+  alert('数据仪表盘功能开发中')
+}
+
+function toggleMobileMode() {
+  isMobile.value = !isMobile.value
+  document.body.classList.toggle('mobile-mode', isMobile.value)
 }
 </script>

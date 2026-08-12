@@ -164,6 +164,12 @@ export const useAppStore = defineStore('app', () => {
         fields.value = cached.fields || []
         yiliProjects.value = cached.yiliProjects || []
         favorites.value = cached.favorites || []
+      } else if (window.EXPERT_DATA) {
+        // 开发/无后端 fallback: 使用原始 data.js
+        experts.value = window.EXPERT_DATA.experts || []
+        fields.value = window.EXPERT_DATA.fields || []
+        yiliProjects.value = window.EXPERT_DATA.yiliProjects || []
+        favorites.value = window.EXPERT_DATA.favorites || []
       }
     } finally {
       loading.value = false

@@ -1,27 +1,55 @@
 <template>
-  <div class="pagination-control">
+  <div class="page-navigation-inline">
     <button
-      v-if="currentPage > 1"
-      class="page-btn"
-      @click="$emit('change', currentPage - 1)"
+      class="page-nav-inline-btn"
+      :class="{ disabled: currentPage === 1 }"
+      @click="gotoPage(currentPage - 1)"
     >
-      上一页
+      ‹ 上页
     </button>
+
+    <template v-if="totalPages > 1">
+      <button
+        v-if="startPage > 1"
+        class="page-nav-inline-num"
+        @click="gotoPage(1)"
+      >
+        1
+      </button>
+      <span v-if="startPage > 2" class="page-nav-inline-ellipsis">…</span>
+
+      <button
+        v-for="p in visiblePages"
+        :key="p"
+        class="page-nav-inline-num"
+        :class="{ active: p === currentPage }"
+        @click="gotoPage(p)"
+      >
+        {{ p }}
+      </button>
+
+      <span v-if="endPage < totalPages - 1" class="page-nav-inline-ellipsis">…</span>
+      <button
+        v-if="endPage < totalPages"
+        class="page-nav-inline-num"
+        @click="gotoPage(totalPages)"
+      >
+        {{ totalPages }}
+      </button>
+    </template>
+    <button v-else class="page-nav-inline-num active">1</button>
+
     <button
-      v-for="page in pages"
-      :key="page"
-      class="page-btn"
-      :class="{ active: page === currentPage }"
-      @click="$emit('change', page)"
+      class="page-nav-inline-btn"
+      :class="{ disabled: currentPage === totalPages }"
+      @click="gotoPage(currentPage + 1)"
     >
-      {{ page }}
+      下页 ›
     </button>
-    <button
-      v-if="currentPage < totalPages"
-      class="page-btn"
-      @click="$emit('change', currentPage + 1)"
-    >
-      下一页
+
+    <span class="page-nav-inline-info">{{ currentPage }} / {{ totalPages }} 页</span>
+    <button class="page-nav-inline-btn" @click="scrollToTop">
+      返回顶部
     </button>
   </div>
 </template>
@@ -34,21 +62,39 @@ const props = defineProps<{
   totalPages: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   change: [page: number]
 }>()
 
-const pages = computed(() => {
-  const result: number[] = []
-  const max = 7
-  let start = Math.max(1, props.currentPage - 3)
-  let end = Math.min(props.totalPages, start + max - 1)
-  if (end - start < max - 1) {
-    start = Math.max(1, end - max + 1)
+const maxButtons = 7
+
+const startPage = computed(() => {
+  let start = Math.max(1, props.currentPage - Math.floor(maxButtons / 2))
+  let end = Math.min(props.totalPages, start + maxButtons - 1)
+  if (end - start < maxButtons - 1) {
+    start = Math.max(1, end - maxButtons + 1)
   }
-  for (let i = start; i <= end; i++) {
-    result.push(i)
-  }
-  return result
+  return start
 })
+
+const endPage = computed(() => {
+  return Math.min(props.totalPages, startPage.value + maxButtons - 1)
+})
+
+const visiblePages = computed(() => {
+  const pages: number[] = []
+  for (let p = startPage.value; p <= endPage.value; p++) {
+    pages.push(p)
+  }
+  return pages
+})
+
+function gotoPage(p: number) {
+  if (p < 1 || p > props.totalPages || p === props.currentPage) return
+  emit('change', p)
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 </script>

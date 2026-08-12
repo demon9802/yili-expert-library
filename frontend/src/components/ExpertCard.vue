@@ -1,106 +1,227 @@
 <template>
   <div class="expert-card" @click="$emit('click')">
-    <!-- Score Badge -->
-    <div v-if="overallScore" class="score-badge" :class="scoreClass">
-      <span class="score-value">{{ overallScore.toFixed(1) }}</span>
-      <span class="score-stars">{{ stars }}</span>
-    </div>
-
-    <!-- Favorite Button -->
-    <button
-      class="favorite-btn"
-      :class="{ active: isFavorite }"
-      @click.stop="$emit('toggle-favorite')"
-    >
-      {{ isFavorite ? '★' : '☆' }}
-    </button>
-
-    <!-- Card Content -->
+    <!-- Card Header -->
     <div class="card-header">
-      <h3 class="expert-name">{{ expert.name }}</h3>
-      <div class="expert-fields">
-        <span
-          v-for="field in expert.fields"
-          :key="field"
-          class="field-tag"
-          :style="getFieldStyle(field)"
-        >
-          {{ abbreviateField(field) }}
+      <div class="card-avatar">{{ surname }}</div>
+      <div class="card-header-info">
+        <div class="card-name-row">
+          <div class="card-name" v-html="highlightText(cardDisplayName)"></div>
+          <span
+            class="card-fav-star"
+            :class="{ active: isFavorite }"
+            :title="isFavorite ? '取消收藏' : '收藏专家'"
+            @click.stop="toggleFav"
+          >
+            {{ isFavorite ? '♥' : '♡' }}
+          </span>
+        </div>
+        <div class="card-fields-row">
+          <span
+            v-for="field in expert.fields"
+            :key="field"
+            class="card-field-tag"
+            :style="fieldStyle(field)"
+            v-html="highlightText(displayFieldName(field))"
+          ></span>
+        </div>
+      </div>
+      <div v-if="expert.scores?.overall != null" class="card-score-box">
+        <span class="card-score-main">
+          <span class="score-star">★</span> {{ expert.scores.overall.toFixed(1) }}
         </span>
+        <div class="card-score-subs">
+          <span class="card-score-sub">
+            专业 {{ expert.scores.professional?.toFixed(1) }}<span class="score-star">★</span>
+          </span>
+          <span class="card-score-divider">·</span>
+          <span class="card-score-sub">
+            影响 {{ expert.scores.influence?.toFixed(1) }}<span class="score-star">★</span>
+          </span>
+        </div>
       </div>
     </div>
 
-    <div class="card-body">
-      <div v-if="expert.advantages?.length" class="advantages">
-        <span v-for="(adv, i) in expert.advantages.slice(0, 3)" :key="i" class="advantage-tag">
-          {{ adv }}
-        </span>
+    <!-- Qual Highlights -->
+    <div v-if="qualItems.length > 0" class="card-qual-highlights">
+      <div v-for="(q, i) in qualItems" :key="i" class="card-qual-line">
+        <span class="card-qual-bullet">▸</span>
+        <span class="card-qual-text" v-html="highlightText(q)"></span>
       </div>
-      <p v-if="expert.education" class="education">{{ expert.education }}</p>
-      <p v-if="expert.qualDisplay" class="qualifications">{{ expert.qualDisplay }}</p>
     </div>
 
-    <div class="card-footer">
-      <span v-if="expert.isSupplier" class="supplier-badge">供应商</span>
-      <span v-if="hasCooperation" class="cooperation-badge">已合作</span>
-      <span v-if="expert.observationStatus" class="observation-badge">{{ expert.observationStatus }}</span>
+    <!-- Yili Projects -->
+    <div v-if="latestProject" class="card-yili-project">
+      <template v-if="visibleProjects.length === 1">
+        <div class="proj-count-line">📋 最近合作：{{ latestProject.title }}</div>
+        <div class="proj-detail-line">{{ projectMeta(latestProject) }}</div>
+        <div v-if="latestProject.satisfaction" class="proj-detail-line">
+          <span style="color:#eab308;letter-spacing:2px">{{ satisfactionStars(latestProject.satisfaction) }}</span>
+          <span style="color:#166534;margin-left:6px;font-size:11px">{{ satisfactionDisplay(latestProject.satisfaction) }}/10</span>
+        </div>
+      </template>
+      <template v-else>
+        <div class="proj-count-line">📋 已合作 {{ visibleProjects.length }} 次</div>
+        <div class="proj-detail-line" style="font-weight:600">最近合作：{{ latestProject.title }}</div>
+        <div class="proj-detail-line">{{ projectMeta(latestProject) }}</div>
+        <div v-if="latestProject.satisfaction" class="proj-detail-line">
+          <span style="color:#eab308;letter-spacing:2px">{{ satisfactionStars(latestProject.satisfaction) }}</span>
+          <span style="color:#166534;margin-left:6px;font-size:11px">{{ satisfactionDisplay(latestProject.satisfaction) }}/10</span>
+        </div>
+      </template>
     </div>
+
+    <!-- Advantages -->
+    <div v-if="advItems.length > 0" class="card-advantages-new">
+      <div v-for="(item, idx) in advItems" :key="idx" class="card-advantage-title-item">
+        <span class="card-adv-num">{{ idx + 1 }}</span>
+        <span v-if="item.includes('：')">
+          <span class="card-adv-title-bold">{{ item.split('：')[0] }}：</span>
+          <span>{{ item.split('：').slice(1).join('：') }}</span>
+        </span>
+        <span v-else class="card-adv-title-bold">{{ item }}</span>
+      </div>
+    </div>
+
+    <!-- Education -->
+    <div v-if="expert.education && expert.education !== '未公开'" class="card-edu card-edu-bottom">
+      🎓 {{ truncatedEducation }}
+    </div>
+
+    <!-- Contact -->
+    <div v-if="contacts.length > 0" class="card-contact">
+      <span v-for="(c, idx) in contactGroups" :key="idx">
+        <span v-if="idx > 0"> | </span>
+        <span v-if="c.showPersonIcon">👤 </span>
+        <span v-if="c.label">{{ c.label }}:</span>
+        {{ c.value }}
+      </span>
+    </div>
+
+    <!-- Supplier bookmark -->
+    <div v-if="expert.isSupplier" class="card-supplier-bookmark">库内供应商</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
-import type { Expert } from '@/types'
+import type { Expert, Project, ContactInfo } from '@/types'
 import { isNarrowScreen } from '@/utils/helpers'
 
 const props = defineProps<{
   expert: Expert
-  isFavorite: boolean
+  searchQuery?: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   click: []
-  'toggle-favorite': []
 }>()
 
 const store = useAppStore()
 
-const overallScore = computed(() => props.expert.scores?.overall)
+const searchQuery = computed(() => props.searchQuery || '')
 
-const scoreClass = computed(() => {
-  const s = overallScore.value
-  if (!s) return ''
-  if (s >= 4) return 'score-high'
-  if (s >= 3) return 'score-mid'
-  return 'score-low'
+const surname = computed(() => props.expert.name.charAt(0))
+
+const cardDisplayName = computed(() => {
+  const name = props.expert.name
+  if (name.length <= 6) return name
+  if (window.innerWidth <= 480) return name.slice(0, 4) + '…'
+  return name
 })
 
-const stars = computed(() => {
-  const s = overallScore.value
-  if (!s) return ''
-  return '★'.repeat(Math.round(s)) + '☆'.repeat(5 - Math.round(s))
-})
+const isFavorite = computed(() => store.isFavorited(props.expert.id))
 
-const hasCooperation = computed(() =>
-  store.yiliProjects.some(p => p.expertId === props.expert.id)
-)
+function toggleFav(e: MouseEvent) {
+  e.stopPropagation()
+  store.toggleFavorite(props.expert.id)
+}
 
-function getFieldStyle(fieldName: string) {
+function fieldStyle(fieldName: string) {
   const field = store.fields.find(f => f.name === fieldName)
   if (field) {
     return {
-      backgroundColor: field.color,
-      color: field.textColor,
+      background: field.color,
+      color: field.textColor || '#ffffff'
     }
   }
-  return {}
+  return { background: '#64748b', color: '#ffffff' }
 }
 
-function abbreviateField(name: string): string {
+function displayFieldName(name: string) {
   if (isNarrowScreen() && name.length > 4) {
     return name.slice(0, 2) + '…'
   }
   return name
 }
+
+function highlightText(text: string) {
+  const q = searchQuery.value.trim()
+  if (!q) return text
+  const regex = new RegExp('(' + escapeRegExp(q) + ')', 'gi')
+  return text.replace(regex, '<mark>$1</mark>')
+}
+
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const visibleProjects = computed(() => {
+  return store.yiliProjects
+    .filter(p => p.expertId === props.expert.id && p.visible)
+    .sort((a, b) => b.year - a.year || (b.month || 0) - (a.month || 0))
+})
+
+const latestProject = computed(() => visibleProjects.value[0] as Project | undefined)
+
+function projectMeta(p: Project) {
+  let s = p.year + '年'
+  if (p.month) s += (p.month < 10 ? '0' : '') + p.month + '月'
+  return s
+}
+
+function satisfactionStars(sat: any) {
+  const val = Number(sat.value || sat)
+  if (!val) return ''
+  const full = Math.round(val / 2)
+  return '★'.repeat(full) + '☆'.repeat(5 - full)
+}
+
+function satisfactionDisplay(sat: any) {
+  const val = Number(sat.value || sat)
+  return val.toFixed ? val.toFixed(1) : String(val)
+}
+
+const qualItems = computed(() => {
+  const items: string[] = []
+  if (props.expert.qualifications) {
+    items.push(...props.expert.qualifications.split(/[;；]/).filter(Boolean))
+  }
+  if (props.expert.qualDisplay) {
+    items.push(...props.expert.qualDisplay.split(/[;；]/).filter(Boolean))
+  }
+  return items.slice(0, 3)
+})
+
+const advItems = computed(() => {
+  if (!props.expert.advantages?.length) return []
+  return props.expert.advantages.slice(0, 3)
+})
+
+const truncatedEducation = computed(() => {
+  const edu = props.expert.education || ''
+  return edu.length > 50 ? edu.substring(0, 50) + '...' : edu
+})
+
+const contacts = computed(() => {
+  const list: ContactInfo[] = props.expert.contacts || []
+  if (!list.length && props.expert.contactInfo) {
+    list.push({ type: 'other', label: '联系方式', value: props.expert.contactInfo })
+  }
+  return list
+})
+
+const contactGroups = computed(() => {
+  return contacts.value.map((c, idx) => ({ ...c, showPersonIcon: idx === 0 }))
+})
 </script>
