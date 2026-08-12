@@ -1,0 +1,54 @@
+// ===== SCSS 变量定义 =====
+// 从原 CSS :root 变量提取，保持一致性
+
+// 颜色
+$color-primary: #1a56db;
+$color-primary-light: #e8f0fe;
+$color-primary-dark: #1e40af;
+$color-bg: #f8fafc;
+$color-surface: #ffffff;
+$color-border: #e2e8f0;
+$color-text: #1e293b;
+$color-text-secondary: #64748b;
+$color-text-muted: #94a3b8;
+$color-success: #10b981;
+$color-warning: #f59e0b;
+$color-danger: #ef4444;
+
+// 阴影
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+// 圆角
+$radius: 12px;
+$radius-sm: 8px;
+
+// 过渡
+$transition: 0.2s ease;
+
+// 布局
+$max-width: 1320px;
+
+// CSS 自定义属性 (保持与原项目一致)
+:root {
+  --primary: #{$color-primary};
+  --primary-light: #{$color-primary-light};
+  --primary-dark: #{$color-primary-dark};
+  --bg: #{$color-bg};
+  --surface: #{$color-surface};
+  --border: #{$color-border};
+  --text: #{$color-text};
+  --text-secondary: #{$color-text-secondary};
+  --text-muted: #{$color-text-muted};
+  --success: #{$color-success};
+  --warning: #{$color-warning};
+  --danger: #{$color-danger};
+  --shadow-sm: #{$shadow-sm};
+  --shadow: #{$shadow};
+  --shadow-lg: #{$shadow-lg};
+  --radius: #{$radius};
+  --radius-sm: #{$radius-sm};
+  --transition: #{$transition};
+  --max-width: #{$max-width};
+}

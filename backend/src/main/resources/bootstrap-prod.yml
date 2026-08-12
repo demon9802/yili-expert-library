@@ -1,0 +1,14 @@
+# ============================================================
+# prod 环境 - 数据库/Redis连接配置 (bootstrap)
+# ============================================================
+spring:
+  redis:
+    password: E5yihwQDvcStZaJg
+    host: 10.254.2.143
+    port: 37937
+    database: 4
+  datasource:
+    url: jdbc:mysql://10.254.12.25:3306/data-center-ai-evaluation-sit?characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: data_center_app_sit
+    password: LQvgzhcE^3
+    driver-class-name: com.mysql.cj.jdbc.Driver

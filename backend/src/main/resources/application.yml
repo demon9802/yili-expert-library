@@ -1,0 +1,33 @@
+# ============================================================
+# 伊利专家资源库 V6 - Spring Boot 主配置
+# 仅放公共配置项，环境相关配置见 application-{profile}.yml
+# ============================================================
+spring:
+  profiles:
+    active: @active.profile@
+  application:
+    name: yili-expert-resource
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+server:
+  port: 8080
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+jwt:
+  secret: yili-expert-resource-secret-key-2024-very-long-for-hmac-sha256
+  expiration: 86400000
+
+logging:
+  level:
+    com.yili.expert.resource: debug
+    org.springframework.web: info

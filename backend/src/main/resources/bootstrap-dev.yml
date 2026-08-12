@@ -1,0 +1,14 @@
+# ============================================================
+# dev 环境 - 数据库/Redis连接配置 (bootstrap)
+# ============================================================
+spring:
+  redis:
+    password: E5yihwQDvcStZaJg
+    host: 10.254.2.143
+    port: 37937
+    database: 4
+  datasource:
+    url: jdbc:mysql://cloudbh-transit-tencent.digitalyili.com:9059/data-center-ai-evaluation-sit?characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: u230x5g
+    password: Jhzn6QYuvraHGPGFrb2hkCKRiFDfRPYB
+    driver-class-name: com.mysql.cj.jdbc.Driver
