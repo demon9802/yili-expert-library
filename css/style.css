@@ -617,30 +617,27 @@ body {
   margin-top: 2px;
   margin-left: 4px;
 }
-/* v5.9.3-fix2: 专家卡评分重设计——金色实底徽章+白字（清晰醒目、不与领域标签/供应商铜金混淆） */
+/* v5.9.4-fix: 专家卡三项评分形式统一——均为「维度X★」圆角实底徽章，仅颜色/大小区分 */
 .card-score-main {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 11px;
+  gap: 2px;
+  padding: 4px 10px;
   border-radius: 999px;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   border: 1px solid #d97706;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   white-space: nowrap;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(245,158,11,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 2px 5px rgba(245,158,11,0.32), inset 0 1px 0 rgba(255,255,255,0.25);
 }
-.card-score-main::before {
-  content: '★';
-  font-size: 12px;
-  color: #ffffff;
-  line-height: 1;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.15);
+.card-score-main .score-star,
+.card-score-sub .score-star {
+  font-size: 0.85em;
 }
 .card-score-subs {
   display: flex;
@@ -657,9 +654,10 @@ body {
   white-space: nowrap;
   line-height: 1.4;
   border: 1px solid transparent;
+  color: #ffffff;
 }
-.card-score-sub.prof { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-.card-score-sub.infl { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+.card-score-sub.prof { background: #3B82F6; border-color: #2563EB; }
+.card-score-sub.infl { background: #F59E0B; border-color: #D97706; }
 
 /* ===== v5.9.0 五星制评分展示（双层叠加，支持小数星级） ===== */
 .star-rating {
