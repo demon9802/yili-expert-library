@@ -7476,7 +7476,7 @@ function renderRatingsTab(panel) {
         <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.3）</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
       </div>
-      <a href="./docs/scoring-rules-five-star.html?v=5961" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+      <a href="./docs/scoring-rules-five-star.html?v=5981" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
     `;
     configSec.appendChild(docLink);
   }
@@ -7626,8 +7626,10 @@ function renderRatingsTab(panel) {
         td.appendChild(inp); row.appendChild(td);
       });
 
-      const act = h('td', {});
-      act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px', marginRight:'6px' }, onclick: () => {
+      // v5.9.8: 操作列按钮改为 flex 自动换行，避免横向滚动；不新增列，同一单元格内完整展示
+      const act = h('td', { style:{ minWidth:'150px', verticalAlign:'top' } });
+      const actWrap = h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px', alignItems:'center' } });
+      actWrap.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
         if (!confirm('重置为自动评分将用系统自动估算覆盖「' + e.name + '」当前的人工调分，确定继续？')) return;
         var before = snapshotExpertScores(e);
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e);
@@ -7636,9 +7638,9 @@ function renderRatingsTab(panel) {
         saveDB(db);
         renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
       } }, '重置为自动评分'));
-      // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲）
+      // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲；不改分值，仅改状态留痕）
       if (e.status !== 'observation') {
-        act.appendChild(h('button', { className:'btn btn-warning btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+        actWrap.appendChild(h('button', { className:'btn btn-warning btn-sm', style:{ fontSize:'11px' }, onclick: () => {
           promptObservationNote('移入观察库：' + e.name, '', function(note) {
             var before = snapshotExpertScores(e);
             e.status = 'observation';
@@ -7648,14 +7650,15 @@ function renderRatingsTab(panel) {
             recordObservationOperation(db, e, 'manual_in', before, after, note, ['手动移入']);
             saveDB(db);
             renderRatingsTab(panel);
-            toast(e.name + ' 已移入观察库', 'success');
+            toast(e.name + ' 已移入观察库（分值不变）', 'success');
           });
         } }, '移入观察库'));
       }
       // v5.9.6: 从云端恢复（以 Supabase 为准，覆盖本地被误改的评分/状态）
-      act.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', marginLeft:'6px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff' }, onclick: async () => {
+      actWrap.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff' }, onclick: async () => {
         await restoreExpertFromCloud(e, panel);
       } }, '从云端恢复'));
+      act.appendChild(actWrap);
       row.appendChild(act);
       tbody.appendChild(row);
     });
