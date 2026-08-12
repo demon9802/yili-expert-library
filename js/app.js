@@ -7476,7 +7476,7 @@ function renderRatingsTab(panel) {
         <div style="font-weight:600; font-size:13px; color:#166534;">评分规则·五星制完整文档（v5.9.3）</div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
       </div>
-      <a href="./docs/scoring-rules-five-star.html?v=5981" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
+      <a href="./docs/scoring-rules-five-star.html?v=5991" target="_blank" rel="noopener" style="flex-shrink:0; font-size:11px; color:#166534; text-decoration:none; padding:5px 12px; border:1px solid #86EFAC; border-radius:6px; background:white; font-weight:600;">打开完整文档 ↗</a>
     `;
     configSec.appendChild(docLink);
   }
@@ -7626,10 +7626,20 @@ function renderRatingsTab(panel) {
         td.appendChild(inp); row.appendChild(td);
       });
 
-      // v5.9.8: 操作列按钮改为 flex 自动换行，避免横向滚动；不新增列，同一单元格内完整展示
-      const act = h('td', { style:{ minWidth:'150px', verticalAlign:'top' } });
-      const actWrap = h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'6px', alignItems:'center' } });
-      actWrap.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+      // v5.9.9: 操作列改为下拉菜单，压缩行高；不新增列、不产生横向滚动
+      const act = h('td', { style:{ minWidth:'70px', verticalAlign:'middle', textAlign:'center' } });
+      const details = h('details', { className: 'rating-action-dropdown' });
+      const summary = h('summary', { className:'btn btn-secondary btn-sm', style:{ fontSize:'12px', padding:'5px 10px', cursor:'pointer' } }, '操作 ▼');
+      const menu = h('div', { className: 'rating-action-menu' });
+      const addMenuItem = function(label, cls, color, onClick) {
+        const item = h('button', { className: 'rating-action-menu-item ' + cls, style:{ color: color }, onclick: function(ev) {
+          ev.stopPropagation();
+          details.open = false;
+          onClick();
+        } }, label);
+        menu.appendChild(item);
+      };
+      addMenuItem('🔄 重置为自动评分', '', '#374151', function() {
         if (!confirm('重置为自动评分将用系统自动估算覆盖「' + e.name + '」当前的人工调分，确定继续？')) return;
         var before = snapshotExpertScores(e);
         e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e);
@@ -7637,10 +7647,10 @@ function renderRatingsTab(panel) {
         recordObservationOperation(db, e, 'ai_reset', before, after, '管理员手动重置为自动评分（覆盖人工调分）', ['重置为自动评分']);
         saveDB(db);
         renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
-      } }, '重置为自动评分'));
+      });
       // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲；不改分值，仅改状态留痕）
       if (e.status !== 'observation') {
-        actWrap.appendChild(h('button', { className:'btn btn-warning btn-sm', style:{ fontSize:'11px' }, onclick: () => {
+        addMenuItem('⚠️ 移入观察库', 'warning', '#B45309', function() {
           promptObservationNote('移入观察库：' + e.name, '', function(note) {
             var before = snapshotExpertScores(e);
             e.status = 'observation';
@@ -7652,13 +7662,15 @@ function renderRatingsTab(panel) {
             renderRatingsTab(panel);
             toast(e.name + ' 已移入观察库（分值不变）', 'success');
           });
-        } }, '移入观察库'));
+        });
       }
       // v5.9.6: 从云端恢复（以 Supabase 为准，覆盖本地被误改的评分/状态）
-      actWrap.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff' }, onclick: async () => {
+      addMenuItem('☁️ 从云端恢复', '', '#0e7490', async function() {
         await restoreExpertFromCloud(e, panel);
-      } }, '从云端恢复'));
-      act.appendChild(actWrap);
+      });
+      details.appendChild(summary);
+      details.appendChild(menu);
+      act.appendChild(details);
       row.appendChild(act);
       tbody.appendChild(row);
     });
@@ -9759,7 +9771,7 @@ async function boot() {
 // ===== v5.8: 月度系统数据报告 =====
 // VERSION_CHANGELOG 已提取到 js/changelog.js（v5.8.1）
 
-function renderMonthlyReportTab(panel) {
+async function renderMonthlyReportTab(panel) {
   var db = appState.db;
   panel.innerHTML = '';
   
@@ -9802,12 +9814,12 @@ function renderMonthlyReportTab(panel) {
   headerBar.appendChild(h('button', {
     className: 'btn btn-sm',
     style: { background:'#eff6ff', color:'var(--primary)', fontSize:'12px', padding:'4px 10px', marginRight:'6px' },
-    onclick: function() { exportMonthlyReportImage(); }
+    onclick: async function() { await exportMonthlyReportImage(); }
   }, '导出PNG'));
   headerBar.appendChild(h('button', {
     className: 'btn btn-sm',
     style: { background:'#fef2f2', color:'#dc2626', fontSize:'12px', padding:'4px 10px', marginRight:'6px' },
-    onclick: function() { exportMonthlyReportPDF(); }
+    onclick: async function() { await exportMonthlyReportPDF(); }
   }, '导出PDF'));
   headerBar.appendChild(h('a', {
     href: 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h',
@@ -9968,10 +9980,10 @@ function renderMonthlyReportTab(panel) {
   // Page views (placeholder - will be populated when counter is implemented)
   var viewCol = h('div', { style: { flex:'1', minWidth:'200px' } });
   viewCol.appendChild(h('div', { style: { fontSize:'12px', fontWeight:'600', marginBottom:'8px', color:'var(--text-secondary)' } }, '前端访问情况'));
-  var pageViews = loadPageViews(ry, rm);
+  var pageViews = await loadPageViews(ry, rm);
   viewCol.appendChild(renderUsageRow('本月访问', pageViews.monthly));
   viewCol.appendChild(renderUsageRow('累计访问', pageViews.total));
-  viewCol.appendChild(h('div', { style: { fontSize:'11px', color:'var(--text-muted)', marginTop:'6px' } }, '注：访问计数基于本地记录，完整统计需后续部署'));
+  viewCol.appendChild(h('div', { style: { fontSize:'11px', color:'var(--text-muted)', marginTop:'6px' } }, '注：访问计数已同步云端，支持跨设备统计'));
   usageCols.appendChild(viewCol);
   
   usageCard.appendChild(usageCols);
@@ -10038,8 +10050,8 @@ function renderMonthlyReportTab(panel) {
 }
 
 // ===== v5.8.1: 月度报告导出为图片（Canvas → PNG） =====
-function exportMonthlyReportImage() {
-  var canvas = buildMonthlyReportCanvas();
+async function exportMonthlyReportImage() {
+  var canvas = await buildMonthlyReportCanvas();
   if (!canvas) return;
   canvas.toBlob(function(blob) {
     downloadBlob(blob, '月度报告_' + appState.reportMonth.year + '-' + String(appState.reportMonth.month).padStart(2,'0') + '.png');
@@ -10048,8 +10060,8 @@ function exportMonthlyReportImage() {
 }
 
 // ===== v5.8.1: 月度报告导出为PDF（Canvas → JPEG → PDF） =====
-function exportMonthlyReportPDF() {
-  var canvas = buildMonthlyReportCanvas();
+async function exportMonthlyReportPDF() {
+  var canvas = await buildMonthlyReportCanvas();
   if (!canvas) return;
   canvas.toBlob(function(jpegBlob) {
     var reader = new FileReader();
@@ -10060,7 +10072,7 @@ function exportMonthlyReportPDF() {
   }, 'image/jpeg', 0.92);
 }
 
-function buildMonthlyReportCanvas() {
+async function buildMonthlyReportCanvas() {
   var db = appState.db;
   var ry = appState.reportMonth.year;
   var rm = appState.reportMonth.month;
@@ -10339,7 +10351,7 @@ function buildMonthlyReportCanvas() {
   drawSectionTitle('④ 系统使用情况');
   var masterCount = db.subAdmins ? db.subAdmins.filter(function(a) { return a.role === 'master'; }).length : 1;
   var subCount = db.subAdmins ? db.subAdmins.filter(function(a) { return a.role !== 'master'; }).length : 0;
-  var pageViews = loadPageViews(ry, rm);
+  var pageViews = await loadPageViews(ry, rm);
   
   drawTextRow('主管理员：' + masterCount + '人', leftPad, y + 14);
   drawTextRow('子管理员：' + subCount + '人', leftPad + 200, y + 14);
@@ -10509,8 +10521,43 @@ function renderUsageRow(label, value) {
   );
 }
 
+// v5.9.9: 将页面访问记录写入云端，实现跨设备统计
+async function recordPageViewToCloud() {
+  if (typeof supabase === 'undefined' || !supabase) return;
+  try {
+    var now = new Date();
+    var yearMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var userId = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : null;
+    await supabase.from('page_views').insert({
+      year_month: yearMonth,
+      page_path: location.pathname + location.search,
+      viewer_id: userId,
+      created_at: now.toISOString()
+    });
+  } catch(e) { /* silent */ }
+}
+
+// v5.9.9: 从云端读取访问统计
+async function loadPageViewsFromCloud(year, month) {
+  if (typeof supabase === 'undefined' || !supabase) return null;
+  try {
+    var monthKey = year + '-' + String(month).padStart(2, '0');
+    var monthRes = await supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('year_month', monthKey);
+    if (monthRes.error) throw monthRes.error;
+    var totalRes = await supabase.from('page_views').select('*', { count: 'exact', head: true });
+    if (totalRes.error) throw totalRes.error;
+    return { monthly: monthRes.count || 0, total: totalRes.count || 0 };
+  } catch(e) {
+    console.error('[loadPageViewsFromCloud]', e);
+    return null;
+  }
+}
+
 // Helper: load page views from localStorage (simple counter)
-function loadPageViews(year, month) {
+async function loadPageViews(year, month) {
+  // v5.9.9: 优先读取云端实现跨设备统计；失败/离线时回退 localStorage
+  var cloud = await loadPageViewsFromCloud(year, month);
+  if (cloud) return cloud;
   try {
     var key = 'yili_page_views';
     var data = JSON.parse(localStorage.getItem(key) || '{}');
@@ -10533,6 +10580,8 @@ function incrementPageView() {
     data[monthKey] = (data[monthKey] || 0) + 1;
     localStorage.setItem(key, JSON.stringify(data));
   } catch(e) { /* silent */ }
+  // v5.9.9: 同步写入云端
+  recordPageViewToCloud();
 }
 
 document.addEventListener('DOMContentLoaded', boot);
