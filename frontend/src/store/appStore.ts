@@ -254,7 +254,7 @@ export const useAppStore = defineStore('app', () => {
   // ===== 领域 CRUD =====
   async function saveField(field: Partial<Field>) {
     if (field.id) {
-      await fieldApi.update(field.name, field)
+      await fieldApi.update(field.name!, field)
       const idx = fields.value.findIndex(f => f.name === field.name)
       if (idx >= 0) fields.value[idx] = { ...fields.value[idx], ...field } as Field
     } else {
