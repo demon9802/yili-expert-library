@@ -539,6 +539,7 @@ body {
   margin-bottom: 12px;
   padding-bottom: 10px;
   border-bottom: 1px solid #f1f5f9;
+  position: relative;
 }
 /* Avatar circle - blue bg + white surname */
 .card-avatar {
@@ -563,6 +564,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  padding-right: 92px;
 }
 /* Row 1: name + scores */
 .card-name-row {
@@ -607,16 +609,17 @@ body {
   font-size: 13px;
   font-weight: 700;
 }
-/* New card score layout */
+/* v5.9.6: 评分徽章回到卡片右上角，综合第一行、专业/影响第二行（绝对定位，避免与姓名/头像争位） */
 .card-score-box {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
   flex-shrink: 0;
-  margin-top: 2px;
-  margin-left: 8px;
+  z-index: 2;
 }
 /* v5.9.5-fix: 专家卡三项评分形式完全统一——同一行「维度X★」圆角实底徽章，仅颜色区分；配色与详情页一致 */
 .card-score-main,

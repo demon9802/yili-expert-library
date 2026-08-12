@@ -1003,13 +1003,26 @@ function openScoringHelp() {
   (inflDim.subDimensions || []).forEach(sd => {
     rows.push(`<tr><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#F59E0B;font-weight:600;white-space:nowrap;width:80px">影响力</td><td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${escapeHtml(sd.name)}</td></tr>`);
   });
+  // 简化评分规则矩阵（1★-5★）——与后台评分规则表同源，仅压缩措辞
+  const ruleMatrix = [
+    { item: '① 学历与学术背景', dim: '专业度', stars: ['大专/中专及以下', '普通本科', '较好本科(211/双一流)或普通硕士', '名校硕士(985/双一流)或普通博士', '博士+顶尖院校(清北/C9/QS50)'] },
+    { item: '② 行业资质与认证', dim: '专业度', stars: ['无相关认证', '培训/通用认证', '厂商认证或国家级执业资格', '国家级执业/行业权威认证', '国际权威认证(CFA/CPA等)'] },
+    { item: '③ 专业成果与经验', dim: '专业度', stars: ['一般经验/仅演讲', '参与级项目/普通论文', '省级/行业级项目·SCI/EI', '战略级/国家级项目·顶刊', '牵头国标行标/高被引'] },
+    { item: '④ 社会荣誉与奖项', dim: '影响力', stars: ['无荣誉/一般成员', '地市级/国家级学会成员', '省部级荣誉或称号', '国家级荣誉或称号', '两院院士/国家级人才'] },
+    { item: '⑤ 职称·管理履历·行业地位', dim: '影响力', stars: ['无职称/基层', '经理/高工/主管', '副教授/总监/VP/合伙人', '教授/CEO/创始人(百强)', '教授/CEO(世界500强/央企)'] }
+  ];
+  const ruleRows = ruleMatrix.map(r => `<tr>
+    <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:11px;font-weight:600;color:${r.dim==='专业度'?'#3B82F6':'#F59E0B'};white-space:nowrap">${r.item}</td>
+    ${r.stars.map(s => `<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-size:10px;color:#475569;text-align:center;line-height:1.3">${s}</td>`).join('')}
+  </tr>`).join('');
   const html = `
     <div class="sh-head">
       <div class="sh-title">评分规则说明</div>
       <div class="sh-ver">五星制</div>
     </div>
     <div class="sh-body" style="padding-top:8px">
-      <table class="sh-table" style="margin:0">
+      <div style="font-size:12px;font-weight:600;color:#334155;margin:4px 0 6px">一、评分项</div>
+      <table class="sh-table" style="margin:0 0 12px">
         <thead>
           <tr style="background:#f8fafc">
             <th style="padding:8px 10px;text-align:left;font-size:12px;color:#64748b;font-weight:600;width:80px">维度</th>
@@ -1017,6 +1030,20 @@ function openScoringHelp() {
           </tr>
         </thead>
         <tbody>${rows.join('')}</tbody>
+      </table>
+      <div style="font-size:12px;font-weight:600;color:#334155;margin:4px 0 6px">二、评分规则（简化）</div>
+      <table class="sh-table" style="margin:0 0 4px">
+        <thead>
+          <tr style="background:#f8fafc">
+            <th style="padding:6px 8px;text-align:left;font-size:11px;color:#64748b;font-weight:600">评分项</th>
+            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">1★</th>
+            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">2★</th>
+            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">3★</th>
+            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">4★</th>
+            <th style="padding:6px 8px;font-size:11px;color:#64748b;font-weight:600;text-align:center">5★</th>
+          </tr>
+        </thead>
+        <tbody>${ruleRows}</tbody>
       </table>
       <div class="sh-foot" style="margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;color:#475569;line-height:1.7">
         信息缺失统一记为 2★，专家评分根据补充信息动态维护。
@@ -2025,17 +2052,19 @@ function renderExpertGrid() {
     headerInfo.appendChild(nameRow);
 
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.5-fix: 三项评分同一行「维度X★」圆角实底徽章，配色与详情页一致，位于 card-header 右上角
+      // v5.9.6: 评分徽章回到卡片右上角，综合第一行、专业/影响第二行（同尺寸，仅颜色区分，与详情页一致）
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('span', { className: 'card-score-main' });
-      overallScore.textContent = '综合' + expert.scores.overall.toFixed(1) + '★';
+      overallScore.textContent = '综合 ' + expert.scores.overall.toFixed(1) + '★';
+      const subRow = h('div', { className: 'card-score-subs' });
       const profTag = h('span', { className: 'card-score-sub prof' });
-      profTag.textContent = '专业' + expert.scores.professional.toFixed(1) + '★';
+      profTag.textContent = '专业 ' + expert.scores.professional.toFixed(1) + '★';
       const inflTag = h('span', { className: 'card-score-sub infl' });
-      inflTag.textContent = '影响' + expert.scores.influence.toFixed(1) + '★';
+      inflTag.textContent = '影响 ' + expert.scores.influence.toFixed(1) + '★';
+      subRow.appendChild(profTag);
+      subRow.appendChild(inflTag);
       scoreBox.appendChild(overallScore);
-      scoreBox.appendChild(profTag);
-      scoreBox.appendChild(inflTag);
+      scoreBox.appendChild(subRow);
       cardHeader.appendChild(scoreBox);
     }
     
@@ -3050,8 +3079,8 @@ function renderDoughnutChart(containerId, labels, data) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
-  // v5.9.5-fix: 分值分布使用金色→灰色评分质感配色（避免蓝绿）
-  const colors = ['#B45309', '#D97706', '#F59E0B', '#94A3B8', '#CBD5E1'];
+  // v5.9.6: 分值分布使用绿→黄→红连续渐变（高分绿、低分红，直观映射评分质量）
+  const colors = ['#22C55E', '#84CC16', '#EAB308', '#F97316', '#EF4444'];
   const total = data.reduce((a,b) => a+b, 0);
   const h = Math.max(280, container.clientHeight);
   const w = container.clientWidth || 400;
@@ -3999,25 +4028,76 @@ function renderAdmin() {
     : db.experts.filter(function(e) { return e.status === 'observation' && managedIds.has(e.id); });
   var myReminderCount = halfCount + oneCount + overCount;
   var hasReminders = myReminderCount > 0;
-  var banner = h('div', { style:{
-    background: '#ffffff',
-    borderBottom: '1px solid #e2e8f0',
-    padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px', flexWrap:'wrap'
-  }});
-  var bannerLeft = h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } });
-  bannerLeft.appendChild(h('span', { style:{ fontSize:'12px', fontWeight:'600', color:'#334155' } }, '📋 数据维护'));
-  bannerLeft.appendChild(h('span', { style:{ fontSize:'12px', color:'#64748b' } }, '观察库 ' + visibleObsExperts.length + ' 位'));
-  if (halfCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#f0fdf4', color:'#15803d', borderRadius:'999px' } }, '半年提醒 ' + halfCount));
-  if (oneCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#fffbeb', color:'#b45309', borderRadius:'999px' } }, '一年提醒 ' + oneCount));
-  if (overCount) bannerLeft.appendChild(h('span', { style:{ fontSize:'11px', padding:'2px 8px', background:'#fef2f2', color:'#dc2626', borderRadius:'999px' } }, '已超期 ' + overCount));
-  banner.appendChild(bannerLeft);
-  if (hasReminders) {
-    banner.appendChild(h('button', { className:'btn btn-sm', style:{ background:'#f59e0b', color:'white', border:'none', flexShrink:0 }, onclick: function() {
-      appState.adminTab = 'observation';
-      renderAdmin();
-    } }, '去处理'));
+  // v5.9.6: 数据维护提醒（替代旧的数据统计横幅）——定期提醒管理员维护专家/项目数据，主管理员看全部、子管理员只看相关
+  db.maintenance = db.maintenance || { expertMaintainedAt: {}, projectMaintainedAt: {} };
+  var MDAY = 90; // 季度周期
+  function _isDue(ts) { return !ts || (Date.now() - new Date(ts).getTime()) > MDAY * 86400000; }
+  function _respExpert(e) { return isMaster ? true : managedIds.has(e.id); }
+  var dueExperts = db.experts.filter(function(e) {
+    if (e.status === 'eliminated') return false;
+    if (!_respExpert(e)) return false;
+    return _isDue(db.maintenance.expertMaintainedAt[e.id]);
+  });
+  var dueProjects = (db.yiliProjects || []).filter(function(p) {
+    if (!p.visible || !p.id) return false;
+    if (!isMaster && managedIds.size && !managedIds.has(p.expertId)) return false;
+    return _isDue(db.maintenance.projectMaintainedAt[p.id]);
+  });
+  var totalDue = dueExperts.length + dueProjects.length + visibleObsExperts.length;
+  if (totalDue > 0) {
+    var mCard = h('div', { style:{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', padding:'14px 16px', marginBottom:'16px' } });
+    mCard.appendChild(h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' } },
+      h('span', { style:{ fontSize:'15px' } }, '📋'),
+      h('div', { style:{ fontWeight:'700', fontSize:'14px', color:'#334155' } }, '数据维护提醒'),
+      h('span', { style:{ fontSize:'11px', color:'#64748b', marginLeft:'auto' } }, '每季度核对一次 · ' + (isMaster ? '全部专家/项目' : '仅与我相关'))
+    ));
+    function _addSec(title, items, renderItem) {
+      if (!items.length) return;
+      mCard.appendChild(h('div', { style:{ fontSize:'12px', fontWeight:'600', color:'#475569', margin:'10px 0 4px' } }, title + '（' + items.length + '）'));
+      var list = h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } });
+      items.slice(0, 6).forEach(function(it) { list.appendChild(renderItem(it)); });
+      mCard.appendChild(list);
+      if (items.length > 6) mCard.appendChild(h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' } }, '…等共 ' + items.length + ' 项，可在对应管理中标记'));
+    }
+    _addSec('专家信息待核对', dueExperts, function(e) {
+      var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff', border:'1px solid #eef2f7', borderRadius:'6px', padding:'6px 10px' } });
+      row.appendChild(h('div', { style:{ fontSize:'13px' } },
+        h('span', { style:{ fontWeight:'600' } }, e.name),
+        h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginLeft:'8px' } }, '录入：' + (e.createdBy || '主管理员') + (e.createdAt ? ' · ' + String(e.createdAt).substring(0,10) : ''))
+      ));
+      row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff', flexShrink:0 }, onclick: function() {
+        db.maintenance.expertMaintainedAt[e.id] = new Date().toISOString();
+        saveDB(db); renderAdmin();
+      } }, '标记已维护'));
+      return row;
+    });
+    _addSec('合作项目待更新', dueProjects, function(p) {
+      var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff', border:'1px solid #eef2f7', borderRadius:'6px', padding:'6px 10px' } });
+      var expName = (db.experts.find(function(x){ return x.id === p.expertId; }) || {}).name || p.pendingExpertName || '待关联';
+      row.appendChild(h('div', { style:{ fontSize:'13px' } },
+        h('span', { style:{ fontWeight:'600' } }, p.title),
+        h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginLeft:'8px' } }, expName + ' · ' + p.year + '年')
+      ));
+      row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff', flexShrink:0 }, onclick: function() {
+        db.maintenance.projectMaintainedAt[p.id] = new Date().toISOString();
+        saveDB(db); renderAdmin();
+      } }, '标记已维护'));
+      return row;
+    });
+    if (visibleObsExperts.length) {
+      mCard.appendChild(h('div', { style:{ fontSize:'12px', fontWeight:'600', color:'#475569', margin:'10px 0 4px' } }, '观察库待处理（' + visibleObsExperts.length + '）'));
+      var obsList = h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } });
+      visibleObsExperts.slice(0, 6).forEach(function(e) {
+        var row = h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', background:'#fff7ed', border:'1px solid #fed7aa', borderRadius:'6px', padding:'6px 10px' } });
+        row.appendChild(h('div', { style:{ fontSize:'13px', fontWeight:'600' } }, e.name));
+        row.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', background:'#d97706', color:'#fff', border:'none', flexShrink:0 }, onclick: function() { appState.adminTab = 'observation'; renderAdmin(); } }, '去处理'));
+        obsList.appendChild(row);
+      });
+      mCard.appendChild(obsList);
+      if (visibleObsExperts.length > 6) mCard.appendChild(h('div', { style:{ fontSize:'11px', color:'#94a3b8', marginTop:'2px' } }, '…等共 ' + visibleObsExperts.length + ' 位'));
+    }
+    app.appendChild(mCard);
   }
-  app.appendChild(banner);
 
   // Container
   const container = h('div', { className: 'admin-container' });
@@ -6854,7 +6934,7 @@ function autoSyncObservationGlobal() {
   const db = appState.db;
   const cfg = db.ratingConfig || DEFAULT_RATING_CONFIG;
   const obsThreshold = cfg.observationThreshold !== undefined ? cfg.observationThreshold : 3;
-  const systemOperator = { id: 'system', name: '系统', role: 'system' };
+  const autoOp = getOperatorInfo();
   let changed = false;
   db.experts.forEach(e => {
     if (e.status === 'eliminated') return;
@@ -6866,7 +6946,7 @@ function autoSyncObservationGlobal() {
       recordObservationOperation(db, e, 'auto_in', before, after,
         '综合评分低于 ' + obsThreshold + '★，系统自动移入观察库（观察期 18 个月）',
         ['自动入库'],
-        systemOperator
+        autoOp
       );
       changed = true;
     }
@@ -6877,7 +6957,7 @@ function autoSyncObservationGlobal() {
       recordObservationOperation(db, e, 'auto_out', before, after,
         '综合评分达到 ' + obsThreshold + '★，系统自动移出观察库',
         ['自动出库'],
-        systemOperator
+        autoOp
       );
       changed = true;
     }
@@ -6892,7 +6972,7 @@ function autoSyncObservationGlobal() {
         recordObservationOperation(db, e, 'eliminate', before, after,
           '观察期满（截止 ' + deadline.toLocaleDateString('zh-CN') + '）仍低于 ' + obsThreshold + '★，系统自动淘汰',
           ['淘汰', '系统默认'],
-          systemOperator
+          autoOp
         );
         changed = true;
       }
@@ -7654,7 +7734,12 @@ function renderRatingsTab(panel) {
 
       const act = h('td', {});
       act.appendChild(h('button', { className:'btn btn-secondary btn-sm', style:{ fontSize:'11px', marginRight:'6px' }, onclick: () => {
-        e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e); saveDB(db);
+        if (!confirm('重置为自动评分将用系统自动估算覆盖「' + e.name + '」当前的人工调分，确定继续？')) return;
+        var before = snapshotExpertScores(e);
+        e.subScores = null; aiScoreExpert(e); recalcExpertFromSubscores(e);
+        var after = snapshotExpertScores(e);
+        recordObservationOperation(db, e, 'ai_reset', before, after, '管理员手动重置为自动评分（覆盖人工调分）', ['重置为自动评分']);
+        saveDB(db);
         renderRatingsTab(panel); toast(e.name + ' 已重置为自动评分', 'success');
       } }, '重置为自动评分'));
       // v5.9.5: 评分管理支持手动移入观察库（先不淘汰，留缓冲）
@@ -7673,6 +7758,10 @@ function renderRatingsTab(panel) {
           });
         } }, '移入观察库'));
       }
+      // v5.9.6: 从云端恢复（以 Supabase 为准，覆盖本地被误改的评分/状态）
+      act.appendChild(h('button', { className:'btn btn-sm', style:{ fontSize:'11px', marginLeft:'6px', color:'#0e7490', border:'1px solid #a5f3fc', background:'#ecfeff' }, onclick: async () => {
+        await restoreExpertFromCloud(e, panel);
+      } }, '从云端恢复'));
       row.appendChild(act);
       tbody.appendChild(row);
     });
@@ -8482,6 +8571,28 @@ function renderCategoriesTab(panel) {
     toast('标签已添加', 'success');
   } }, '添加'));
   panel.appendChild(addDiv);
+}
+
+// v5.9.6: 从云端（Supabase）恢复指定专家的评分与状态，覆盖本地数据。
+// 用于误触「重置为自动评分」等导致本地数据被覆盖的场景（Supabase 为数据真理来源）。
+async function restoreExpertFromCloud(expert, panel) {
+  if (!confirm('从云端（Supabase）恢复「' + expert.name + '」的最新评分与状态？\n将覆盖当前本地数据。')) return;
+  try {
+    if (typeof supabase === 'undefined' || !supabase) { toast('Supabase 未连接，无法从云端恢复', 'error'); return; }
+    const all = await fetchExperts();
+    const cloud = all.find(function(x) { return (expert.id && x.id && x.id === expert.id) || x.name === expert.name; });
+    if (!cloud) { toast('云端无该专家记录', 'error'); return; }
+    expert.subScores = cloud.subScores;
+    expert.scores = cloud.scores;
+    expert.status = cloud.status;
+    expert.observationStatus = cloud.observationStatus;
+    expert.observationDate = cloud.observationDate;
+    saveDB(appState.db);
+    if (panel) renderRatingsTab(panel);
+    toast(expert.name + ' 已从云端恢复', 'success');
+  } catch (err) {
+    toast('恢复失败：' + (err && err.message ? err.message : err), 'error');
+  }
 }
 
 function renderObservationTab(panel) {
