@@ -2074,17 +2074,12 @@ function renderExpertGrid() {
     headerInfo.appendChild(nameRow);
 
     if (db.ratingConfig.showScores !== false) {
-      // v5.9.11: 评分徽章质感化——右上角绝对定位，渐变卡片+层次阴影+星级图标
+      // v5.9.12: 评分徽章扁平化——右上角纯文字，与左侧顶部水平对齐，不用卡片套卡片
       const scoreBox = h('div', { className: 'card-score-box' });
       const overallScore = h('span', { className: 'card-score-main' });
-      overallScore.innerHTML = '<span class="score-crown">★</span> 综合 ' + expert.scores.overall.toFixed(1) + '<span class="score-star">★</span>';
+      overallScore.textContent = '综合 ' + expert.scores.overall.toFixed(1);
       const subRow = h('div', { className: 'card-score-subs' });
-      const profTag = h('span', { className: 'card-score-sub prof' });
-      profTag.innerHTML = '专业 ' + expert.scores.professional.toFixed(1) + '<span class="score-star">★</span>';
-      const inflTag = h('span', { className: 'card-score-sub infl' });
-      inflTag.innerHTML = '影响 ' + expert.scores.influence.toFixed(1) + '<span class="score-star">★</span>';
-      subRow.appendChild(profTag);
-      subRow.appendChild(inflTag);
+      subRow.textContent = '专业 ' + expert.scores.professional.toFixed(1) + ' · 影响 ' + expert.scores.influence.toFixed(1);
       scoreBox.appendChild(overallScore);
       scoreBox.appendChild(subRow);
       cardHeader.appendChild(scoreBox);
