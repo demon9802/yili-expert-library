@@ -165,13 +165,13 @@
 | # | 功能 | 说明 |
 |---|------|------|
 | 1 | Excel 导入导出 | 原项目使用 SheetJS (xlsx) 实现专家数据导入导出，前端已引入 xlsx 依赖，但功能逻辑未迁移。 |
-| 2 | 图表渲染 | 原项目有自定义图表渲染函数 (renderBarChart, renderDoughnutChart, renderScoreDistChart 等)，当前 DashboardTab 使用简单 HTML 条形图替代。 |
-| 3 | 测试模式 | 原项目的测试模式 (testMode) 功能未迁移。 |
-| 4 | 评分规则浮窗 | 前端详情页的评分规则"?"浮窗未实现。 |
-| 5 | 手机端适配细节 | 极窄屏 (≤400px) 领域标签语义缩略等细节未完全迁移。 |
-| 6 | 数据迁移脚本 | Supabase → MySQL 的数据迁移脚本未编写。 |
-| 7 | 邮件发送 | 密码重置邮件功能未实现（当前生成临时密码但未发送）。 |
-| 8 | Supabase RPC 替代 | 原项目使用 Supabase RPC (verify_security_answers, admin_reset_password_by_id, get_user_list) 的服务端函数，已在 Spring Boot Service 层重新实现。 |
+| 2 | 测试模式 | 原项目的测试模式 (testMode) 功能未迁移。 |
+| 3 | 评分规则浮窗 | 前端详情页的评分规则"?"浮窗未实现。 |
+| 4 | 手机端适配细节 | 极窄屏 (≤400px) 领域标签语义缩略等细节未完全迁移。 |
+| 5 | 数据迁移脚本 | Supabase → MySQL 的数据迁移脚本未编写。 |
+| 6 | 邮件发送 | 密码重置邮件功能未实现（当前生成临时密码但未发送）。 |
+| 7 | Supabase RPC 替代 | 原项目使用 Supabase RPC (verify_security_answers, admin_reset_password_by_id, get_user_list) 的服务端函数，已在 Spring Boot Service 层重新实现。 |
+| 8 | 管理后台「仪表盘」配置页 | 当前 DashboardTab 为只读数据看板；原「仪表盘管理」的展示模块开关/图表类型配置尚未实现。 |
 
 ---
 
@@ -187,20 +187,25 @@
 
 ---
 
-## 七、构建验证结果（2026-08-12 已完成）
+## 七、构建验证结果（2026-08-13 更新）
 
 ### 7.1 前端构建 ✅ 已通过
 | 检查项 | 结果 |
 |--------|------|
 | `npm install` | ✅ 依赖安装完成（node_modules 就绪） |
 | `vue-tsc --noEmit` | ✅ TypeScript 类型检查零错误 |
-| `vite build` | ✅ 92 模块构建成功，3.68s 完成 |
+| `vite build` | ✅ 95 模块构建成功，3.08s 完成 |
 | 产物大小 | 主 JS 110KB (gzip 42.7KB) + 主 CSS 39.5KB (gzip 7.9KB) |
-| 开发服务器 | ✅ `http://localhost:3000` 可访问 (HTTP 200) |
+| 开发服务器 | ✅ `http://localhost:3002` 可访问 (HTTP 200) |
 
 **修复记录**：
 - `appStore.ts:257` — `field.name` 添加非空断言 `!`（`Partial<Field>` 类型安全）
 - `vite.config.ts` — 移除 SCSS `additionalData`，避免与 `main.scss` 中 `@use` 重复导入
+- `index.html` — data.js 加载后挂载到 `window.EXPERT_DATA`，解决无后端时专家数据为空
+- `request.ts` — 增加 6s 请求超时，后端不可用时快速降级到本地 data.js
+- `DashboardModal.vue` — 新增数据仪表盘弹窗（领域分布/分值分布/平均分卡片）
+- `LoginModal.vue` — 按原始 `.admin-login` 样式重写
+- `Expert` 类型/搜索/卡片 — 兼容 `advantages` 对象数组与字符串数组
 
 ### 7.2 后端验证步骤（待用户执行）
 1. 安装 JDK 1.8 + Maven
@@ -212,12 +217,13 @@
 ### 7.3 UI 对照清单（待用户验证）
 - [ ] 前台 Header 样式
 - [ ] 搜索框 + 搜索历史
-- [ ] 领域筛选条
+- [ ] 领域筛选条（有领域标签、人数正确）
 - [ ] 排序/筛选控件
 - [ ] 专家卡片 (评分徽章、领域标签、收藏按钮)
 - [ ] 专家详情弹窗
 - [ ] 分页控件
-- [ ] 登录/注册弹窗
+- [ ] 管理员登录弹窗
+- [ ] 数据仪表盘弹窗
 - [ ] 管理后台各标签页
 
 ### 7.4 Git 提交状态
@@ -226,6 +232,8 @@
 | `373b440` | V6.0.0 技术栈改写（126文件，8453行） | ✅ 已提交本地 |
 | `354a3b8` | fix: TypeScript类型错误 + SCSS重复@use | ✅ 已提交本地 |
 | `896e4d1` | chore: 清理Vite临时文件 + .gitignore | ✅ 已提交本地 |
+| `5f335ae` | fix: 修复前端 UI 样式丢失 + 数据回退 | ✅ 已提交本地 |
+| `1012050` | fix: 数据回退生效 + 数据仪表盘 + 管理员登录弹窗样式 | ✅ 已提交本地 |
 | `git push origin main` | 推送到 GitHub | ⚠️ 待用户手动推送（当前环境认证不可用） |
 
 ---
@@ -241,5 +249,5 @@
 ---
 
 **报告生成时间**: 2026-08-12 23:15
-**更新时间**: 2026-08-12 23:55（补充构建验证结果）
+**更新时间**: 2026-08-13 00:45（补充数据回退、仪表盘、登录弹窗修复）
 **改写人**: AI Agent (WorkBuddy)
