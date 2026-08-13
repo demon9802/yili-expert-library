@@ -138,24 +138,25 @@
         </div>
 
         <!-- 联系方式 (V5.9+: PC/手机端均可点击，PC 提供复制/调用，手机端优先原生 tel/mailto) -->
-        <div v-if="contacts.length > 0 || expert.referrer" class="detail-section">
+        <div v-if="groupedContacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
           <div
-            v-for="(c, idx) in contacts"
+            v-for="(group, idx) in groupedContacts"
             :key="idx"
             class="detail-contact-line"
           >
             <span class="contact-person">
-              {{ contacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ c.person || '未填写' }}
+              {{ groupedContacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ group.person || '未填写' }}
             </span>
-            <button
-              v-if="c.info"
-              type="button"
+            <span
+              v-for="(m, mIdx) in group.methods"
+              :key="mIdx"
               class="contact-method"
-              @click="handleContactClick(c)"
+              @click="handleContactClick(m)"
             >
-              <span class="contact-icon">{{ typeIcon(c.type) }}</span>{{ typeLabel(c.type) }}：{{ c.info }}
-            </button>
+              <span class="contact-icon">{{ contactTypeIcon(m.type) }}</span>{{ contactTypeLabel(m.type) }}：{{ m.info }}
+              <span v-if="mIdx < group.methods.length - 1" class="contact-sep"> / </span>
+            </span>
           </div>
           <div v-if="expert.referrer" class="detail-text detail-referrer">
             内部推荐人：{{ expert.referrer }}
@@ -173,7 +174,7 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, ContactInfo, SubScores } from '@/types'
-import { formatRichText, copyText } from '@/utils/helpers'
+import { formatRichText, handleContactClick, contactTypeIcon, contactTypeLabel } from '@/utils/helpers'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 import StarRating from '@/components/StarRating.vue'
 import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
@@ -236,7 +237,7 @@ const contacts = computed(() => {
   if (!list.length && props.expert.contactInfo) {
     list.push({
       type: props.expert.contactType || 'phone',
-      label: typeLabel(props.expert.contactType || 'phone'),
+      label: contactTypeLabel(props.expert.contactType || 'phone'),
       value: props.expert.contactInfo,
       info: props.expert.contactInfo,
       person: props.expert.contactPerson,
@@ -245,68 +246,19 @@ const contacts = computed(() => {
   return list
 })
 
-function typeLabel(type?: string): string {
-  switch (type) {
-    case 'email': return '邮箱'
-    case 'wechat': return '微信'
-    case 'phone':
-    case 'mobile': return '电话'
-    default: return '联系方式'
-  }
-}
-
-function typeIcon(type?: string): string {
-  switch (type) {
-    case 'email': return '📧'
-    case 'wechat': return '💬'
-    case 'phone':
-    case 'mobile': return '📞'
-    default: return '📎'
-  }
-}
-
-function isMobileViewport(): boolean {
-  return window.innerWidth <= 768
-}
-
-function normalizePhone(info?: string): string {
-  return String(info || '').replace(/[^0-9+]/g, '')
-}
-
-function handleContactClick(c: ContactInfo) {
-  const info = c.info || c.value || ''
-  if (!info) return
-
-  if (isMobileViewport()) {
-    copyText(info).catch(() => {})
-    if (c.type === 'email') {
-      window.location.href = 'mailto:' + info
-      return
+const groupedContacts = computed(() => {
+  const groups: { person: string; methods: ContactInfo[] }[] = []
+  contacts.value.forEach(c => {
+    const person = c.person || ''
+    const last = groups[groups.length - 1]
+    if (last && last.person === person) {
+      last.methods.push(c)
+    } else {
+      groups.push({ person, methods: [c] })
     }
-    if (c.type === 'phone' || c.type === 'mobile') {
-      window.location.href = 'tel:' + normalizePhone(info)
-      return
-    }
-    alert('已复制：' + info)
-    return
-  }
-
-  const action = c.type === 'email'
-    ? confirm('是否打开邮件客户端？\n\n选择“确定”：发邮件\n选择“取消”：复制邮箱')
-    : c.type === 'phone' || c.type === 'mobile'
-      ? confirm('是否拨打电话？\n\n选择“确定”：拨号\n选择“取消”：复制号码')
-      : false
-
-  if (action && c.type === 'email') {
-    window.location.href = 'mailto:' + info
-    return
-  }
-  if (action && (c.type === 'phone' || c.type === 'mobile')) {
-    window.location.href = 'tel:' + normalizePhone(info)
-    return
-  }
-  copyText(info).then(() => alert('已复制：' + info)).catch(() => alert('复制失败'))
-}
+  })
+  return groups
+})
 
 function getFieldStyle(fieldName: string) {
   const field = store.fields.find(f => f.name === fieldName)
@@ -365,5 +317,21 @@ async function toggleFav() {
 }
 .detail-referrer {
   margin-top: 8px;
+}
+.contact-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+  cursor: pointer;
+  user-select: none;
+}
+.contact-method:hover {
+  text-decoration: underline;
+}
+.contact-sep {
+  color: var(--text-secondary);
+  margin: 0 4px;
+  pointer-events: none;
 }
 </style>

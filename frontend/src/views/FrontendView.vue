@@ -459,3 +459,31 @@ function toggleMobileMode() {
   document.body.classList.toggle('mobile-mode', isMobile.value)
 }
 </script>
+
+<style scoped>
+.page-navigation-float {
+  left: 50%;
+  right: auto;
+  bottom: 16px;
+  width: auto;
+  max-width: min(92vw, 720px);
+  padding: 6px 12px;
+  border-radius: 24px;
+  transform: translateX(-50%) translateY(100%);
+}
+.page-navigation-float.visible {
+  transform: translateX(-50%) translateY(0);
+}
+.page-navigation-float :deep(.page-nav-inline-btn),
+.page-navigation-float :deep(.page-nav-inline-num) {
+  padding: 5px 10px;
+  font-size: 12px;
+  min-width: 28px;
+  height: 28px;
+}
+.page-navigation-float :deep(.page-nav-inline-info) {
+  font-size: 11px;
+  margin-left: 6px;
+  margin-right: 2px;
+}
+</style>

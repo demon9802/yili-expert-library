@@ -87,12 +87,18 @@
       🎓 {{ truncatedEducation }}
     </div>
 
-    <!-- Contact (V5: 卡片只显示第一位联系人) -->
-    <div v-if="contacts.length > 0 && (contacts[0].person || contacts[0].info)" class="card-contact">
-      <span v-if="contacts[0].person">👤 {{ contacts[0].person }}</span>
-      <span v-if="contacts[0].info">
-        <span>{{ typeIcon(contacts[0].type) }}</span>
-        <span>{{ displayContactInfo(contacts[0].info) }}</span>
+    <!-- Contact (V5: 卡片只显示第一位联系人，多个方式用 / 分隔) -->
+    <div v-if="firstContactGroup" class="card-contact" @click.stop>
+      <span v-if="firstContactGroup.person">👤 {{ firstContactGroup.person }}</span>
+      <span
+        v-for="(m, idx) in firstContactGroup.methods"
+        :key="idx"
+        class="card-contact-method"
+        @click.stop="handleContactClick(m)"
+      >
+        <span>{{ contactTypeIcon(m.type) }}</span>
+        <span>{{ displayContactInfo(m.info) }}</span>
+        <span v-if="idx < firstContactGroup.methods.length - 1" class="card-contact-sep">/</span>
       </span>
     </div>
 
@@ -105,7 +111,7 @@
 import { computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project, ContactInfo } from '@/types'
-import { isNarrowScreen } from '@/utils/helpers'
+import { isNarrowScreen, handleContactClick, contactTypeIcon } from '@/utils/helpers'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 
 const props = defineProps<{
@@ -240,6 +246,16 @@ const contacts = computed(() => {
   return list
 })
 
+const firstContactGroup = computed(() => {
+  if (!contacts.value.length) return null
+  const first = contacts.value[0]
+  const person = first.person || ''
+  return {
+    person,
+    methods: contacts.value.filter(c => (c.person || '') === person),
+  }
+})
+
 function typeLabel(type: string): string {
   switch (type) {
     case 'email': return '邮箱'
@@ -249,17 +265,26 @@ function typeLabel(type: string): string {
   }
 }
 
-function typeIcon(type: string): string {
-  switch (type) {
-    case 'email': return '📧'
-    case 'wechat': return '💬'
-    case 'phone':
-    case 'mobile': return '📞'
-    default: return '📞'
-  }
-}
-
-function displayContactInfo(info: string): string {
+function displayContactInfo(info?: string): string {
+  if (!info) return ''
   return info.length > 25 ? info.substring(0, 25) + '...' : info
 }
 </script>
+
+<style scoped>
+.card-contact-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+  cursor: pointer;
+}
+.card-contact-method:hover {
+  text-decoration: underline;
+}
+.card-contact-sep {
+  color: var(--text-secondary);
+  margin: 0 4px;
+  pointer-events: none;
+}
+</style>

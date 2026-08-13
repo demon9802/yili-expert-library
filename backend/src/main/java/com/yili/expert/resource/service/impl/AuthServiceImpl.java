@@ -60,7 +60,7 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("id", user.getId());
         userMap.put("email", user.getEmail());
-        userMap.put("is_admin", false);
+        userMap.put("isAdmin", false);
         userMap.put("role", user.getRole());
         result.put("user", userMap);
         result.put("token", token);
@@ -87,7 +87,7 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("id", user.getId());
         userMap.put("email", user.getEmail());
-        userMap.put("is_admin", user.getIsAdmin() != null && user.getIsAdmin());
+        userMap.put("isAdmin", user.getIsAdmin() != null && user.getIsAdmin());
         userMap.put("role", user.getRole());
         result.put("user", userMap);
         result.put("token", token);

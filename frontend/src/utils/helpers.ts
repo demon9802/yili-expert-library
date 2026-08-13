@@ -133,3 +133,62 @@ export function copyText(text: string): Promise<void> {
     }
   })
 }
+
+export function contactTypeLabel(type?: string): string {
+  switch (type) {
+    case 'email': return '邮箱'
+    case 'wechat': return '微信'
+    case 'phone':
+    case 'mobile': return '电话'
+    default: return '联系方式'
+  }
+}
+
+export function contactTypeIcon(type?: string): string {
+  switch (type) {
+    case 'email': return '📧'
+    case 'wechat': return '💬'
+    case 'phone':
+    case 'mobile': return '📞'
+    default: return '📎'
+  }
+}
+
+export function normalizePhone(info?: string): string {
+  return String(info || '').replace(/[^0-9+]/g, '')
+}
+
+export function handleContactClick(c: { type?: string; info?: string; value?: string }) {
+  const info = c.info || c.value || ''
+  if (!info) return
+
+  if (window.innerWidth <= 768) {
+    copyText(info).catch(() => {})
+    if (c.type === 'email') {
+      window.location.href = 'mailto:' + info
+      return
+    }
+    if (c.type === 'phone' || c.type === 'mobile') {
+      window.location.href = 'tel:' + normalizePhone(info)
+      return
+    }
+    alert('已复制：' + info)
+    return
+  }
+
+  const action = c.type === 'email'
+    ? confirm('是否打开邮件客户端？\n\n选择“确定”：发邮件\n选择“取消”：复制邮箱')
+    : c.type === 'phone' || c.type === 'mobile'
+      ? confirm('是否拨打电话？\n\n选择“确定”：拨号\n选择“取消”：复制号码')
+      : false
+
+  if (action && c.type === 'email') {
+    window.location.href = 'mailto:' + info
+    return
+  }
+  if (action && (c.type === 'phone' || c.type === 'mobile')) {
+    window.location.href = 'tel:' + normalizePhone(info)
+    return
+  }
+  copyText(info).then(() => alert('已复制：' + info)).catch(() => alert('复制失败'))
+}
