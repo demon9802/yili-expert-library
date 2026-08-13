@@ -57,18 +57,17 @@
                     :d="slice.path"
                     :fill="slice.color"
                     stroke="#ffffff"
-                    stroke-width="3"
+                    stroke-width="2"
                     opacity="0.95"
                   />
                   <text
                     v-if="slice.percent >= 3"
-                    :x="slice.labelX" :y="slice.labelY"
-                    text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff"
-                    style="paint-order:stroke; stroke:rgba(15,23,42,0.35); stroke-width:3px"
+                    :x="slice.labelX" :y="slice.labelY + 4"
+                    text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff"
                   >{{ slice.percent.toFixed(1) }}%</text>
                 </g>
-                <text :x="cx" :y="cy - 6" text-anchor="middle" font-size="30" font-weight="800" fill="#1e293b">{{ scoreTotal }}</text>
-                <text :x="cx" :y="cy + 18" text-anchor="middle" font-size="13" fill="#64748b">位专家</text>
+                <text :x="cx" :y="cy - 4" text-anchor="middle" font-size="24" font-weight="600" fill="#1e293b">{{ scoreTotal }}</text>
+                <text :x="cx" :y="cy + 16" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>
 
                 <g v-for="(item, idx) in scoreLegend" :key="'l'+idx" :transform="`translate(220, ${legendStartY + idx * 40})`">
                   <rect x="0" y="2" width="14" height="14" rx="3" :fill="item.color"/>
@@ -149,10 +148,10 @@ function shortFieldName(name: string) {
 
 // 分值分布（V5.9.5 五星制：按综合评分区间统计活跃专家）
 const buckets = [
-  { label: '4.5-5.0★', min: 4.5, max: 5.0, includeMax: true },
-  { label: '4.0-4.5★（不含4.5）', min: 4.0, max: 4.5 },
-  { label: '3.5-4.0★（不含4.0）', min: 3.5, max: 4.0 },
-  { label: '3.0-3.5★（不含3.5）', min: 3.0, max: 3.5 }
+  { label: '4.5-5.0分', min: 4.5, max: 5.0, includeMax: true },
+  { label: '4.0-4.5分', min: 4.0, max: 4.5 },
+  { label: '3.5-4.0分', min: 3.5, max: 4.0 },
+  { label: '3.0-3.5分', min: 3.0, max: 3.5 }
 ]
 const colors = ['#22c55e', '#86efac', '#f59e0b', '#f97316']
 
