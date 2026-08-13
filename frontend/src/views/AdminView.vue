@@ -86,3 +86,107 @@ function handleLogout() {
   router.push('/')
 }
 </script>
+
+<style scoped>
+.admin-view {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.admin-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.admin-header-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.admin-header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.admin-header-actions .btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.admin-header-actions .btn:hover {
+  color: var(--primary);
+  background: var(--primary-light);
+  border-color: var(--primary-light);
+}
+
+.admin-tabs {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 4px;
+  padding: 0 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-tab {
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.admin-tab:hover {
+  color: var(--primary);
+}
+
+.admin-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.admin-content {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.admin-content-inner {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+</style>

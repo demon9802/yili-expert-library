@@ -269,8 +269,7 @@ const activeExpertCount = computed(() =>
 )
 
 const userName = computed(() => {
-  const email = store.currentUser?.email || ''
-  return email.split('@')[0] || ''
+  return store.currentUser?.email || ''
 })
 
 const countInfoHtml = computed(() => {
