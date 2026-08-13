@@ -33,8 +33,8 @@ public class DataInitializer implements CommandLineRunner {
         UserEntity existing = userMapper.selectOne(
                 new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
         if (existing != null) {
-            // 兼容：为老数据补 role
-            if (existing.getRole() == null) {
+            // 强制同步主/子管理员角色（老数据 role 默认 sub 需纠正）
+            if (!role.equals(existing.getRole())) {
                 existing.setRole(role);
                 userMapper.updateById(existing);
             }
