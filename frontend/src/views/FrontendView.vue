@@ -472,8 +472,8 @@ function toggleMobileMode() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 5px 12px;
+  gap: 3px;
+  padding: 3px 10px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -497,10 +497,10 @@ function toggleMobileMode() {
   flex-wrap: wrap;
 }
 .page-navigation-float :deep(.page-nav-inline-btn) {
-  padding: 0 12px;
-  height: 28px;
-  font-size: 13px;
-  line-height: 28px;
+  padding: 0 10px;
+  height: 24px;
+  font-size: 12px;
+  line-height: 24px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -511,10 +511,10 @@ function toggleMobileMode() {
   transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 28px;
-  height: 28px;
+  min-width: 24px;
+  height: 24px;
   padding: 0 4px;
-  font-size: 13px;
+  font-size: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -527,9 +527,9 @@ function toggleMobileMode() {
   transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  margin-left: 6px;
+  margin-left: 4px;
   white-space: nowrap;
 }
 </style>
