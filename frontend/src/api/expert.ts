@@ -4,6 +4,11 @@
 import { api } from './request'
 import type { Expert } from '@/types'
 
+export interface BulkScoreItem {
+  id: number
+  scores: Expert['scores']
+}
+
 export const expertApi = {
   findAll(): Promise<Expert[]> {
     return api.get('/experts')
@@ -27,5 +32,9 @@ export const expertApi = {
 
   delete(id: number): Promise<void> {
     return api.delete(`/experts/${id}`)
+  },
+
+  bulkUpdateScores(items: BulkScoreItem[]): Promise<number> {
+    return api.post('/experts/bulk-update-scores', items)
   },
 }

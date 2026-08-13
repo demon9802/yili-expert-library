@@ -1,6 +1,7 @@
 package com.yili.expert.resource.controller;
 
 import com.yili.expert.resource.common.ApiResponse;
+import com.yili.expert.resource.dto.BulkScoreUpdateRequest;
 import com.yili.expert.resource.dto.ExpertDTO;
 import com.yili.expert.resource.service.ExpertService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,5 +49,10 @@ public class ExpertController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         expertService.delete(id);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/bulk-update-scores")
+    public ApiResponse<Integer> bulkUpdateScores(@RequestBody List<BulkScoreUpdateRequest> requests) {
+        return ApiResponse.success(expertService.bulkUpdateScores(requests));
     }
 }

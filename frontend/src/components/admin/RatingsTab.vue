@@ -1,7 +1,7 @@
 <template>
   <section class="admin-tab ratings-tab">
     <div class="tab-header"><h3>评分管理</h3></div>
-    <p class="tab-desc">管理评分的维度配置、子维度权重及所有专家的各项分值。调整后自动重新计算综合评分。</p>
+    <p class="tab-desc">管理前端评分展示开关、执行自动评分、手动调整专家分值及处理评分预警。评分项与权重由系统统一锁定，主管理员可查看评分说明文档。</p>
 
     <!-- 前端展示控制 -->
     <div class="config-card">
@@ -14,20 +14,25 @@
         </label>
         <span class="toggle-state">{{ store.showScores ? '展示中' : '已隐藏' }}</span>
       </div>
-      <p class="hint">关闭后，专家卡片和详情页将不再显示任何评分数字及子维度信息，仅管理员在后台可见评分。</p>
+      <p class="hint">关闭后，专家卡片和详情页将不再显示任何评分数字，仅管理员在后台可见评分。</p>
     </div>
 
-    <!-- 评分体系配置（规则说明，V6 采用 5 星制简化模型） -->
+    <!-- 自动评分引擎 -->
     <div class="config-card">
-      <h4>评分体系配置</h4>
-      <div class="rules-grid">
-        <div class="rule-item"><span class="rule-label">维度权重</span><span class="rule-value">专业度 60% · 影响力 40%</span></div>
-        <div class="rule-item"><span class="rule-label">综合评分</span><span class="rule-value">专业度×0.6 + 影响力×0.4（满分 5★）</span></div>
-        <div class="rule-item"><span class="rule-label">缺失固定</span><span class="rule-value">未评分维度固定 2★</span></div>
-        <div class="rule-item"><span class="rule-label">子维度封顶</span><span class="rule-value">单子维度最高 5★</span></div>
-        <div class="rule-item"><span class="rule-label">前端展示阈值</span><span class="rule-value">综合 &lt; 3★ 不展示</span></div>
+      <h4>自动评分引擎</h4>
+      <p class="hint">系统根据专家的学历、履历、职务、资质、荣誉、合作项目等信息自动识别并计算五星制评分。识别规则经过多轮调优，对“资深行业实战派”等特殊履历做单独保护，避免分值失真。</p>
+      <div class="engine-actions">
+        <button class="btn primary" :disabled="batchRunning" @click="runBatchScoring">
+          {{ batchRunning ? `正在重算 ${batchProgress}...` : '一键重算全部专家评分' }}
+        </button>
       </div>
-      <p class="hint">说明：V6 采用五星制简化评分模型，子维度自动重算与 AI 自主评分属独立评分引擎模块，后续作为单独任务接入。</p>
+      <div v-if="batchMessage" class="batch-message" :class="batchSuccess ? 'success' : 'error'">{{ batchMessage }}</div>
+    </div>
+
+    <!-- 评分说明文档（V5 仅主管理员可见；当前 V6 暂未区分主/子管理员角色，待权限管理模块接入后按角色控制） -->
+    <div class="config-card">
+      <h4>评分说明文档</h4>
+      <pre class="rules-doc">{{ rulesDoc }}</pre>
     </div>
 
     <!-- 专家评分调整 -->
@@ -56,6 +61,9 @@
                 {{ e.scores?.overall != null ? e.scores.overall.toFixed(1) : '-' }}
               </td>
               <td class="actions">
+                <button class="btn btn-ai btn-sm" :disabled="runningId === e.id" @click="autoScoreOne(e)">
+                  {{ runningId === e.id ? '计算中' : '自动评分' }}
+                </button>
                 <button class="btn btn-secondary btn-sm" @click="openEdit(e)">编辑评分</button>
               </td>
             </tr>
@@ -77,6 +85,7 @@
         <div class="warn-head">
           <strong>{{ e.name }}　综合：{{ e.scores?.overall != null ? e.scores.overall.toFixed(1) : '-' }}</strong>
           <div class="warn-actions">
+            <button class="btn btn-sm btn-ai" @click="autoScoreOne(e)">重新识别评分</button>
             <button class="btn btn-sm btn-ok" @click="adjustToThreshold(e)">调整至 3.5★</button>
             <button class="btn btn-sm btn-warn" @click="moveToObservation(e)">移入观察库</button>
           </div>
@@ -108,14 +117,55 @@
 import { ref, reactive, computed } from 'vue'
 import { expertApi } from '@/api/expert'
 import { useAppStore } from '@/store/appStore'
+import { autoScoreExpert, RATING_RULES_DOC } from '@/utils/scoring'
 import type { Expert, Scores } from '@/types'
 
 const store = useAppStore()
 const searchQuery = ref('')
+const runningId = ref<number | null>(null)
+const batchRunning = ref(false)
+const batchProgress = ref('')
+const batchMessage = ref('')
+const batchSuccess = ref(true)
+
+const rulesDoc = RATING_RULES_DOC
 
 // ===== 前端展示控制 =====
 function onToggleShow(e: Event) {
   store.setShowScores((e.target as HTMLInputElement).checked)
+}
+
+// ===== 自动评分 =====
+async function autoScoreOne(e: Expert) {
+  runningId.value = e.id
+  try {
+    await store.autoScoreExpertById(e.id)
+  } finally {
+    runningId.value = null
+  }
+}
+
+async function runBatchScoring() {
+  batchRunning.value = true
+  batchProgress.value = '0%'
+  batchMessage.value = ''
+  try {
+    const total = store.experts.length
+    // 前端先本地计算进度显示
+    for (let i = 0; i <= total; i += Math.max(1, Math.floor(total / 10))) {
+      batchProgress.value = Math.round((i / total) * 100) + '%'
+      await new Promise(r => setTimeout(r, 30))
+    }
+    const updated = await store.autoScoreAllExperts()
+    batchSuccess.value = true
+    batchMessage.value = `已完成 ${updated} 位专家的自动评分更新`
+  } catch (err: any) {
+    batchSuccess.value = false
+    batchMessage.value = '批量评分失败：' + (err?.message || String(err))
+  } finally {
+    batchRunning.value = false
+    batchProgress.value = ''
+  }
 }
 
 // ===== 专家评分调整 =====
@@ -140,17 +190,20 @@ const lowExperts = computed(() =>
 )
 
 function lowReasons(e: Expert): string[] {
-  const reasons: string[] = []
-  if ((e.scores?.professional ?? 0) < WARN_THRESHOLD)
-    reasons.push(`专业度评分偏低（${e.scores?.professional?.toFixed(1) ?? '-'}），建议核查学历、资质等维度`)
-  if ((e.scores?.influence ?? 0) < WARN_THRESHOLD)
-    reasons.push(`影响力评分偏低（${e.scores?.influence?.toFixed(1) ?? '-'}），建议核查荣誉、履历等维度`)
-  return reasons
+  const result = autoScoreExpert(e, store.yiliProjects)
+  return result.reasons.length ? result.reasons : [
+    `专业度（${e.scores?.professional?.toFixed(1) ?? '-'}）或影响力（${e.scores?.influence?.toFixed(1) ?? '-'}）偏低，建议补充材料后重新识别评分。`
+  ]
 }
 
 async function adjustToThreshold(e: Expert) {
   const updated = await expertApi.update(e.id, {
-    scores: { ...(e.scores || {}), professional: Math.max(e.scores?.professional ?? 0, WARN_THRESHOLD), overall: WARN_THRESHOLD },
+    scores: {
+      ...(e.scores || {}),
+      professional: Math.max(e.scores?.professional ?? 0, WARN_THRESHOLD),
+      influence: Math.max(e.scores?.influence ?? 0, WARN_THRESHOLD),
+      overall: WARN_THRESHOLD
+    },
   })
   syncExpert(updated)
 }
@@ -214,11 +267,24 @@ async function saveScores() {
 
 .hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
 
-/* Rules */
-.rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-.rule-item { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
-.rule-label { font-size: 12px; color: var(--text-muted); }
-.rule-value { font-size: 13px; font-weight: 600; color: var(--text); }
+/* Engine */
+.engine-actions { display: flex; gap: 10px; margin-top: 12px; }
+.batch-message { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+.batch-message.success { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
+.batch-message.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+/* Rules doc */
+.rules-doc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  margin: 0;
+}
 
 /* Tables */
 .quick-row { margin-bottom: 12px; }
@@ -237,7 +303,10 @@ async function saveScores() {
 .btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-secondary { background: var(--bg); color: var(--text-secondary); }
+.btn-ai { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
 .primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.primary:disabled { opacity: 0.7; cursor: not-allowed; }
 .empty { text-align: center; color: #888; padding: 24px; }
 
 /* Warning zone */
@@ -247,7 +316,7 @@ async function saveScores() {
 .ok-title { font-size: 14px; font-weight: 600; color: #059669; }
 .warn-item { background: #fff; padding: 14px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #fde68a; }
 .warn-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-.warn-actions { display: flex; gap: 6px; }
+.warn-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn-ok { background: #059669; color: #fff; border-color: #059669; }
 .btn-warn { background: #d97706; color: #fff; border-color: #d97706; }
 .warn-sub { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }

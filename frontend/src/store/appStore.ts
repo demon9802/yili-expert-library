@@ -14,6 +14,7 @@ import { authApi } from '@/api/auth'
 import { settingApi } from '@/api/setting'
 import { setToken, removeToken, getToken } from '@/api/request'
 import { lsGet, lsSet, lsRemove, debounce } from '@/utils/helpers'
+import { autoScoreExpert } from '@/utils/scoring'
 
 const STORAGE_KEY = 'yili_expert_db'
 const SEARCH_HISTORY_KEY = 'yili_search_history'
@@ -260,6 +261,39 @@ export const useAppStore = defineStore('app', () => {
     experts.value = experts.value.filter(e => e.id !== id)
   }
 
+  // ===== 自动评分 =====
+  async function autoScoreExpertById(id: number) {
+    const idx = experts.value.findIndex(e => e.id === id)
+    if (idx < 0) return null
+    const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
+    const updated = await expertApi.update(id, { scores: {
+      professional: result.professional,
+      influence: result.influence,
+      overall: result.overall,
+    }})
+    experts.value[idx] = updated
+    return result
+  }
+
+  async function autoScoreAllExperts(): Promise<number> {
+    const items = experts.value.map(e => {
+      const result = autoScoreExpert(e, yiliProjects.value)
+      return {
+        id: e.id,
+        scores: {
+          professional: result.professional,
+          influence: result.influence,
+          overall: result.overall,
+        }
+      }
+    })
+    const updated = await expertApi.bulkUpdateScores(items)
+    // 刷新本地数据
+    const data = await appDataApi.loadAppData()
+    experts.value = data.experts || []
+    return updated
+  }
+
   // ===== 项目 CRUD =====
   async function saveProject(project: Partial<Project>) {
     if (project.id) {
@@ -396,7 +430,8 @@ export const useAppStore = defineStore('app', () => {
     filteredExperts, totalPages, paginatedExperts,
     // Actions
     loadAppData, checkAuthState, login, signUp, logout,
-    saveExpert, deleteExpert, saveProject, deleteProject,
+    saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts,
+    saveProject, deleteProject,
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
     toggleFieldFilter, clearFilters, setMode, setAdminTab,

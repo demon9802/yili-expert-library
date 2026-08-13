@@ -2,6 +2,7 @@ package com.yili.expert.resource.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yili.expert.resource.dto.BulkScoreUpdateRequest;
 import com.yili.expert.resource.dto.ExpertDTO;
 import com.yili.expert.resource.entity.ExpertEntity;
 import com.yili.expert.resource.mapper.ExpertMapper;
@@ -77,6 +78,29 @@ public class ExpertServiceImpl implements ExpertService {
     @Override
     public void delete(Long id) {
         expertMapper.deleteById(id);
+    }
+
+    @Override
+    public int bulkUpdateScores(List<BulkScoreUpdateRequest> requests) {
+        int updated = 0;
+        LocalDateTime now = LocalDateTime.now();
+        for (BulkScoreUpdateRequest req : requests) {
+            ExpertEntity e = expertMapper.selectById(req.getId());
+            if (e == null) continue;
+            try {
+                Map<String, Object> scoresMap = new HashMap<>();
+                if (req.getScores() != null) {
+                    scoresMap.putAll(req.getScores());
+                }
+                e.setScores(objectMapper.writeValueAsString(scoresMap));
+                e.setUpdatedAt(now);
+                expertMapper.updateById(e);
+                updated++;
+            } catch (Exception ex) {
+                // skip invalid entry
+            }
+        }
+        return updated;
     }
 
     // ===== Data conversion: Entity ↔ DTO (matching original rowToExpert/expertToRow) =====
