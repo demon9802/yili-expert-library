@@ -529,6 +529,16 @@ export const useAppStore = defineStore('app', () => {
     return favorites.value.includes(expertId)
   }
 
+  // 本地持久化（后端不可用时降级，保证导入/编辑在离线时也能落地到 localStorage）
+  function persistLocal() {
+    lsSet(STORAGE_KEY, {
+      experts: experts.value,
+      fields: fields.value,
+      yiliProjects: yiliProjects.value,
+      favorites: favorites.value,
+    })
+  }
+
   // ===== 搜索历史 =====
   function saveSearchHistory(query: string) {
     if (!query?.trim()) return
@@ -597,6 +607,6 @@ export const useAppStore = defineStore('app', () => {
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
     setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, applyColorScheme,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
-    toggleFieldFilter, clearFilters, setMode, setAdminTab,
+    toggleFieldFilter, clearFilters, setMode, setAdminTab, persistLocal,
   }
 })

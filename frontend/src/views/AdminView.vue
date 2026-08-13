@@ -78,14 +78,12 @@ const allTabs: { key: AdminTab; label: string; masterOnly?: boolean }[] = [
   { key: 'experts', label: '专家管理' },
   { key: 'projects', label: '合作项目管理' },
   { key: 'ratings', label: '评分管理' },
-  { key: 'sort', label: '排序标签' },
   { key: 'dashboard', label: '数据看板' },
   { key: 'categories', label: '分类管理', masterOnly: true },
   { key: 'observation', label: '观察库' },
   { key: 'permissions', label: '权限管理', masterOnly: true },
   { key: 'settings', label: '系统设置', masterOnly: true },
   { key: 'users', label: '用户管理', masterOnly: true },
-  { key: 'docs', label: '文档', masterOnly: true },
   { key: 'monthlyReport', label: '月度报告', masterOnly: true },
 ]
 

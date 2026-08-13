@@ -144,8 +144,23 @@ export function contactTypeLabel(type?: string): string {
   }
 }
 
-export function contactTypeIcon(type?: string): string {
-  switch (type) {
+// 根据联系方式值推断真实类型：当 info 是纯电话号码（含 +、数字、空格、短横线）但
+// 存储的 type 误标为 email/other 时，强制判定为 phone。
+// 这样可修复「办公电话」被识别成邮箱、以及由此导致的 010 区号未格式化问题。
+export function resolveContactType(c: { type?: string; info?: string; value?: string }): string {
+  const declared = c.type || 'other'
+  const info = String(c.info || c.value || '').trim()
+  if (!info) return declared
+  const phoneLike = /^[+\d][\d\s-]{6,}$/.test(info)
+  if (phoneLike && declared !== 'phone' && declared !== 'mobile') {
+    return 'phone'
+  }
+  return declared
+}
+
+export function contactTypeIcon(c: { type?: string; info?: string; value?: string }): string {
+  const t = resolveContactType(c)
+  switch (t) {
     case 'email': return '📧'
     case 'wechat': return '💬'
     case 'phone':
@@ -183,27 +198,27 @@ export function formatPhoneDisplay(info?: string): string {
   return s
 }
 
-// V5.9.4: 联系方式统一走原生协议，PC 端点击直接调用邮件/电话应用，不再弹窗确认
+// V6: 不再直接调用邮件/电话应用，由 ContactActionMenu 统一处理（PC 复制、手机复制+拨打）
 export function handleContactClick(c: { type?: string; info?: string; value?: string }) {
   const info = c.info || c.value || ''
   if (!info) return
-
-  if (c.type === 'email') {
+  const t = resolveContactType(c)
+  if (t === 'email') {
     window.location.href = 'mailto:' + info
     return
   }
-  if (c.type === 'phone' || c.type === 'mobile') {
+  if (t === 'phone' || t === 'mobile') {
     window.location.href = 'tel:' + normalizePhone(info)
     return
   }
-  // 微信等其他联系方式：复制到剪贴板
   copyText(info).catch(() => {})
 }
 
 export function contactHref(c: { type?: string; info?: string; value?: string }): string {
   const info = c.info || c.value || ''
   if (!info) return '#'
-  if (c.type === 'email') return 'mailto:' + info
-  if (c.type === 'phone' || c.type === 'mobile') return 'tel:' + normalizePhone(info)
+  const t = resolveContactType(c)
+  if (t === 'email') return 'mailto:' + info
+  if (t === 'phone' || t === 'mobile') return 'tel:' + normalizePhone(info)
   return '#'
 }

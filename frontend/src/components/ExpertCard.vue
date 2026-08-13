@@ -90,29 +90,32 @@
     <!-- Contact (V5: 卡片只显示第一位联系人，多个方式用 / 分隔) -->
     <div v-if="firstContactGroup" class="card-contact" @click.stop>
       <span v-if="firstContactGroup.person">👤 {{ firstContactGroup.person }}</span>
-      <a
+      <span
         v-for="(m, idx) in firstContactGroup.methods"
         :key="idx"
         class="card-contact-method"
-        :href="contactHref(m)"
-        @click.stop
+        @click.stop="openContact(m)"
       >
-        <span>{{ contactTypeIcon(m.type) }}</span>
+        <span>{{ contactTypeIcon(m) }}</span>
         <span>{{ displayContactInfo(m) }}</span>
         <span v-if="idx < firstContactGroup.methods.length - 1" class="card-contact-sep">/</span>
-      </a>
+      </span>
     </div>
 
     <!-- Supplier bookmark -->
     <div v-if="expert.isSupplier" class="card-supplier-bookmark">库内供应商</div>
+
+    <!-- 联系方式操作菜单（PC 复制 / 手机 复制+拨打） -->
+    <ContactActionMenu :contact="activeContact" @close="activeContact = null" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project, ContactInfo } from '@/types'
-import { isNarrowScreen, contactHref, contactTypeIcon, formatPhoneDisplay } from '@/utils/helpers'
+import { isNarrowScreen, contactTypeIcon, formatPhoneDisplay, resolveContactType } from '@/utils/helpers'
+import ContactActionMenu from '@/components/ContactActionMenu.vue'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 
 const props = defineProps<{
@@ -125,6 +128,12 @@ const emit = defineEmits<{
 }>()
 
 const store = useAppStore()
+
+const activeContact = ref<ContactInfo | null>(null)
+
+function openContact(m: ContactInfo) {
+  activeContact.value = m
+}
 
 const searchQuery = computed(() => props.searchQuery || '')
 
@@ -269,7 +278,8 @@ function typeLabel(type: string): string {
 function displayContactInfo(m: ContactInfo): string {
   const info = m.info || m.value || ''
   if (!info) return ''
-  if (m.type === 'phone' || m.type === 'mobile') {
+  const t = resolveContactType(m)
+  if (t === 'phone' || t === 'mobile') {
     const formatted = formatPhoneDisplay(info)
     return formatted.length > 25 ? formatted.substring(0, 25) + '...' : formatted
   }

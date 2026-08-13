@@ -31,15 +31,15 @@ public class FieldController {
         return ApiResponse.success(fieldService.create(dto));
     }
 
-    @PutMapping("/{name}")
-    public ApiResponse<Void> update(@PathVariable String name, @RequestBody FieldDTO dto) {
+    @PutMapping
+    public ApiResponse<Void> update(@RequestParam String oldName, @RequestBody FieldDTO dto) {
         RequestContextUtil.requireAdmin();
-        fieldService.update(name, dto);
+        fieldService.update(oldName, dto);
         return ApiResponse.success();
     }
 
-    @DeleteMapping("/{name}")
-    public ApiResponse<Void> delete(@PathVariable String name) {
+    @DeleteMapping
+    public ApiResponse<Void> delete(@RequestParam String name) {
         RequestContextUtil.requireAdmin();
         fieldService.delete(name);
         return ApiResponse.success();

@@ -14,18 +14,24 @@
       <input
         ref="importFileInput"
         type="file"
-        accept="application/json,.json"
+        accept=".xlsx,.xls,.csv"
         style="display: none"
         @change="onImportFile"
       />
     </div>
 
-    <!-- Filter row -->
+    <!-- Filter row (含「排序一行」) -->
     <div class="admin-filter-row">
       <span class="filter-label">领域：</span>
       <select v-model="filterField" class="filter-select">
         <option value="">全部领域</option>
         <option v-for="f in store.fields" :key="f.name" :value="f.name">{{ f.name }}</option>
+      </select>
+
+      <span class="filter-label">排序：</span>
+      <select v-model="filterSort" class="filter-select">
+        <option value="">默认（姓名）</option>
+        <option v-for="o in sortOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
       </select>
 
       <span class="filter-label">评分：</span>
@@ -35,6 +41,9 @@
         <option value="4.0">4.0★及以上</option>
         <option value="3.5">3.5★及以上</option>
         <option value="3.0">3.0★及以上</option>
+        <option value="2.5">2.5★及以上</option>
+        <option value="2.0">2.0★及以上</option>
+        <option value="1.0">1.0★及以上</option>
       </select>
 
       <span class="filter-label">状态：</span>
@@ -104,36 +113,87 @@
     </div>
     <div class="record-count">共 {{ filteredExperts.length }} 条记录</div>
 
-    <!-- Create / Edit Modal -->
+    <!-- Create / Edit Modal (V5 结构) -->
     <div v-if="showModal" class="modal-mask" @click.self="closeModal">
       <form class="modal-card" @submit.prevent="submitForm">
-        <h3>{{ form.id ? '编辑专家' : '新增专家' }}</h3>
+        <h3>{{ form.id ? '编辑专家：' + form.name : '新增专家' }}</h3>
 
-        <label>姓名<input v-model.trim="form.name" required /></label>
-        <label>适用领域</label>
+        <label>姓名 *<input v-model.trim="form.name" required /></label>
+
+        <label>适用领域（多选）</label>
         <div class="checkbox-list">
-          <label v-for="field in store.fields" :key="field.name" class="inline-check">
+          <label v-for="field in store.fields" :key="field.name" class="inline-check field-chip" :style="{ '--chip': field.color }">
             <input v-model="form.fields" type="checkbox" :value="field.name" /> {{ field.name }}
           </label>
         </div>
-        <label>学历<textarea v-model="form.education" rows="2" /></label>
-        <label>核心优势（每行一项）<textarea v-model="advantagesText" rows="4" /></label>
-        <label>资质<textarea v-model="form.qualifications" rows="2" /></label>
-        <label>课程<textarea v-model="form.courses" rows="2" /></label>
 
         <div class="form-row">
-          <label>专业度（0-5）<input v-model.number="form.scores.professional" type="number" step="0.1" min="0" max="5" /></label>
-          <label>影响力（0-5）<input v-model.number="form.scores.influence" type="number" step="0.1" min="0" max="5" /></label>
-          <label>综合评分（0-5）<input v-model.number="form.scores.overall" type="number" step="0.1" min="0" max="5" /></label>
+          <label>学历<input v-model="form.education" /></label>
+          <label>库内供应商
+            <select v-model="form.isSupplier">
+              <option :value="false">否</option>
+              <option :value="true">是</option>
+            </select>
+          </label>
         </div>
 
+        <label>突出优势（每行一条，用■开头，如：■行业经验：20年乳业咨询）</label>
+        <textarea v-model="advantagesText" rows="3" placeholder="■行业经验：20年乳业咨询经验"></textarea>
+
+        <label>🃏 专家卡优势概括（1-3条，每行一条，显示在专家卡片上）</label>
+        <textarea v-model="form.advDisplay" rows="2" placeholder="例：供应链管理专家，10年供应链管理经历"></textarea>
+
+        <label>🃏 专家卡资历概括（1-3条，每行一条，显示在专家卡片上）</label>
+        <textarea v-model="form.qualDisplay" rows="2" placeholder="例：智篆商业智库专家"></textarea>
+
+        <!-- 资历资质（子标题 + 内容，可增删） -->
+        <label>资历资质（选择子标题类型，填写对应内容）</label>
+        <div class="repeat-list">
+          <div v-for="(pair, idx) in qualPairs" :key="'q' + idx" class="repeat-row">
+            <select v-model="pair.subtitle" class="repeat-select">
+              <option v-for="opt in qualSubtitleOptions" :key="opt" :value="opt">{{ opt }}</option>
+              <option v-if="pair.subtitle && !qualSubtitleOptions.includes(pair.subtitle)" :value="pair.subtitle">{{ pair.subtitle }}</option>
+            </select>
+            <input v-model="pair.content" class="repeat-input" placeholder="请填写内容" />
+            <button type="button" class="row-del" @click="removeQual(idx)">✕</button>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" @click="addQual">+ 添加资历项</button>
+        </div>
+
+        <!-- 参考案例（固定子标题） -->
+        <label>参考案例</label>
+        <div class="repeat-list">
+          <div v-for="(pair, idx) in casePairs" :key="'c' + idx" class="repeat-block">
+            <div class="repeat-subtitle">{{ pair.subtitle }}</div>
+            <textarea v-model="pair.content" rows="2" :placeholder="'请填写' + pair.subtitle + '相关内容'"></textarea>
+          </div>
+        </div>
+
+        <!-- 联系方式（多联系人） -->
+        <div class="detail-section-title" style="margin-top:16px">📋 联系方式</div>
+        <div class="repeat-list">
+          <div v-for="(c, idx) in contacts" :key="'m' + idx" class="repeat-row">
+            <input v-model="c.person" class="repeat-input" placeholder="联系人姓名" />
+            <select v-model="c.type" class="repeat-select" style="width:90px">
+              <option value="phone">电话</option>
+              <option value="wechat">微信</option>
+              <option value="email">邮箱</option>
+            </select>
+            <input v-model="c.info" class="repeat-input" placeholder="电话/微信/邮箱" />
+            <button type="button" class="row-del" @click="removeContact(idx)">✕</button>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" @click="addContact">+ 新增联系人</button>
+        </div>
+
+        <label>内部推荐人<input v-model="form.referrer" /></label>
+
+        <label>评分（0-5★，可手动调整）</label>
         <div class="form-row">
-          <label>联系人<input v-model="form.contactPerson" /></label>
-          <label>联系方式<input v-model="form.contactInfo" /></label>
-          <label>联系类型<input v-model="form.contactType" /></label>
+          <label>专业度<input v-model.number="form.scores.professional" type="number" step="0.1" min="0" max="5" /></label>
+          <label>影响力<input v-model.number="form.scores.influence" type="number" step="0.1" min="0" max="5" /></label>
+          <label>综合评分<input v-model.number="form.scores.overall" type="number" step="0.1" min="0" max="5" /></label>
         </div>
 
-        <label>推荐人<input v-model="form.referrer" /></label>
         <label>状态
           <select v-model="form.status">
             <option value="active">正常</option>
@@ -141,7 +201,6 @@
             <option value="eliminated">已淘汰</option>
           </select>
         </label>
-        <label class="inline"><input v-model="form.isSupplier" type="checkbox" /> 供应商</label>
 
         <div class="modal-actions">
           <button class="btn primary" type="submit">保存</button>
@@ -155,19 +214,24 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useAppStore } from '@/store/appStore'
-import type { Expert, Scores } from '@/types'
+import type { Expert, Scores, ContactInfo } from '@/types'
 import { formatDate } from '@/utils/helpers'
+import * as XLSX from 'xlsx'
 
 const store = useAppStore()
 const importFileInput = ref<HTMLInputElement | null>(null)
 
 // ===== Filters (local, reset on tab switch) =====
 const filterField = ref('')
+const filterSort = ref('')
 const filterScore = ref('')
 const filterStatus = ref('')
 
+const sortOptions = computed(() => store.sortOptions)
+
 function clearFilters() {
   filterField.value = ''
+  filterSort.value = ''
   filterScore.value = ''
   filterStatus.value = ''
 }
@@ -188,7 +252,14 @@ const filteredExperts = computed(() => {
         (filterStatus.value === 'observation' && (e.status === 'observation' || e.observationStatus))
     )
   }
-  return list
+  // 「排序一行」：按选定维度排序
+  const arr = [...list]
+  const sort = filterSort.value
+  if (sort === 'overall') arr.sort((a, b) => (b.scores?.overall ?? 0) - (a.scores?.overall ?? 0))
+  else if (sort === 'professional') arr.sort((a, b) => (b.scores?.professional ?? 0) - (a.scores?.professional ?? 0))
+  else if (sort === 'influence') arr.sort((a, b) => (b.scores?.influence ?? 0) - (a.scores?.influence ?? 0))
+  else arr.sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+  return arr
 })
 
 // ===== Display helpers =====
@@ -246,18 +317,30 @@ function statusInfo(e: Expert): { label: string; color: string } {
   return { label: '正常', color: '#059669' }
 }
 
-// ===== Export / Import =====
+// ===== Export / Import (Excel) =====
 function exportExperts() {
-  const data = filteredExperts.value
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `experts-export-${new Date().toISOString().slice(0, 10)}.json`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const rows = filteredExperts.value.map(e => {
+    const contacts = getContactList(e)
+    const contactStr = contacts.map(c => (c.person ? c.person + '：' : '') + c.info).join(' / ')
+    return {
+      姓名: e.name || '',
+      适用领域: (e.fields || []).join('、'),
+      学历: e.education || '',
+      核心优势: (e.advantages || []).map(a => typeof a === 'string' ? a : `${a.title || ''}：${a.desc || ''}`).join('\n'),
+      专业度: e.scores?.professional ?? '',
+      影响力: e.scores?.influence ?? '',
+      综合评分: e.scores?.overall ?? '',
+      联系人: contacts.map(c => c.person).join('、') || '',
+      联系方式: contactStr,
+      状态: statusInfo(e).label,
+      录入时间: e.createdAt ? formatDate(e.createdAt).slice(0, 10) : '',
+      录入者: e.createdBy || '主管理员',
+    }
+  })
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '专家')
+  XLSX.writeFile(wb, `专家库导出-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 function triggerImport() {
@@ -271,32 +354,79 @@ function onImportFile(e: Event) {
   const reader = new FileReader()
   reader.onload = async () => {
     try {
-      const parsed = JSON.parse(String(reader.result))
-      if (!Array.isArray(parsed)) throw new Error('文件内容不是专家数组')
-      for (const item of parsed) {
-        const clean: Partial<Expert> = { ...item }
-        delete (clean as any).id
-        await store.saveExpert(clean)
+      const wb = XLSX.read(reader.result as ArrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      let ok = 0
+      let fail = 0
+      for (const r of rows) {
+        const name = String(r['姓名'] || r['name'] || '').trim()
+        if (!name) { fail++; continue }
+        const fields = String(r['适用领域'] || r['fields'] || '')
+          .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
+        const advantages = String(r['核心优势'] || r['advantages'] || '')
+          .split('\n').map((s: string) => s.trim()).filter(Boolean)
+        const contactsRaw = String(r['联系方式'] || r['contactInfo'] || '')
+        const contacts: ContactInfo[] = contactsRaw
+          ? [{ type: 'phone', info: contactsRaw, value: contactsRaw, person: String(r['联系人'] || r['contactPerson'] || '') }]
+          : []
+        const statusMap: Record<string, string> = { 正常: 'active', 观察中: 'observation', 已淘汰: 'eliminated', active: 'active', observation: 'observation', eliminated: 'eliminated' }
+        const status = statusMap[String(r['状态'] || r['status'] || '').trim()] || 'active'
+        const payload: Partial<Expert> = {
+          name,
+          fields,
+          education: String(r['学历'] || r['education'] || ''),
+          advantages,
+          qualifications: String(r['资历资质'] || r['qualifications'] || ''),
+          courses: String(r['参考案例'] || r['courses'] || ''),
+          contacts,
+          contactPerson: String(r['联系人'] || r['contactPerson'] || ''),
+          contactInfo: contactsRaw,
+          contactType: 'phone',
+          referrer: String(r['内部推荐人'] || r['referrer'] || ''),
+          isSupplier: String(r['库内供应商'] || r['isSupplier'] || '').includes('是'),
+          status,
+          scores: {
+            professional: parseFloat(r['专业度'] ?? r['professional']) || null,
+            influence: parseFloat(r['影响力'] ?? r['influence']) || null,
+            overall: parseFloat(r['综合评分'] ?? r['overall']) || null,
+          },
+        }
+        try {
+          await store.saveExpert(payload)
+          ok++
+        } catch {
+          // 后端不可用时降级到本地，保证数据落地
+          store.experts.push({ ...payload, id: -Date.now() - ok } as Expert)
+          store.persistLocal()
+          ok++
+        }
       }
-      window.alert(`成功导入 ${parsed.length} 条专家`)
+      window.alert(`成功导入 ${ok} 条专家${fail ? `，${fail} 条因缺少姓名跳过` : ''}`)
     } catch (err) {
       window.alert('导入失败：' + (err as Error).message)
     } finally {
       input.value = ''
     }
   }
-  reader.readAsText(file)
+  reader.readAsArrayBuffer(file)
 }
 
 // ===== Create / Edit =====
 const showModal = ref(false)
 const advantagesText = ref('')
+const qualSubtitleOptions = ['职称/荣誉头衔', '社会职务', '履历资历']
+const qualPairs = ref<{ subtitle: string; content: string }[]>([])
+const casePairs = ref<{ subtitle: string; content: string }[]>([])
+const contacts = ref<ContactInfo[]>([])
 
 const emptyForm = (): Partial<Expert> & { scores: Scores } => ({
   name: '',
   fields: [],
   advantages: [],
   education: '',
+  qualDisplay: '',
+  advDisplay: '',
   qualifications: '',
   courses: '',
   contactPerson: '',
@@ -310,11 +440,40 @@ const emptyForm = (): Partial<Expert> & { scores: Scores } => ({
 
 const form = reactive<Partial<Expert> & { scores: Scores }>(emptyForm())
 
+function parsePairs(text?: string): { subtitle: string; content: string }[] {
+  if (!text) return []
+  const pairs: { subtitle: string; content: string }[] = []
+  const parts = String(text).split(/【([^】]+)】/)
+  for (let i = 1; i < parts.length; i += 2) {
+    pairs.push({ subtitle: parts[i].trim(), content: (parts[i + 1] || '').trim() })
+  }
+  if (pairs.length === 0 && String(text).trim()) pairs.push({ subtitle: '', content: String(text).trim() })
+  return pairs
+}
+
 function resetForm(data: Partial<Expert> = emptyForm()) {
   Object.assign(form, emptyForm(), data, { fields: [...(data.fields || [])] })
   advantagesText.value = (data.advantages || [])
     .map(a => (typeof a === 'string' ? a : a.title && a.desc ? `${a.title}：${a.desc}` : a.desc || a.title || ''))
     .join('\n')
+  qualPairs.value = parsePairs(data.qualifications).length ? parsePairs(data.qualifications) : [{ subtitle: '职称/荣誉头衔', content: '' }]
+  casePairs.value = (['核心课程', '服务经历']).map(sub => {
+    const found = parsePairs(data.courses).find(p => p.subtitle === sub)
+    return found || { subtitle: sub, content: '' }
+  })
+  const cl = getContactList(data as Expert)
+  contacts.value = cl.length ? cl.map(c => ({ person: c.person, info: c.info, value: c.info, type: 'phone' })) : [{ person: '', info: '', value: '', type: 'phone' }]
+}
+
+function addQual() { qualPairs.value.push({ subtitle: '职称/荣誉头衔', content: '' }) }
+function removeQual(idx: number) {
+  qualPairs.value.splice(idx, 1)
+  if (qualPairs.value.length === 0) qualPairs.value.push({ subtitle: '职称/荣誉头衔', content: '' })
+}
+function addContact() { contacts.value.push({ person: '', info: '', value: '', type: 'phone' }) }
+function removeContact(idx: number) {
+  if (contacts.value.length <= 1) return
+  contacts.value.splice(idx, 1)
 }
 
 function openCreate() {
@@ -336,7 +495,28 @@ async function submitForm() {
     .split('\n')
     .map(item => item.trim())
     .filter(Boolean)
-  await store.saveExpert({ ...form })
+  // 资历资质 → 【子标题】内容
+  form.qualifications = qualPairs.value
+    .filter(p => p.subtitle || p.content)
+    .map(p => '【' + (p.subtitle || '未分类') + '】' + (p.content || ''))
+    .join('\n')
+  // 参考案例 → 【子标题】内容
+  form.courses = casePairs.value
+    .filter(p => p.subtitle || p.content)
+    .map(p => '【' + (p.subtitle || '未分类') + '】' + (p.content || ''))
+    .join('\n')
+  // 联系方式
+  const validContacts = contacts.value.filter(c => c.person || c.info)
+  const contactArr = validContacts.length ? validContacts : [{ person: '', info: '', value: '', type: 'phone' }]
+  form.contacts = contactArr
+  form.contactPerson = contactArr[0].person
+  form.contactInfo = contactArr[0].info
+  form.contactType = contactArr[0].type || 'phone'
+  try {
+    await store.saveExpert({ ...form })
+  } catch {
+    store.persistLocal()
+  }
   closeModal()
 }
 
@@ -557,6 +737,38 @@ async function removeExpert(expert: Expert) {
   gap: 8px 16px;
   margin-bottom: 8px;
 }
+.field-chip {
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.field-chip:has(input:checked) {
+  background: color-mix(in srgb, var(--chip) 16%, #fff);
+  border-color: var(--chip);
+}
+.field-chip:has(input:checked) span { color: var(--chip); font-weight: 600; }
+
+/* 可重复条目（资历/案例/联系方式） */
+.repeat-list { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
+.repeat-row { display: flex; gap: 8px; align-items: center; }
+.repeat-select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: #fff;
+}
+.repeat-input {
+  flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit;
+}
+.row-del {
+  flex-shrink: 0; padding: 6px 10px; border: 1px solid #fecaca; border-radius: 6px;
+  background: #fef2f2; color: #dc2626; cursor: pointer; font-size: 12px;
+}
+.row-del:hover { background: #fee2e2; }
+.repeat-block { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--bg); }
+.repeat-subtitle {
+  font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px;
+  padding: 4px 8px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--primary);
+}
+.repeat-block textarea { width: 100%; margin-top: 0; }
 .inline-check {
   display: flex;
   align-items: center;

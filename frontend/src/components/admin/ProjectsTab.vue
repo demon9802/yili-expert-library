@@ -25,6 +25,9 @@
         <option value="hidden">不显示</option>
         <option value="pending">待关联</option>
       </select>
+      <button class="btn btn-secondary" @click="exportProjects">📥 导出Excel</button>
+      <button class="btn btn-secondary" @click="triggerImport">📤 导入Excel</button>
+      <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="onImportFile" />
     </div>
 
     <!-- Table -->
@@ -153,10 +156,12 @@ import { ref, reactive, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Project } from '@/types'
 import { satisfactionDisplay, parseSatisfaction } from '@/utils/satisfaction'
+import * as XLSX from 'xlsx'
 
 const store = useAppStore()
 const showForm = ref(false)
 const editing = ref<Project | null>(null)
+const importFileInput = ref<HTMLInputElement | null>(null)
 
 // Filters
 const searchQuery = ref('')
@@ -265,6 +270,75 @@ async function handleSave() {
   showForm.value = false
 }
 async function handleDelete(p: Project) { if (confirm(`确认删除「${p.title}」？`)) await store.deleteProject(p.id) }
+
+// ===== Excel 导出 / 导入 =====
+function exportProjects() {
+  const rows = projects.value.map(p => ({
+    项目名称: p.title || '',
+    关联讲师: getExpertName(p.expertId) || p.pendingExpertName || '',
+    合作年份: p.year || '',
+    合作月份: p.month || '',
+    满意度分值: parseSatisfaction(p.satisfaction)?.raw ?? '',
+    满意度量程: parseSatisfaction(p.satisfaction)?.scale ?? '',
+    项目描述: p.desc || '',
+    前端显示: p.visible ? '是' : '否',
+    创建时间: p.createdAt || '',
+  }))
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '合作项目')
+  XLSX.writeFile(wb, `合作项目导出-${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+function triggerImport() { importFileInput.value?.click() }
+
+function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = async () => {
+    try {
+      const wb = XLSX.read(reader.result as ArrayBuffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      let ok = 0
+      for (const r of rows) {
+        const title = String(r['项目名称'] || r['title'] || '').trim()
+        if (!title) continue
+        const lecturer = String(r['关联讲师'] || r['lecturer'] || '').trim()
+        const matched = store.experts.find(ex => ex.name === lecturer)
+        const value = parseFloat(r['满意度分值'] ?? r['satisfactionValue'])
+        const scale = parseInt(r['满意度量程'] ?? r['satisfactionScale']) || 10
+        const satisfaction = Number.isFinite(value) && value > 0
+          ? JSON.stringify({ value, scale }) : null
+        const payload: Partial<Project> = {
+          title,
+          expertId: matched ? matched.id : null,
+          pendingExpertName: matched ? '' : lecturer,
+          year: parseInt(r['合作年份'] ?? r['year']) || new Date().getFullYear(),
+          month: parseInt(r['合作月份'] ?? r['month']) || null,
+          desc: String((r['项目描述'] ?? r['desc']) || ''),
+          visible: String((r['前端显示'] ?? r['visible']) || '').includes('是'),
+          satisfaction,
+        }
+        try {
+          await store.saveProject(payload)
+        } catch {
+          store.yiliProjects.push({ ...payload, id: -Date.now() - ok } as Project)
+          store.persistLocal()
+        }
+        ok++
+      }
+      window.alert(`成功导入 ${ok} 个合作项目`)
+    } catch (err) {
+      window.alert('导入失败：' + (err as Error).message)
+    } finally {
+      input.value = ''
+    }
+  }
+  reader.readAsArrayBuffer(file)
+}
 </script>
 
 <style scoped>

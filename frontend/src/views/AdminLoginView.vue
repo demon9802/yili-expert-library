@@ -23,7 +23,7 @@
     <div v-if="error" class="error" style="display:block">{{ error }}</div>
 
     <button class="btn btn-primary" style="width:100%" @click="handleLogin">登录</button>
-    <button class="btn btn-secondary" style="width:100%;margin-top:8px" @click="goBack">返回前端</button>
+    <button class="btn btn-secondary" style="width:100%;margin-top:8px" @click="goBack">返回前台</button>
   </div>
 </template>
 

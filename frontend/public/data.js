@@ -147,7 +147,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 10,
         "influence": 10,
-        "overall": 10.0
+        "overall": 10
       },
       "status": "active",
       "observationStatus": null,
@@ -216,7 +216,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -280,7 +280,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 7,
         "influence": 9,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -349,7 +349,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 6,
         "influence": 6,
-        "overall": 6.0
+        "overall": 6
       },
       "status": "observation",
       "observationStatus": null,
@@ -490,7 +490,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -561,7 +561,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 7,
         "influence": 9,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -593,7 +593,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -666,7 +666,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -730,7 +730,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 7,
         "influence": 7,
-        "overall": 7.0
+        "overall": 7
       },
       "status": "active",
       "observationStatus": null,
@@ -762,7 +762,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 6,
-        "overall": 7.0
+        "overall": 7
       },
       "status": "active",
       "observationStatus": null,
@@ -795,7 +795,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 7,
         "influence": 9,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -828,7 +828,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -900,7 +900,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 10,
         "influence": 6,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1115,7 +1115,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 8,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1183,7 +1183,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 9,
         "influence": 7,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1214,7 +1214,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 8,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1246,7 +1246,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 5,
         "influence": 9,
-        "overall": 7.0
+        "overall": 7
       },
       "status": "active",
       "observationStatus": null,
@@ -1278,7 +1278,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 7,
         "influence": 7,
-        "overall": 7.0
+        "overall": 7
       },
       "status": "active",
       "observationStatus": null,
@@ -1310,7 +1310,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 8,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1410,7 +1410,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1472,7 +1472,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1505,7 +1505,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 9,
         "influence": 9,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1606,7 +1606,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 6,
         "influence": 10,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1641,7 +1641,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1673,7 +1673,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 8,
-        "overall": 8.0
+        "overall": 8
       },
       "status": "active",
       "observationStatus": null,
@@ -1768,7 +1768,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1800,7 +1800,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 9,
         "influence": 9,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1825,8 +1825,16 @@ const EXPERT_DATA = {
       "contactInfo": "18001129602",
       "contactType": "phone",
       "contacts": [
-        { "person": "贾树擎", "info": "18001129602", "type": "phone" },
-        { "person": "智篆商业（唐三）", "info": "14790675899", "type": "phone" }
+        {
+          "person": "贾树擎",
+          "info": "18001129602",
+          "type": "phone"
+        },
+        {
+          "person": "智篆商业（唐三）",
+          "info": "14790675899",
+          "type": "phone"
+        }
       ],
       "referrer": "刘金鑫",
       "isSupplier": true,
@@ -1835,7 +1843,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 6,
-        "overall": 7.0
+        "overall": 7
       },
       "status": "active",
       "observationStatus": null,
@@ -1866,7 +1874,7 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 8,
         "influence": 10,
-        "overall": 9.0
+        "overall": 9
       },
       "status": "active",
       "observationStatus": null,
@@ -1959,11 +1967,335 @@ const EXPERT_DATA = {
       "scores": {
         "professional": 5,
         "influence": 7,
-        "overall": 6.0
+        "overall": 6
       },
       "status": "observation",
       "observationStatus": null,
       "observationDate": null
+    }
+  ],
+  "yiliProjects": [
+    {
+      "id": -1,
+      "title": "Agent产品复盘",
+      "expertId": 4,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 7,
+      "satisfaction": null,
+      "desc": "复盘Agent搭建能力，识别优秀场景和人才，完善公司Agent产品知识框架，输出统一规范",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-07-28T08:28:43.114Z",
+      "updatedAt": "2026-07-28T08:28:43.114Z"
+    },
+    {
+      "id": -2,
+      "title": "AI训练营：第一期",
+      "expertId": 4,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 3,
+      "satisfaction": "{\"value\":4.66,\"scale\":5}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -3,
+      "title": "产品+算法AI进阶",
+      "expertId": 4,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 1,
+      "satisfaction": "{\"value\":4.8,\"scale\":5}",
+      "desc": "系统性搭建产品经理的 AI 知识体系，掌握落地实操方法",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-07-07T10:33:39.333Z",
+      "updatedAt": "2026-07-07T10:33:39.333Z"
+    },
+    {
+      "id": -4,
+      "title": "《A+经理人》管理进化训练营",
+      "expertId": null,
+      "pendingExpertName": "罗剑勇",
+      "year": 2026,
+      "month": 7,
+      "satisfaction": "{\"value\":4.91,\"scale\":5}",
+      "desc": "聚焦目标承接与执行、跨组织协同、团队管理三大核心能力建设，统一管理语言和工具",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-07-28T08:27:35.377Z",
+      "updatedAt": "2026-07-28T08:27:35.377Z"
+    },
+    {
+      "id": -5,
+      "title": "AI训练营：第二期",
+      "expertId": 4,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 4,
+      "satisfaction": "{\"value\":4.76,\"scale\":5}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-07-07T10:32:44.550Z",
+      "updatedAt": "2026-07-07T10:32:44.550Z"
+    },
+    {
+      "id": -6,
+      "title": "伊数霞光赋能事业部-渠道数字化外部分享",
+      "expertId": null,
+      "pendingExpertName": "王林",
+      "year": 2026,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -7,
+      "title": "电商私董会",
+      "expertId": null,
+      "pendingExpertName": "蒋晖",
+      "year": 2026,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -8,
+      "title": "管理进化3：品质引领·体验升级",
+      "expertId": 33,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 6,
+      "satisfaction": "{\"value\":4.84,\"scale\":5}",
+      "desc": "重视消费者/用户体验，追求品质至上，全面提升核心管理团队的业务导向，深入理解产品品质内涵和标准，了解优秀产品的设计方法，做好产品评估与管理。",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-07-01T01:36:00.195Z",
+      "updatedAt": "2026-07-01T01:36:00.195Z"
+    },
+    {
+      "id": -9,
+      "title": "AI强基计划【YILI-AI实用技巧】",
+      "expertId": 44,
+      "pendingExpertName": "",
+      "year": 2026,
+      "month": 1,
+      "satisfaction": "{\"value\":8.3,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -10,
+      "title": "集团数智化转型战略研讨赋能",
+      "expertId": 53,
+      "pendingExpertName": "",
+      "year": 2024,
+      "month": null,
+      "satisfaction": "{\"value\":8.2,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -11,
+      "title": "聚焦端到端价值引领架构升级主题赋能：流程管理",
+      "expertId": null,
+      "pendingExpertName": "陈果",
+      "year": 2024,
+      "month": null,
+      "satisfaction": "{\"value\":9.5,\"scale\":10}",
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -12,
+      "title": "数字化媒介趋势与实践培训：数字化营销、消费者运营",
+      "expertId": null,
+      "pendingExpertName": "宋星",
+      "year": 2024,
+      "month": null,
+      "satisfaction": "{\"value\":7.9,\"scale\":10}",
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -13,
+      "title": "上接业务、下接技术全链路能力",
+      "expertId": null,
+      "pendingExpertName": "刘剑峰",
+      "year": 2024,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -14,
+      "title": "数智领导力与商业变革",
+      "expertId": null,
+      "pendingExpertName": "刘剑峰",
+      "year": 2024,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -15,
+      "title": "需求洞察、产品定义及设计工作坊：设计思维、UED体验",
+      "expertId": 33,
+      "pendingExpertName": "",
+      "year": 2024,
+      "month": null,
+      "satisfaction": "{\"value\":7.7,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -16,
+      "title": "深度刻画、共情力升级产品体验训练营",
+      "expertId": 33,
+      "pendingExpertName": "",
+      "year": 2024,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -17,
+      "title": "黄金表达MAX",
+      "expertId": null,
+      "pendingExpertName": "刘慕雅",
+      "year": 2024,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -18,
+      "title": "数科战略解码工作坊",
+      "expertId": 54,
+      "pendingExpertName": "",
+      "year": 2024,
+      "month": null,
+      "satisfaction": "{\"value\":8.8,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -19,
+      "title": "数科共创领导力：共创引导技术",
+      "expertId": null,
+      "pendingExpertName": "林小桢",
+      "year": 2023,
+      "month": null,
+      "satisfaction": "{\"value\":7.6,\"scale\":10}",
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -20,
+      "title": "结构思考力系列视频",
+      "expertId": 56,
+      "pendingExpertName": "",
+      "year": 2023,
+      "month": null,
+      "satisfaction": null,
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -21,
+      "title": "黄金表达力：演讲表达、业务影响力",
+      "expertId": null,
+      "pendingExpertName": "刘慕雅",
+      "year": 2022,
+      "month": null,
+      "satisfaction": "{\"value\":7.5,\"scale\":10}",
+      "desc": "",
+      "visible": false,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -22,
+      "title": "结构思考力：结构思考力、内训师培养",
+      "expertId": 56,
+      "pendingExpertName": "",
+      "year": 2022,
+      "month": null,
+      "satisfaction": "{\"value\":7.7,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
+    },
+    {
+      "id": -23,
+      "title": "供应链数字化课程/工作坊：供应链数字化推广",
+      "expertId": 52,
+      "pendingExpertName": "",
+      "year": 2022,
+      "month": null,
+      "satisfaction": "{\"value\":9.1,\"scale\":10}",
+      "desc": "",
+      "visible": true,
+      "createdBy": "system",
+      "createdAt": "2026-06-24T03:00:00.000Z",
+      "updatedAt": "2026-06-24T03:00:00.000Z"
     }
   ]
 };

@@ -21,7 +21,7 @@
             style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
             @click="goAdminLogin"
           >
-            管理员入口
+            管理后台
           </button>
           <template v-if="store.currentUser && store.isAdmin">
             <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="goAdmin">
@@ -461,22 +461,33 @@ function toggleMobileMode() {
 </script>
 
 <style scoped>
+/* V5 原版：轻盈毛玻璃，固定在视口底部，出现/隐藏用 opacity + pointer-events 控制 */
 .page-navigation-float {
   position: fixed;
-  left: 0;
-  right: 0;
   bottom: 0;
-  z-index: 200;
-  background: rgba(255, 255, 255, 0.96);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  padding: 8px 16px;
+  left: 50%;
+  right: auto;
+  width: 100%;
+  max-width: var(--max-width);
+  z-index: 888;
   display: flex;
+  align-items: center;
   justify-content: center;
-  transform: translateY(100%);
-  transition: transform 0.25s ease;
+  gap: 5px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
+  opacity: 0;
+  transform: translateX(-50%) translateY(100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
 }
 .page-navigation-float.visible {
-  transform: translateY(0);
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
 }
 </style>

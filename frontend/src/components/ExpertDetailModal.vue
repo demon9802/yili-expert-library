@@ -137,7 +137,7 @@
           </div>
         </div>
 
-        <!-- 联系方式 (V5.9.4: PC/手机端均走原生协议，文字样式不加粗) -->
+        <!-- 联系方式 (V5: PC 点击显示复制按钮，手机端电话可复制+拨打) -->
         <div v-if="groupedContacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
           <div
@@ -147,16 +147,15 @@
           >
             <span class="detail-contact-text">
               {{ groupedContacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ group.person || '未填写' }}
-              <a
+              <span
                 v-for="(m, mIdx) in group.methods"
                 :key="mIdx"
                 class="contact-link"
-                :href="contactHref(m)"
-                @click.stop
+                @click.stop="openContact(m)"
               >
-                <span class="contact-icon">{{ contactTypeIcon(m.type) }}</span>{{ contactTypeLabel(m.type) }}：{{ displayContactInfo(m) }}
+                <span class="contact-icon">{{ contactTypeIcon(m) }}</span>{{ contactTypeLabel(m.type) }}：{{ displayContactInfo(m) }}
                 <span v-if="mIdx < group.methods.length - 1" class="contact-sep"> / </span>
-              </a>
+              </span>
             </span>
           </div>
           <div v-if="expert.referrer" class="detail-text detail-referrer">
@@ -167,6 +166,9 @@
     </div>
   </div>
 
+  <!-- 联系方式操作菜单 -->
+  <ContactActionMenu :contact="activeContact" @close="activeContact = null" />
+
   <!-- 评分规则弹窗 -->
   <ScoringHelpModal v-if="showHelp" @close="showHelp = false" />
 </template>
@@ -175,7 +177,8 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, ContactInfo, SubScores } from '@/types'
-import { formatRichText, contactHref, contactTypeIcon, contactTypeLabel, formatPhoneDisplay } from '@/utils/helpers'
+import { formatRichText, contactTypeIcon, contactTypeLabel, formatPhoneDisplay, resolveContactType } from '@/utils/helpers'
+import ContactActionMenu from '@/components/ContactActionMenu.vue'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 import StarRating from '@/components/StarRating.vue'
 import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
@@ -190,6 +193,11 @@ defineEmits<{
 
 const store = useAppStore()
 const showHelp = ref(false)
+const activeContact = ref<ContactInfo | null>(null)
+
+function openContact(m: ContactInfo) {
+  activeContact.value = m
+}
 
 const isFav = computed(() => store.favorites.includes(props.expert.id))
 
@@ -280,7 +288,9 @@ async function toggleFav() {
 
 function displayContactInfo(m: ContactInfo): string {
   const info = m.info || m.value || ''
-  if (m.type === 'phone' || m.type === 'mobile') {
+  if (!info) return ''
+  const t = resolveContactType(m)
+  if (t === 'phone' || t === 'mobile') {
     return formatPhoneDisplay(info)
   }
   return info
