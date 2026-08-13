@@ -87,15 +87,12 @@
       🎓 {{ truncatedEducation }}
     </div>
 
-    <!-- Contact -->
-    <div v-if="contacts.length > 0" class="card-contact">
-      <span v-for="(c, idx) in contacts" :key="idx">
-        <span v-if="idx > 0"> | </span>
-        <span v-if="c.person" class="card-contact-person">👤 {{ c.person }}</span>
-        <span v-if="c.info" class="card-contact-info" @click.stop="handleContactClick(c)">
-          <span class="card-contact-icon">{{ typeIcon(c.type) }}</span>
-          <span class="card-contact-value">{{ c.value }}</span>
-        </span>
+    <!-- Contact (V5: 卡片只显示第一位联系人) -->
+    <div v-if="contacts.length > 0 && (contacts[0].person || contacts[0].info)" class="card-contact">
+      <span v-if="contacts[0].person">👤 {{ contacts[0].person }}</span>
+      <span v-if="contacts[0].info">
+        <span>{{ typeIcon(contacts[0].type) }}</span>
+        <span>{{ displayContactInfo(contacts[0].info) }}</span>
       </span>
     </div>
 
@@ -108,7 +105,7 @@
 import { computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project, ContactInfo } from '@/types'
-import { isNarrowScreen, copyText } from '@/utils/helpers'
+import { isNarrowScreen } from '@/utils/helpers'
 
 const props = defineProps<{
   expert: Expert
@@ -221,12 +218,17 @@ const truncatedEducation = computed(() => {
 })
 
 const contacts = computed(() => {
-  const list: ContactInfo[] = props.expert.contacts || []
+  const list: ContactInfo[] = (props.expert.contacts || []).map(c => ({
+    ...c,
+    value: c.value || c.info || '',
+    info: c.info || c.value || '',
+  }))
   if (!list.length && props.expert.contactInfo) {
     list.push({
       type: props.expert.contactType || 'other',
       label: typeLabel(props.expert.contactType || 'other'),
       value: props.expert.contactInfo,
+      info: props.expert.contactInfo,
       person: props.expert.contactPerson,
     })
   }
@@ -246,25 +248,13 @@ function typeIcon(type: string): string {
   switch (type) {
     case 'email': return '📧'
     case 'wechat': return '💬'
-    case 'phone': return '📞'
+    case 'phone':
+    case 'mobile': return '📞'
     default: return '📞'
   }
 }
 
-async function handleContactClick(c: ContactInfo) {
-  if (!c.value) return
-  if (c.type === 'phone') {
-    const num = c.value.replace(/[^0-9\-]/g, '').replace(/-/g, '')
-    window.location.href = 'tel:' + num
-  } else if (c.type === 'email') {
-    window.location.href = 'mailto:' + c.value
-  } else {
-    try {
-      await copyText(c.value)
-      alert('已复制：' + c.value)
-    } catch {
-      alert('复制失败')
-    }
-  }
+function displayContactInfo(info: string): string {
+  return info.length > 25 ? info.substring(0, 25) + '...' : info
 }
 </script>

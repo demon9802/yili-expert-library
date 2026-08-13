@@ -143,28 +143,18 @@
           </div>
         </div>
 
-        <!-- 联系方式 -->
+        <!-- 联系方式 (V5: 多联系人依次显示为纯文本行) -->
         <div v-if="contacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
           <div
             v-for="(c, idx) in contacts"
             :key="idx"
-            class="detail-contact-line detail-text"
+            class="detail-text"
+            :style="{ marginBottom: contacts.length > 1 ? '6px' : '0' }"
           >
-            <span v-if="contacts.length > 1">联系人{{ idx + 1 }}：</span>
-            <span v-else>联系人：</span>
-            <span v-if="c.person" class="contact-person">{{ c.person }}</span>
-            <span v-if="c.info" class="contact-info">
-              <span class="contact-type-label">{{ typeLabel(c.type) }}：</span>
-              <span class="contact-value">{{ c.info }}</span>
-            </span>
-            <span class="contact-actions">
-              <button class="contact-action-btn" title="复制联系方式" @click="copyContact(c.info)">📋 复制</button>
-              <button v-if="c.type === 'phone'" class="contact-action-btn" title="拨号" @click="callPhone(c.info)">📞 拨号</button>
-              <button v-if="c.type === 'email'" class="contact-action-btn" title="发邮件" @click="sendEmail(c.info)">✉️ 邮件</button>
-            </span>
+            {{ contacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ c.person || '' }}<span v-if="c.info">，{{ typeLabel(c.type) }}：{{ c.info }}</span>
           </div>
-          <div v-if="expert.referrer" class="detail-text detail-referrer">
+          <div v-if="expert.referrer" class="detail-text" style="margin-top: 8px;">
             内部推荐人：{{ expert.referrer }}
           </div>
         </div>
@@ -228,12 +218,17 @@ const cooperationProjects = computed(() =>
 )
 
 const contacts = computed(() => {
-  const list: ContactInfo[] = props.expert.contacts || []
+  const list: ContactInfo[] = (props.expert.contacts || []).map(c => ({
+    ...c,
+    value: c.value || c.info || '',
+    info: c.info || c.value || '',
+  }))
   if (!list.length && props.expert.contactInfo) {
     list.push({
       type: props.expert.contactType || 'phone',
       label: typeLabel(props.expert.contactType || 'phone'),
       value: props.expert.contactInfo,
+      info: props.expert.contactInfo,
       person: props.expert.contactPerson,
     } as ContactInfo)
   }
@@ -244,7 +239,8 @@ function typeLabel(type?: string): string {
   switch (type) {
     case 'email': return '邮箱'
     case 'wechat': return '微信'
-    case 'phone': return '电话'
+    case 'phone':
+    case 'mobile': return '电话'
     default: return '联系方式'
   }
 }

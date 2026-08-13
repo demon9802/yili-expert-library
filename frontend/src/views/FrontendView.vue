@@ -237,9 +237,9 @@ const scoreValues: (number | null)[] = [null, 4, 3, 2]
 
 const sortOptions = [
   { id: 'default', name: '默认排序' },
-  { id: 'score', name: '评分最高' },
-  { id: 'name', name: '姓名排序' },
-  { id: 'cooperation', name: '合作最多' }
+  { id: 'overall', name: '按综合评分' },
+  { id: 'professional', name: '按专业度' },
+  { id: 'influence', name: '按影响力' }
 ]
 
 const supplierOptions = [

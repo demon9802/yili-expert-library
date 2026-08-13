@@ -49,7 +49,7 @@
 
           <!-- 分值分布 -->
           <div class="dashboard-card">
-            <h4>综合评分专家数量占比（7分及以上）</h4>
+            <h4>分值分布</h4>
             <div class="chart-container">
               <svg v-if="scoreTotal > 0" width="100%" height="100%" viewBox="0 0 360 250" preserveAspectRatio="xMidYMid meet">
                 <g v-for="(slice, idx) in scoreSlices" :key="idx">
@@ -86,12 +86,12 @@
               <div class="score-numeric-item">
                 <div class="label">专业度</div>
                 <div class="value blue">{{ avgScores.professional }}</div>
-                <div class="sub">满分10分</div>
+                <div class="sub">满分5分</div>
               </div>
               <div class="score-numeric-item">
                 <div class="label">影响力</div>
                 <div class="value amber">{{ avgScores.influence }}</div>
-                <div class="sub">满分10分</div>
+                <div class="sub">满分5分</div>
               </div>
               <div class="score-numeric-item">
                 <div class="label">综合评分</div>
@@ -150,15 +150,14 @@ function shortFieldName(name: string) {
   return name.length > 6 ? name.slice(0, 6) + '…' : name
 }
 
-// 分值分布（V5：7分及以上专家在各分值区间的数量占比）
+// 分值分布（V5.9.5 五星制：按综合评分区间统计活跃专家）
 const buckets = [
-  { label: '7.0-7.5分', min: 7.0, max: 7.5 },
-  { label: '7.5-8.0分', min: 7.5, max: 8.0 },
-  { label: '8.0-8.5分', min: 8.0, max: 8.5 },
-  { label: '8.5-9.0分', min: 8.5, max: 9.0 },
-  { label: '9.0分以上', min: 9.0, max: 999, includeMax: true }
+  { label: '4.5-5.0★', min: 4.5, max: 5.0, includeMax: true },
+  { label: '4.0-4.5★（不含4.5）', min: 4.0, max: 4.5 },
+  { label: '3.5-4.0★（不含4.0）', min: 3.5, max: 4.0 },
+  { label: '3.0-3.5★（不含3.5）', min: 3.0, max: 3.5 }
 ]
-const colors = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899']
+const colors = ['#22c55e', '#86efac', '#f59e0b', '#f97316']
 
 const scoredExperts = computed(() => activeExperts.value.filter(e => e.scores?.overall && e.scores.overall > 0))
 const scoreCounts = computed(() => buckets.map(b => {

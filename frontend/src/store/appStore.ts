@@ -111,20 +111,16 @@ export const useAppStore = defineStore('app', () => {
       )
     }
 
-    // 排序
+    // 排序（V5 默认排序/按综合评分/按专业度/按影响力）
     switch (currentSort.value) {
-      case 'score':
+      case 'overall':
         result.sort((a, b) => (b.scores?.overall || 0) - (a.scores?.overall || 0))
         break
-      case 'name':
-        result.sort((a, b) => a.name?.localeCompare(b.name || '') || 0)
+      case 'professional':
+        result.sort((a, b) => (b.scores?.professional || 0) - (a.scores?.professional || 0))
         break
-      case 'cooperation':
-        result.sort((a, b) => {
-          const aP = yiliProjects.value.filter(p => p.expertId === a.id).length
-          const bP = yiliProjects.value.filter(p => p.expertId === b.id).length
-          return bP - aP
-        })
+      case 'influence':
+        result.sort((a, b) => (b.scores?.influence || 0) - (a.scores?.influence || 0))
         break
       default:
         // default sort by sortOrder/id
