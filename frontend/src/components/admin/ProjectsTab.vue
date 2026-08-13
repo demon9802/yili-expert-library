@@ -8,6 +8,7 @@
     <div class="admin-toolbar">
       <div class="toolbar-main">
         <input v-model="searchQuery" type="search" placeholder="搜索项目名称..." class="search-input" />
+        <button class="btn btn-primary btn-small" @click="openCreate">+ 新建项目</button>
         <select v-model="filterYear" class="filter-select">
           <option value="">全部年度</option>
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
@@ -29,7 +30,6 @@
           <button class="btn btn-secondary btn-small" @click="exportProjects">导出Excel</button>
           <button class="btn btn-secondary btn-small" @click="exportProjectsCSV">导出CSV</button>
           <button class="btn btn-secondary btn-small" @click="showImportModal = true">导入Excel</button>
-          <button class="btn btn-primary btn-small" @click="openCreate">+ 新建项目</button>
         </div>
       </div>
       <div class="sort-row">
