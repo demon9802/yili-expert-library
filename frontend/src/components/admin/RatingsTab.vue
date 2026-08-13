@@ -198,7 +198,7 @@ import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
 import { autoScoreExpert } from '@/utils/scoring'
-import type { Expert, Scores } from '@/types'
+import type { Expert, Scores, SubScores } from '@/types'
 
 const store = useAppStore()
 const searchQuery = ref('')
@@ -214,6 +214,8 @@ const influenceItems = ['社会荣誉与奖项', '职称/管理履历与行业�
 
 type RatingDim = 'professional' | 'influence'
 type FiveItemScores = { professional: Record<string, number>; influence: Record<string, number> }
+
+type AutoScorePayload = { scores: Scores; subScores: SubScores }
 
 function round1(v: number) {
   return Math.round(v * 10) / 10
@@ -233,7 +235,7 @@ function avg(values: number[]) {
   return values.length ? values.reduce((s, n) => s + n, 0) / values.length : 2
 }
 
-function buildAutoScores(e: Expert): { scores: Scores; subScores: FiveItemScores } {
+function buildAutoScores(e: Expert): AutoScorePayload {
   const result = autoScoreExpert(e, store.yiliProjects)
   const titleScore = result.influenceItems['职称与专业头衔'] ?? 2
   const managementScore = result.influenceItems['管理履历与行业地位'] ?? 2
