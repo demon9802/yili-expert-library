@@ -25,15 +25,15 @@
     <section class="dashboard-section">
       <h4>数据统计导出</h4>
       <div class="export-actions">
-        <button class="btn btn-primary btn-sm" @click="exportImage">导出为图片</button>
-        <button class="btn btn-secondary btn-sm" @click="exportPDF">导出为PDF</button>
-        <button class="btn btn-secondary btn-sm" @click="exportCSV">导出统计数据CSV</button>
+        <button class="btn btn-primary btn-sm" @click="exportImage">导出图片</button>
+        <button class="btn btn-secondary btn-sm" @click="exportPDF">导出PDF</button>
+        <button class="btn btn-secondary btn-sm" @click="exportCSV">导出CSV</button>
       </div>
     </section>
 
     <section class="dashboard-section">
       <h4>实时预览</h4>
-      <div class="dashboard-grid">
+      <div ref="dashboardExportRef" class="dashboard-grid">
         <div v-if="visibleModules.fields" class="dashboard-card full">
           <h4>领域分布情况</h4>
           <div class="chart-container tall">
@@ -97,6 +97,8 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 import { useAppStore } from '@/store/appStore'
 import FieldChartInline from '@/components/FieldChartInline.vue'
 
@@ -162,6 +164,7 @@ const scoreDistItems = computed(() => {
 const scoreDistTotal = computed(() => activeExperts.value.length)
 
 const chartContainer = ref<HTMLElement | null>(null)
+const dashboardExportRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(400)
 
 function updateWidth() {
@@ -210,12 +213,55 @@ const scoreDistSlices = computed(() => {
   })
 })
 
-function exportImage() {
-  console.log('导出为图片需要接入 html2canvas 后生成图片文件')
+async function captureDashboard() {
+  if (!dashboardExportRef.value) return null
+  return html2canvas(dashboardExportRef.value, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true,
+  })
 }
 
-function exportPDF() {
-  console.log('导出为PDF需要接入 html2canvas 与 jspdf 后生成 PDF 文件')
+function downloadCanvasAsPNG(canvas: HTMLCanvasElement, filename: string) {
+  const link = document.createElement('a')
+  link.href = canvas.toDataURL('image/png')
+  link.download = filename
+  link.click()
+}
+
+function downloadCanvasAsPDF(canvas: HTMLCanvasElement, title: string, filename: string) {
+  const pdf = new jsPDF('p', 'mm', 'a4')
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 10
+  const headerHeight = 12
+  const contentWidth = pageWidth - margin * 2
+  const contentHeight = pageHeight - margin * 2 - headerHeight
+  const imgHeight = (canvas.height * contentWidth) / canvas.width
+  const imgData = canvas.toDataURL('image/png')
+  let renderedHeight = 0
+
+  while (renderedHeight < imgHeight) {
+    if (renderedHeight > 0) pdf.addPage()
+    pdf.setFontSize(14)
+    pdf.text(title, margin, margin + 4)
+    pdf.addImage(imgData, 'PNG', margin, margin + headerHeight - renderedHeight, contentWidth, imgHeight)
+    renderedHeight += contentHeight
+  }
+
+  pdf.save(filename)
+}
+
+async function exportImage() {
+  const canvas = await captureDashboard()
+  if (!canvas) return
+  downloadCanvasAsPNG(canvas, `仪表盘统计报告_${new Date().toISOString().slice(0, 10)}.png`)
+}
+
+async function exportPDF() {
+  const canvas = await captureDashboard()
+  if (!canvas) return
+  downloadCanvasAsPDF(canvas, '仪表盘统计报告', `仪表盘统计报告_${new Date().toISOString().slice(0, 10)}.pdf`)
 }
 
 function exportCSV() {
