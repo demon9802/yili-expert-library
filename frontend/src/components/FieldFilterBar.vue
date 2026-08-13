@@ -23,9 +23,13 @@
       </div>
       <button
         class="field-toggle-btn"
-        style="margin-left:8px"
+        style="margin-left:8px;display:inline-flex;align-items:center;gap:4px"
         @click="store.fieldsCollapsed = !store.fieldsCollapsed"
       >
+        <span
+          style="display:inline-block;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;transition:transform .2s"
+          :style="store.fieldsCollapsed ? 'border-top:4px solid currentColor' : 'border-bottom:4px solid currentColor'"
+        ></span>
         {{ store.fieldsCollapsed ? '展开' : '收起' }}
       </button>
     </div>

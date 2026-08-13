@@ -191,21 +191,35 @@ function satisfactionDisplay(sat: any) {
   return val.toFixed ? val.toFixed(1) : String(val)
 }
 
+// V5 卡片资历高亮：优先 qualDisplay，fallback 解析 qualifications
 const qualItems = computed(() => {
-  const items: string[] = []
-  if (props.expert.qualifications) {
-    items.push(...props.expert.qualifications.split(/[;；]/).filter(Boolean))
-  }
-  if (props.expert.qualDisplay) {
-    items.push(...props.expert.qualDisplay.split(/[;；]/).filter(Boolean))
+  const raw = String(props.expert.qualDisplay || props.expert.qualifications || '').trim()
+  if (!raw) return []
+  let items: string[] = []
+  if (raw.includes('\n')) {
+    items = raw.split('\n').map(s => s.trim()).filter(Boolean)
+  } else if (raw.includes('■')) {
+    items = raw.split('■').map(s => s.trim()).filter(Boolean)
+    items = items.map(it => {
+      const m = it.match(/】\s*(.+)/)
+      return m ? m[1].trim() : it
+    })
+  } else {
+    items = raw.split(/[;；]/).map(s => s.trim()).filter(Boolean)
   }
   return items.slice(0, 3)
 })
 
+// V5 卡片优势：优先 advDisplay，fallback 解析 advantages
 const advItems = computed(() => {
+  const raw = String(props.expert.advDisplay || '').trim()
+  if (raw) {
+    return raw.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4)
+      .map(item => item.replace(/^\d+[、，．.\s]*/, ''))
+  }
   if (!props.expert.advantages?.length) return []
   return props.expert.advantages.slice(0, 3).map(a => {
-    if (typeof a === 'string') return a
+    if (typeof a === 'string') return a.replace(/^\d+[、，．.\s]*/, '')
     const title = (a as any).title || ''
     const desc = (a as any).desc || ''
     return title && desc ? `${title}：${desc}` : (desc || title)

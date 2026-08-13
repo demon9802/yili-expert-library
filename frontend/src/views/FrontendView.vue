@@ -232,8 +232,8 @@ const isMobile = ref(false)
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
 
-const scoreLabels = ['全部', '4+', '3+', '2+']
-const scoreValues: (number | null)[] = [null, 4, 3, 2]
+const scoreLabels = ['全部', '5★', '4★+', '3★+', '2★+']
+const scoreValues: (number | null)[] = [null, 5, 4, 3, 2]
 
 const sortOptions = [
   { id: 'default', name: '默认排序' },

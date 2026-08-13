@@ -61,9 +61,10 @@
                     opacity="0.95"
                   />
                   <text
-                    v-if="slice.percent > 5"
+                    v-if="slice.percent >= 4"
                     :x="slice.labelX" :y="slice.labelY"
-                    text-anchor="middle" font-size="11" font-weight="700" fill="white"
+                    text-anchor="middle" font-size="12" font-weight="800" fill="white"
+                    style="text-shadow:0 1px 2px rgba(0,0,0,0.35); paint-order:stroke; stroke:#00000033; stroke-width:2px"
                   >{{ slice.percent.toFixed(1) }}%</text>
                 </g>
                 <text :x="cx" :y="cy - 6" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">{{ scoreTotal }}</text>

@@ -127,7 +127,8 @@ export const useAppStore = defineStore('app', () => {
         result.sort((a, b) => (b.scores?.influence || 0) - (a.scores?.influence || 0))
         break
       default:
-        // default sort by sortOrder/id
+        // V5 默认排序：按姓名首字母排序（不区分排名先后）
+        result.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-CN'))
         break
     }
 
