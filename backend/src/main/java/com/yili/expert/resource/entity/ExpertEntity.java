@@ -36,14 +36,12 @@ public class ExpertEntity {
     private String qualDisplay;
     private String advDisplay;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
     private String scores;
 
     private String status;
     private String observationStatus;
     private String observationDate;
 
-    @TableField(typeHandler = JacksonTypeHandler.class)
     private String contacts;
 
     private Integer sortOrder;

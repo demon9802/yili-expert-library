@@ -37,13 +37,6 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!-- Spring Cloud Bootstrap (支持 bootstrap.yml) -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-bootstrap</artifactId>
-            <version>3.1.8</version>
-        </dependency>
-
         <!-- MyBatis-Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>
@@ -105,6 +98,10 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- 强制服务端口为 8080，避免外部进程/环境变量（如 WorkBuddy 注入的 SERVER__PORT=0）覆盖 -->
+                    <arguments>
+                        <argument>--server.port=8080</argument>
+                    </arguments>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
