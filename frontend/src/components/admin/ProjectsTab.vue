@@ -25,8 +25,19 @@
         <option value="hidden">不显示</option>
         <option value="pending">待关联</option>
       </select>
-      <button class="btn btn-secondary" @click="exportProjects">📥 导出Excel</button>
-      <button class="btn btn-secondary" @click="triggerImport">📤 导入Excel</button>
+      <div class="sort-buttons" role="group" aria-label="项目排序">
+        <button
+          v-for="option in sortOptions"
+          :key="option.value"
+          class="sort-btn"
+          :class="{ active: sortMode === option.value }"
+          @click="sortMode = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <button class="btn btn-secondary" @click="exportProjects">导出</button>
+      <button class="btn btn-secondary" @click="triggerImport">导入</button>
       <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="onImportFile" />
     </div>
 
@@ -168,6 +179,14 @@ const searchQuery = ref('')
 const filterYear = ref('')
 const filterQuarter = ref('')
 const filterVisibility = ref('')
+const sortMode = ref<'default' | 'name' | 'year' | 'month'>('default')
+
+const sortOptions = [
+  { value: 'default' as const, label: '默认（年份▼）' },
+  { value: 'name' as const, label: '项目名称 A-Z' },
+  { value: 'year' as const, label: '年份▼' },
+  { value: 'month' as const, label: '月份（年分组）' },
+]
 
 const projects = computed(() => store.yiliProjects)
 
@@ -190,8 +209,29 @@ const filteredProjects = computed(() => {
     const q = searchQuery.value.trim().toLowerCase()
     list = list.filter(p => (p.title || '').toLowerCase().includes(q))
   }
-  return list.sort((a, b) => (b.year || 0) - (a.year || 0))
+  return sortProjects(list)
 })
+
+function sortProjects(list: Project[]) {
+  return [...list].sort((a, b) => {
+    switch (sortMode.value) {
+      case 'name':
+        return (a.title || '').localeCompare(b.title || '', 'zh-CN')
+      case 'month': {
+        const yearDiff = (b.year || 0) - (a.year || 0)
+        if (yearDiff !== 0) return yearDiff
+        return (b.month || 0) - (a.month || 0)
+      }
+      case 'year':
+      case 'default':
+      default: {
+        const yearDiff = (b.year || 0) - (a.year || 0)
+        if (yearDiff !== 0) return yearDiff
+        return (b.month || 0) - (a.month || 0)
+      }
+    }
+  })
+}
 
 const stats = computed(() => {
   const list = projects.value
@@ -350,6 +390,10 @@ function onImportFile(e: Event) {
 .search-input { flex: 1; max-width: 280px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
 .search-input:focus { outline: none; border-color: var(--primary); }
 .filter-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface); min-width: 120px; }
+.sort-buttons { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.sort-btn { border: 0; background: transparent; color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.sort-btn:hover { background: var(--bg); color: var(--text); }
+.sort-btn.active { background: var(--primary); color: #fff; }
 
 .table-scroll-wrapper { overflow: auto; max-height: 55vh; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
