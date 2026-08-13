@@ -23,7 +23,7 @@ public class ExpertEntity {
     private List<String> fields;
 
     @TableField(typeHandler = JacksonTypeHandler.class)
-    private List<String> advantages;
+    private List<Object> advantages;
 
     private String education;
     private String qualifications;

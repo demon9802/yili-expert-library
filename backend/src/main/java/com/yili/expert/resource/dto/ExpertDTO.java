@@ -11,7 +11,7 @@ public class ExpertDTO {
     private Long id;
     private String name;
     private List<String> fields;
-    private List<String> advantages;
+    private List<Object> advantages;
     private String education;
     private String qualifications;
     private String courses;
