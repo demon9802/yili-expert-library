@@ -9,18 +9,11 @@
         class="search-input"
       />
       <button class="btn primary" @click="openCreate">+ 新增专家</button>
-      <button class="btn secondary" @click="exportExperts">📥 导出</button>
-      <button class="btn secondary" @click="triggerImport">📤 导入</button>
-      <input
-        ref="importFileInput"
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        style="display: none"
-        @change="onImportFile"
-      />
+      <button class="btn secondary" @click="exportExperts">导出Excel</button>
+      <button class="btn secondary" @click="triggerImport">导入</button>
     </div>
 
-    <!-- Filter row (含「排序一行」) -->
+    <!-- Filter row -->
     <div class="admin-filter-row">
       <span class="filter-label">领域：</span>
       <select v-model="filterField" class="filter-select">
@@ -28,23 +21,26 @@
         <option v-for="f in store.fields" :key="f.name" :value="f.name">{{ f.name }}</option>
       </select>
 
-      <span class="filter-label">排序：</span>
-      <select v-model="filterSort" class="filter-select">
-        <option value="">默认（姓名）</option>
-        <option v-for="o in sortOptions" :key="o.id" :value="o.id">{{ o.name }}</option>
-      </select>
-
       <span class="filter-label">评分：</span>
-      <select v-model="filterScore" class="filter-select">
-        <option value="">全部评分</option>
-        <option value="4.5">4.5★及以上</option>
-        <option value="4.0">4.0★及以上</option>
-        <option value="3.5">3.5★及以上</option>
-        <option value="3.0">3.0★及以上</option>
-        <option value="2.5">2.5★及以上</option>
-        <option value="2.0">2.0★及以上</option>
-        <option value="1.0">1.0★及以上</option>
-      </select>
+      <div class="score-range-filter">
+        <input
+          v-model.number="filterScoreMin"
+          type="number"
+          step="0.1"
+          min="0"
+          max="5"
+          placeholder="最低 ★"
+        />
+        <span>-</span>
+        <input
+          v-model.number="filterScoreMax"
+          type="number"
+          step="0.1"
+          min="0"
+          max="5"
+          placeholder="最高 ★"
+        />
+      </div>
 
       <span class="filter-label">状态：</span>
       <select v-model="filterStatus" class="filter-select">
@@ -55,6 +51,19 @@
       </select>
 
       <button class="btn clear-btn" @click="clearFilters">清除筛选</button>
+    </div>
+
+    <div class="admin-sort-row">
+      <span class="filter-label">排序：</span>
+      <button
+        v-for="option in adminSortOptions"
+        :key="option.id"
+        class="sort-pill"
+        :class="{ active: filterSort === option.id }"
+        @click="filterSort = option.id"
+      >
+        {{ option.name }}
+      </button>
     </div>
 
     <!-- Table -->
@@ -140,10 +149,10 @@
         <label>突出优势（每行一条，用■开头，如：■行业经验：20年乳业咨询）</label>
         <textarea v-model="advantagesText" rows="3" placeholder="■行业经验：20年乳业咨询经验"></textarea>
 
-        <label>🃏 专家卡优势概括（1-3条，每行一条，显示在专家卡片上）</label>
+        <label>专家卡优势概括（1-3条，每行一条，显示在专家卡片上）</label>
         <textarea v-model="form.advDisplay" rows="2" placeholder="例：供应链管理专家，10年供应链管理经历"></textarea>
 
-        <label>🃏 专家卡资历概括（1-3条，每行一条，显示在专家卡片上）</label>
+        <label>专家卡资历概括（1-3条，每行一条，显示在专家卡片上）</label>
         <textarea v-model="form.qualDisplay" rows="2" placeholder="例：智篆商业智库专家"></textarea>
 
         <!-- 资历资质（子标题 + 内容，可增删） -->
@@ -155,6 +164,8 @@
               <option v-if="pair.subtitle && !qualSubtitleOptions.includes(pair.subtitle)" :value="pair.subtitle">{{ pair.subtitle }}</option>
             </select>
             <input v-model="pair.content" class="repeat-input" placeholder="请填写内容" />
+            <button type="button" class="row-move" :disabled="idx === 0" @click="moveQual(idx, -1)">↑</button>
+            <button type="button" class="row-move" :disabled="idx === qualPairs.length - 1" @click="moveQual(idx, 1)">↓</button>
             <button type="button" class="row-del" @click="removeQual(idx)">✕</button>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" @click="addQual">+ 添加资历项</button>
@@ -170,7 +181,7 @@
         </div>
 
         <!-- 联系方式（多联系人） -->
-        <div class="detail-section-title" style="margin-top:16px">📋 联系方式</div>
+        <div class="detail-section-title" style="margin-top:16px">联系方式</div>
         <div class="repeat-list">
           <div v-for="(c, idx) in contacts" :key="'m' + idx" class="repeat-row">
             <input v-model="c.person" class="repeat-input" placeholder="联系人姓名" />
@@ -187,6 +198,22 @@
 
         <label>内部推荐人<input v-model="form.referrer" /></label>
 
+        <div class="project-collapse">
+          <button type="button" class="project-toggle" @click="showProjectPanel = !showProjectPanel">
+            合作项目（{{ currentExpertProjects.length }}）
+            <span>{{ showProjectPanel ? '收起 ▲' : '展开 ▼' }}</span>
+          </button>
+          <div v-if="showProjectPanel" class="project-list">
+            <div v-for="p in currentExpertProjects" :key="p.id" class="project-item">
+              <div class="project-title">{{ p.title || '未命名项目' }}</div>
+              <div class="project-meta">
+                {{ p.year || '-' }}{{ p.month ? '年' + String(p.month).padStart(2, '0') + '月' : '年' }}
+              </div>
+            </div>
+            <div v-if="currentExpertProjects.length === 0" class="project-empty">暂无合作项目</div>
+          </div>
+        </div>
+
         <label>评分（0-5★，可手动调整）</label>
         <div class="form-row">
           <label>专业度<input v-model.number="form.scores.professional" type="number" step="0.1" min="0" max="5" /></label>
@@ -202,11 +229,53 @@
           </select>
         </label>
 
+        <label>录入信息</label>
+        <div class="form-row readonly-row">
+          <label>录入时间<input :value="form.createdAt ? formatDate(form.createdAt) : '-'" readonly /></label>
+          <label>录入者<input :value="form.createdBy || '主管理员'" readonly /></label>
+        </div>
+
         <div class="modal-actions">
-          <button class="btn primary" type="submit">保存</button>
+          <button class="btn primary" type="submit">保存修改</button>
           <button class="btn" type="button" @click="closeModal">取消</button>
         </div>
       </form>
+    </div>
+
+    <div v-if="showImportModal" class="modal-mask" @click.self="closeImportModal">
+      <div class="import-modal-card">
+        <h3>批量导入专家数据</h3>
+        <div class="import-step">
+          <div class="step-index">①</div>
+          <div class="step-content">
+            <div class="step-title">下载导入模板</div>
+            <p>请先下载标准 Excel 模板，按字段填写专家信息后再上传。</p>
+            <button type="button" class="btn secondary" @click="downloadImportTemplate">下载导入模板</button>
+          </div>
+        </div>
+        <div class="import-step">
+          <div class="step-index">②</div>
+          <div class="step-content">
+            <div class="step-title">选择文件并导入</div>
+            <p>系统自动检测重复专家（基于姓名），由管理员确认后处理。导入不会覆盖已有数据。</p>
+            <div class="import-file-row">
+              <button type="button" class="btn secondary" @click="importFileInput?.click()">选择文件</button>
+              <span class="import-file-name">{{ importFileName || '未选择文件' }}</span>
+            </div>
+            <input
+              ref="importFileInput"
+              type="file"
+              accept=".xlsx,.xls"
+              style="display: none"
+              @change="onImportFileSelected"
+            />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn primary" type="button" :disabled="!pendingImportFile" @click="uploadImportFile">上传并导入</button>
+          <button class="btn" type="button" @click="closeImportModal">取消</button>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -214,25 +283,35 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useAppStore } from '@/store/appStore'
-import type { Expert, Scores, ContactInfo } from '@/types'
+import type { Expert, Scores, ContactInfo, Project } from '@/types'
 import { formatDate } from '@/utils/helpers'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
 const importFileInput = ref<HTMLInputElement | null>(null)
+const showImportModal = ref(false)
+const pendingImportFile = ref<File | null>(null)
+const importFileName = ref('')
 
 // ===== Filters (local, reset on tab switch) =====
 const filterField = ref('')
-const filterSort = ref('')
-const filterScore = ref('')
+const filterSort = ref('default')
+const filterScoreMin = ref<number | null>(null)
+const filterScoreMax = ref<number | null>(null)
 const filterStatus = ref('')
 
-const sortOptions = computed(() => store.sortOptions)
+const adminSortOptions = [
+  { id: 'default', name: '默认（姓名）' },
+  { id: 'overall', name: '综合评分 ▼' },
+  { id: 'createdAt', name: '录入时间 ▼' },
+  { id: 'nameAsc', name: '姓名 A-Z' },
+]
 
 function clearFilters() {
   filterField.value = ''
-  filterSort.value = ''
-  filterScore.value = ''
+  filterSort.value = 'default'
+  filterScoreMin.value = null
+  filterScoreMax.value = null
   filterStatus.value = ''
 }
 
@@ -241,9 +320,11 @@ const filteredExperts = computed(() => {
   const q = store.adminSearchQuery.trim().toLowerCase()
   if (q) list = list.filter(e => e.name?.toLowerCase().includes(q))
   if (filterField.value) list = list.filter(e => (e.fields || []).includes(filterField.value))
-  if (filterScore.value) {
-    const min = parseFloat(filterScore.value)
-    list = list.filter(e => e.scores?.overall != null && e.scores.overall >= min)
+  if (filterScoreMin.value != null) {
+    list = list.filter(e => e.scores?.overall != null && e.scores.overall >= Number(filterScoreMin.value))
+  }
+  if (filterScoreMax.value != null) {
+    list = list.filter(e => e.scores?.overall != null && e.scores.overall <= Number(filterScoreMax.value))
   }
   if (filterStatus.value) {
     list = list.filter(
@@ -256,9 +337,8 @@ const filteredExperts = computed(() => {
   const arr = [...list]
   const sort = filterSort.value
   if (sort === 'overall') arr.sort((a, b) => (b.scores?.overall ?? 0) - (a.scores?.overall ?? 0))
-  else if (sort === 'professional') arr.sort((a, b) => (b.scores?.professional ?? 0) - (a.scores?.professional ?? 0))
-  else if (sort === 'influence') arr.sort((a, b) => (b.scores?.influence ?? 0) - (a.scores?.influence ?? 0))
-  else arr.sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+  else if (sort === 'createdAt') arr.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+  else arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'))
   return arr
 })
 
@@ -327,6 +407,12 @@ function exportExperts() {
       适用领域: (e.fields || []).join('、'),
       学历: e.education || '',
       核心优势: (e.advantages || []).map(a => typeof a === 'string' ? a : `${a.title || ''}：${a.desc || ''}`).join('\n'),
+      专家卡优势概括: e.advDisplay || '',
+      专家卡资历概括: e.qualDisplay || '',
+      资历资质: e.qualifications || '',
+      参考案例: e.courses || '',
+      库内供应商: e.isSupplier ? '是' : '否',
+      内部推荐人: e.referrer || '',
       专业度: e.scores?.professional ?? '',
       影响力: e.scores?.influence ?? '',
       综合评分: e.scores?.overall ?? '',
@@ -344,27 +430,72 @@ function exportExperts() {
 }
 
 function triggerImport() {
-  importFileInput.value?.click()
+  showImportModal.value = true
 }
 
-function onImportFile(e: Event) {
+function closeImportModal() {
+  showImportModal.value = false
+  pendingImportFile.value = null
+  importFileName.value = ''
+  if (importFileInput.value) importFileInput.value.value = ''
+}
+
+function onImportFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+  const file = input.files?.[0] || null
+  pendingImportFile.value = file
+  importFileName.value = file?.name || ''
+}
+
+function downloadImportTemplate() {
+  const rows = [
+    {
+      姓名: '',
+      适用领域: '',
+      学历: '',
+      库内供应商: '否',
+      核心优势: '■行业经验：',
+      专家卡优势概括: '',
+      专家卡资历概括: '',
+      资历资质: '【职称/荣誉头衔】\n【社会职务】\n【履历资历】',
+      参考案例: '【核心课程】\n【服务经历】',
+      联系人: '',
+      联系方式: '',
+      内部推荐人: '',
+      专业度: '',
+      影响力: '',
+      综合评分: '',
+      状态: '正常',
+    },
+  ]
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '导入模板')
+  XLSX.writeFile(wb, '专家导入模板.xlsx')
+}
+
+function uploadImportFile() {
+  if (!pendingImportFile.value) return
+  importExpertsFromFile(pendingImportFile.value)
+}
+
+function importExpertsFromFile(file: File) {
   const reader = new FileReader()
   reader.onload = async () => {
     try {
       const wb = XLSX.read(reader.result as ArrayBuffer, { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
       let ok = 0
       let fail = 0
+      let skipped = 0
       for (const r of rows) {
         const name = String(r['姓名'] || r['name'] || '').trim()
         if (!name) { fail++; continue }
+        if (store.experts.some(e => e.name === name)) { skipped++; continue }
         const fields = String(r['适用领域'] || r['fields'] || '')
           .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
-        const advantages = String(r['核心优势'] || r['advantages'] || '')
+        const advantages = String(r['核心优势'] || r['突出优势'] || r['advantages'] || '')
           .split('\n').map((s: string) => s.trim()).filter(Boolean)
         const contactsRaw = String(r['联系方式'] || r['contactInfo'] || '')
         const contacts: ContactInfo[] = contactsRaw
@@ -377,6 +508,8 @@ function onImportFile(e: Event) {
           fields,
           education: String(r['学历'] || r['education'] || ''),
           advantages,
+          advDisplay: String(r['专家卡优势概括'] || r['advDisplay'] || ''),
+          qualDisplay: String(r['专家卡资历概括'] || r['qualDisplay'] || ''),
           qualifications: String(r['资历资质'] || r['qualifications'] || ''),
           courses: String(r['参考案例'] || r['courses'] || ''),
           contacts,
@@ -396,17 +529,15 @@ function onImportFile(e: Event) {
           await store.saveExpert(payload)
           ok++
         } catch {
-          // 后端不可用时降级到本地，保证数据落地
           store.experts.push({ ...payload, id: -Date.now() - ok } as Expert)
           store.persistLocal()
           ok++
         }
       }
-      window.alert(`成功导入 ${ok} 条专家${fail ? `，${fail} 条因缺少姓名跳过` : ''}`)
+      window.alert(`成功导入 ${ok} 条专家${skipped ? `，${skipped} 条重复姓名已跳过` : ''}${fail ? `，${fail} 条因缺少姓名跳过` : ''}`)
+      closeImportModal()
     } catch (err) {
       window.alert('导入失败：' + (err as Error).message)
-    } finally {
-      input.value = ''
     }
   }
   reader.readAsArrayBuffer(file)
@@ -439,6 +570,14 @@ const emptyForm = (): Partial<Expert> & { scores: Scores } => ({
 })
 
 const form = reactive<Partial<Expert> & { scores: Scores }>(emptyForm())
+const showProjectPanel = ref(false)
+
+const currentExpertProjects = computed<Project[]>(() => {
+  if (!form.id) return []
+  return store.yiliProjects
+    .filter(p => p.expertId === form.id)
+    .sort((a, b) => (b.year || 0) - (a.year || 0) || (b.month || 0) - (a.month || 0))
+})
 
 function parsePairs(text?: string): { subtitle: string; content: string }[] {
   if (!text) return []
@@ -453,6 +592,7 @@ function parsePairs(text?: string): { subtitle: string; content: string }[] {
 
 function resetForm(data: Partial<Expert> = emptyForm()) {
   Object.assign(form, emptyForm(), data, { fields: [...(data.fields || [])] })
+  showProjectPanel.value = false
   advantagesText.value = (data.advantages || [])
     .map(a => (typeof a === 'string' ? a : a.title && a.desc ? `${a.title}：${a.desc}` : a.desc || a.title || ''))
     .join('\n')
@@ -466,6 +606,13 @@ function resetForm(data: Partial<Expert> = emptyForm()) {
 }
 
 function addQual() { qualPairs.value.push({ subtitle: '职称/荣誉头衔', content: '' }) }
+function moveQual(idx: number, dir: -1 | 1) {
+  const next = idx + dir
+  if (next < 0 || next >= qualPairs.value.length) return
+  const item = qualPairs.value[idx]
+  qualPairs.value.splice(idx, 1)
+  qualPairs.value.splice(next, 0, item)
+}
 function removeQual(idx: number) {
   qualPairs.value.splice(idx, 1)
   if (qualPairs.value.length === 0) qualPairs.value.push({ subtitle: '职称/荣誉头衔', content: '' })
@@ -601,6 +748,48 @@ async function removeExpert(expert: Expert) {
   color: var(--text-secondary);
   background: var(--bg);
 }
+.score-range-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 176px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.score-range-filter input {
+  width: 66px;
+  border: 0;
+  outline: 0;
+  padding: 1px 0;
+  font-size: 12px;
+  background: transparent;
+}
+.admin-sort-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.sort-pill {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.sort-pill.active,
+.sort-pill:hover {
+  border-color: var(--primary);
+  background: var(--primary-light, #dbeafe);
+  color: var(--primary);
+  font-weight: 600;
+}
 
 /* Data table */
 .table-scroll-wrapper {
@@ -694,12 +883,21 @@ async function removeExpert(expert: Expert) {
   background: rgb(0 0 0 / 35%);
 }
 .modal-card {
-  width: min(720px, 92vw);
+  width: min(860px, 94vw);
   max-height: 88vh;
   overflow: auto;
   padding: 20px;
   border-radius: 8px;
   background: #fff;
+}
+.import-modal-card {
+  width: min(620px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 22px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgb(15 23 42 / 24%);
 }
 .modal-card h3 {
   margin-top: 0;
@@ -740,8 +938,9 @@ async function removeExpert(expert: Expert) {
 .field-chip {
   padding: 4px 10px;
   border-radius: 16px;
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 1px solid var(--chip, var(--border));
+  color: #374151;
+  background: color-mix(in srgb, var(--chip, #64748b) 12%, #fff);
 }
 .field-chip:has(input:checked) {
   background: color-mix(in srgb, var(--chip) 16%, #fff);
@@ -762,6 +961,11 @@ async function removeExpert(expert: Expert) {
   flex-shrink: 0; padding: 6px 10px; border: 1px solid #fecaca; border-radius: 6px;
   background: #fef2f2; color: #dc2626; cursor: pointer; font-size: 12px;
 }
+.row-move {
+  flex-shrink: 0; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px;
+  background: #eff6ff; color: #2563eb; cursor: pointer; font-size: 12px;
+}
+.row-move:disabled { opacity: 0.45; cursor: not-allowed; }
 .row-del:hover { background: #fee2e2; }
 .repeat-block { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--bg); }
 .repeat-subtitle {
@@ -795,4 +999,50 @@ async function removeExpert(expert: Expert) {
   margin-top: 16px;
   text-align: right;
 }
+.project-collapse {
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.project-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.project-list { padding: 10px 12px; display: grid; gap: 8px; }
+.project-item { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.project-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.project-meta, .project-empty { font-size: 12px; color: var(--text-secondary); }
+.readonly-row input { background: #f8fafc; color: var(--text-secondary); }
+.import-step {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.import-step:first-of-type { border-top: 0; }
+.step-index {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-light, #dbeafe);
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.step-title { font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.step-content p { margin: 4px 0 10px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.import-file-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.import-file-name { font-size: 12px; color: var(--text-secondary); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
 </style>
