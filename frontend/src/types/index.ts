@@ -103,6 +103,7 @@ export interface UserDTO {
   hasSecurityQuestions: boolean
   forcePasswordChange: boolean
   createdAt: string
+  lastLoginAt?: string
   permissions?: string[]
   extra?: Record<string, any>
 }

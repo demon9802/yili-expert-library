@@ -2,30 +2,28 @@
   <section class="admin-tab">
     <div class="admin-toolbar">
       <h3>用户管理</h3>
-      <button class="btn" @click="loadUsers">刷新</button>
+      <button class="btn btn-secondary btn-sm" @click="loadUsers">刷新</button>
     </div>
 
     <p v-if="message" class="message">{{ message }}</p>
     <table class="admin-table">
       <thead>
         <tr>
-          <th>邮箱</th>
-          <th>管理员</th>
-          <th>已设密保</th>
-          <th>强制改密</th>
+          <th>账号</th>
+          <th>注册时间</th>
+          <th>最近登录时间</th>
           <th>操作</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="user in normalUsers" :key="user.id">
-          <td>{{ user.email }}</td>
-          <td>{{ user.isAdmin ? '是' : '否' }}</td>
-          <td>{{ user.hasSecurityQuestions ? '是' : '否' }}</td>
-          <td>{{ user.forcePasswordChange ? '是' : '否' }}</td>
-          <td><button class="btn" @click="resetPassword(user)">重置密码</button></td>
+          <td class="col-account">{{ user.email }}</td>
+          <td>{{ formatDateTime(user.createdAt) || '—' }}</td>
+          <td>{{ formatDateTime(user.lastLoginAt ?? null) || '—' }}</td>
+          <td><button class="btn btn-secondary btn-sm" @click="resetPassword(user)">重置密码</button></td>
         </tr>
         <tr v-if="normalUsers.length === 0 && !loading">
-          <td colspan="5" class="empty">暂无普通用户</td>
+          <td colspan="4" class="empty">暂无普通用户</td>
         </tr>
       </tbody>
     </table>
@@ -36,6 +34,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { authApi } from '@/api/auth'
+import { formatDateTime } from '@/utils/helpers'
 import type { UserDTO } from '@/types'
 
 const users = ref<UserDTO[]>([])
@@ -68,8 +67,18 @@ onMounted(loadUsers)
 <style scoped>
 .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .admin-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
-.empty { text-align: center; color: #888; }
-.message { color: #059669; }
-.btn { margin-right: 8px; padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; }
+th, td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; text-align: left; font-size: 13px; }
+th { background: var(--bg, #f8fafc); font-weight: 600; color: var(--text-secondary, #64748b); }
+.col-account { font-weight: 500; color: var(--text, #1e293b); }
+.empty { text-align: center; color: #888; padding: 24px; }
+.message { color: #059669; font-size: 13px; }
+
+/* 与平台统一按钮风格 */
+.btn { border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1.2; white-space: nowrap; }
+.btn-sm { padding: 6px 10px; }
+.btn-primary { background: #2563eb; color: #fff; border: 1px solid #2563eb; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #fff; color: var(--text-secondary, #64748b); border: 1px solid var(--border, #e2e8f0); }
+.btn-secondary:hover { background: var(--bg, #f8fafc); color: var(--text, #1e293b); }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
 </style>
