@@ -232,8 +232,8 @@ const isMobile = ref(false)
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
 
-const scoreLabels = ['全部', '9+', '8+', '7+']
-const scoreValues: (number | null)[] = [null, 9, 8, 7]
+const scoreLabels = ['全部', '4+', '3+', '2+']
+const scoreValues: (number | null)[] = [null, 4, 3, 2]
 
 const sortOptions = [
   { id: 'default', name: '默认排序' },
@@ -265,7 +265,7 @@ const updateTimeText = computed(() => {
 })
 
 const activeExpertCount = computed(() =>
-  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 7).length
+  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 3).length
 )
 
 const userName = computed(() => {

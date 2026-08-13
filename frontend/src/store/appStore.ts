@@ -60,8 +60,8 @@ export const useAppStore = defineStore('app', () => {
     // 基础过滤：排除已淘汰专家（V5 getFilteredExperts 逻辑）
     let result = experts.value.filter(e => e.status !== 'eliminated')
 
-    // 评分筛选：默认 >=7（V5 观察库阈值），有显式筛选时用显式值
-    const minScore = scoreFilter.value !== null ? scoreFilter.value : 7
+    // 评分筛选：默认 >=3（V5.9.5 五星制观察库阈值：综合<3★不展示），有显式筛选时用显式值
+    const minScore = scoreFilter.value !== null ? scoreFilter.value : 3
     result = result.filter(e => {
       const overall = e.scores?.overall
       if (overall === null || overall === undefined) return false

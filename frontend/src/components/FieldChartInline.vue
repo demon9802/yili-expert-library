@@ -68,7 +68,7 @@ import { useAppStore } from '@/store/appStore'
 const store = useAppStore()
 
 const activeExperts = computed(() =>
-  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 7)
+  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 3)
 )
 
 const fieldStats = computed(() => {

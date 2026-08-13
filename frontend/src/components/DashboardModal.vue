@@ -114,7 +114,7 @@ const emit = defineEmits<{ close: [] }>()
 const store = useAppStore()
 
 const activeExperts = computed(() =>
-  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 7)
+  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 3)
 )
 
 // 领域分布
