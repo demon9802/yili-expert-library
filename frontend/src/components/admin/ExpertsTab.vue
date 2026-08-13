@@ -10,7 +10,8 @@
       />
       <button class="btn primary" @click="openCreate">+ 新增专家</button>
       <button class="btn secondary" @click="exportExperts">导出Excel</button>
-      <button class="btn secondary" @click="triggerImport">导入</button>
+      <button class="btn secondary" @click="exportExpertsCSV">导出CSV</button>
+      <button class="btn secondary" @click="triggerImport">导入Excel</button>
     </div>
 
     <!-- Filter row -->
@@ -87,7 +88,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="e in filteredExperts" :key="e.id">
+          <tr v-for="e in paginatedExperts" :key="e.id">
             <td class="cell-name">{{ e.name }}</td>
             <td :title="(e.fields || []).join('、')">{{ (e.fields || []).join('、') || '-' }}</td>
             <td :title="e.education || ''" class="cell-clamp">{{ e.education || '-' }}</td>
@@ -120,7 +121,24 @@
         </tbody>
       </table>
     </div>
-    <div class="record-count">共 {{ filteredExperts.length }} 条记录</div>
+    <div class="record-count">
+      <span>共 {{ filteredExperts.length }} 条记录</span>
+      <div v-if="totalPages > 1" class="pagination">
+        <button class="btn btn-sm" type="button" :disabled="currentPage === 1" @click="currentPage--">上一页</button>
+        <button
+          v-for="page in totalPages"
+          :key="page"
+          class="page-btn"
+          :class="{ active: currentPage === page }"
+          type="button"
+          @click="currentPage = page"
+        >
+          {{ page }}
+        </button>
+        <button class="btn btn-sm" type="button" :disabled="currentPage === totalPages" @click="currentPage++">下一页</button>
+        <span>第 {{ currentPage }} / {{ totalPages }} 页</span>
+      </div>
+    </div>
 
     <!-- Create / Edit Modal (V5 结构) -->
     <div v-if="showModal" class="modal-mask" @click.self="closeModal">
@@ -214,13 +232,6 @@
           </div>
         </div>
 
-        <label>评分（0-5★，可手动调整）</label>
-        <div class="form-row">
-          <label>专业度<input v-model.number="form.scores.professional" type="number" step="0.1" min="0" max="5" /></label>
-          <label>影响力<input v-model.number="form.scores.influence" type="number" step="0.1" min="0" max="5" /></label>
-          <label>综合评分<input v-model.number="form.scores.overall" type="number" step="0.1" min="0" max="5" /></label>
-        </div>
-
         <label>状态
           <select v-model="form.status">
             <option value="active">正常</option>
@@ -281,7 +292,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Scores, ContactInfo, Project } from '@/types'
 import { formatDate } from '@/utils/helpers'
@@ -304,8 +315,10 @@ const adminSortOptions = [
   { id: 'default', name: '默认（姓名）' },
   { id: 'overall', name: '综合评分 ▼' },
   { id: 'createdAt', name: '录入时间 ▼' },
-  { id: 'nameAsc', name: '姓名 A-Z' },
 ]
+
+const pageSize = 10
+const currentPage = ref(1)
 
 function clearFilters() {
   filterField.value = ''
@@ -333,13 +346,23 @@ const filteredExperts = computed(() => {
         (filterStatus.value === 'observation' && (e.status === 'observation' || e.observationStatus))
     )
   }
-  // 「排序一行」：按选定维度排序
   const arr = [...list]
   const sort = filterSort.value
   if (sort === 'overall') arr.sort((a, b) => (b.scores?.overall ?? 0) - (a.scores?.overall ?? 0))
   else if (sort === 'createdAt') arr.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   else arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'))
   return arr
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredExperts.value.length / pageSize)))
+const paginatedExperts = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredExperts.value.slice(start, start + pageSize)
+})
+
+watch(filteredExperts, () => {
+  currentPage.value = Math.min(currentPage.value, totalPages.value)
+  if (currentPage.value < 1) currentPage.value = 1
 })
 
 // ===== Display helpers =====
@@ -398,6 +421,22 @@ function statusInfo(e: Expert): { label: string; color: string } {
 }
 
 // ===== Export / Import (Excel) =====
+function scoreForExport(v: number | null | undefined): number | '' {
+  return v == null ? '' : Math.round(v * 10) / 10
+}
+
+function applyScoreFormat(ws: XLSX.WorkSheet, rows: Record<string, unknown>[]) {
+  const scoreHeaders = ['专业度', '影响力', '综合评分']
+  scoreHeaders.forEach(header => {
+    const colIndex = Object.keys(rows[0] || {}).indexOf(header)
+    if (colIndex === -1) return
+    for (let rowIndex = 2; rowIndex <= rows.length + 1; rowIndex++) {
+      const cell = ws[XLSX.utils.encode_cell({ c: colIndex, r: rowIndex - 1 })]
+      if (cell && typeof cell.v === 'number') cell.z = '0.0'
+    }
+  })
+}
+
 function exportExperts() {
   const rows = filteredExperts.value.map(e => {
     const contacts = getContactList(e)
@@ -413,9 +452,9 @@ function exportExperts() {
       参考案例: e.courses || '',
       库内供应商: e.isSupplier ? '是' : '否',
       内部推荐人: e.referrer || '',
-      专业度: e.scores?.professional ?? '',
-      影响力: e.scores?.influence ?? '',
-      综合评分: e.scores?.overall ?? '',
+      专业度: scoreForExport(e.scores?.professional),
+      影响力: scoreForExport(e.scores?.influence),
+      综合评分: scoreForExport(e.scores?.overall),
       联系人: contacts.map(c => c.person).join('、') || '',
       联系方式: contactStr,
       状态: statusInfo(e).label,
@@ -424,9 +463,52 @@ function exportExperts() {
     }
   })
   const ws = XLSX.utils.json_to_sheet(rows)
+  applyScoreFormat(ws, rows)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '专家')
   XLSX.writeFile(wb, `专家库导出-${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+function exportExpertsCSV() {
+  const headers = [
+    '姓名', '适用领域', '学历', '核心优势', '专家卡优势概括', '专家卡资历概括', '资历资质', '参考案例',
+    '库内供应商', '内部推荐人', '专业度', '影响力', '综合评分', '联系人', '联系方式', '状态', '录入时间', '录入者'
+  ]
+  const rows = filteredExperts.value.map(e => {
+    const contacts = getContactList(e)
+    return [
+      e.name || '',
+      (e.fields || []).join('、'),
+      e.education || '',
+      (e.advantages || []).map(a => typeof a === 'string' ? a : `${a.title || ''}：${a.desc || ''}`).join('\n'),
+      e.advDisplay || '',
+      e.qualDisplay || '',
+      e.qualifications || '',
+      e.courses || '',
+      e.isSupplier ? '是' : '否',
+      e.referrer || '',
+      scoreForExport(e.scores?.professional),
+      scoreForExport(e.scores?.influence),
+      scoreForExport(e.scores?.overall),
+      contacts.map(c => c.person).join('、') || '',
+      contacts.map(c => (c.person ? c.person + '：' : '') + c.info).join(' / '),
+      statusInfo(e).label,
+      e.createdAt ? formatDate(e.createdAt).slice(0, 10) : '',
+      e.createdBy || '主管理员',
+    ]
+  })
+  const escapeCsvCell = (value: string | number) => {
+    const text = String(value)
+    return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text
+  }
+  const csv = '\ufeff' + [headers, ...rows].map(row => row.map(escapeCsvCell).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `专家库导出_${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function triggerImport() {
@@ -448,24 +530,25 @@ function onImportFileSelected(e: Event) {
 }
 
 function downloadImportTemplate() {
+  const fieldHint = store.fields.map(f => f.name).join('、')
   const rows = [
     {
       姓名: '',
-      适用领域: '',
+      适用领域: fieldHint,
       学历: '',
-      库内供应商: '否',
-      核心优势: '■行业经验：',
-      专家卡优势概括: '',
-      专家卡资历概括: '',
-      资历资质: '【职称/荣誉头衔】\n【社会职务】\n【履历资历】',
-      参考案例: '【核心课程】\n【服务经历】',
+      库内供应商: '',
+      核心优势: '■行业经验：20年乳业咨询',
+      专家卡优势概括: '1-3条，每行一条，显示在专家卡片上',
+      专家卡资历概括: '1-3条，每行一条，显示在专家卡片上',
+      资历资质: '',
+      参考案例: '',
       联系人: '',
       联系方式: '',
       内部推荐人: '',
       专业度: '',
       影响力: '',
       综合评分: '',
-      状态: '正常',
+      状态: '',
     },
   ]
   const ws = XLSX.utils.json_to_sheet(rows)
@@ -867,9 +950,36 @@ async function removeExpert(expert: Expert) {
   padding: 24px;
 }
 .record-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 12px;
   font-size: 12px;
   color: var(--text-muted);
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.page-btn {
+  min-width: 28px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.page-btn.active,
+.page-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-light, #dbeafe);
+  color: var(--primary);
+  font-weight: 600;
 }
 
 /* Modal */
