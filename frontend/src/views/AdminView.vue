@@ -3,7 +3,10 @@
     <!-- Admin Header -->
     <header class="admin-header">
       <div class="admin-header-inner">
-        <h1>管理后台</h1>
+        <div class="admin-header-left">
+          <h1>专家资源库 · 管理后台</h1>
+          <span class="role-badge">{{ roleLabel }}</span>
+        </div>
         <div class="admin-header-actions">
           <button class="btn btn-text" @click="goFrontend">返回前台</button>
           <button class="btn btn-text" @click="handleLogout">退出登录</button>
@@ -41,6 +44,11 @@ import type { AdminTab } from '@/types'
 
 const store = useAppStore()
 const router = useRouter()
+
+const roleLabel = computed(() => {
+  if (!store.currentUser) return '主管理员'
+  return store.isAdmin ? '主管理员' : `子管理员：${store.currentUser.email || ''}`
+})
 
 const tabs: { key: AdminTab; label: string }[] = [
   { key: 'experts', label: '专家管理' },
@@ -94,9 +102,9 @@ function handleLogout() {
 }
 
 .admin-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, #1e3a5f 0%, #1a56db 50%, #2563eb 100%);
+  border-bottom: none;
+  box-shadow: 0 2px 12px rgba(30, 58, 95, 0.25);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -109,18 +117,41 @@ function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .admin-header h1 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  color: var(--text);
+  color: #fff;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-badge {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 2px 10px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .admin-header-actions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .admin-header-actions .btn {
@@ -128,16 +159,16 @@ function handleLogout() {
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid transparent;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   transition: var(--transition);
 }
 
 .admin-header-actions .btn:hover {
-  color: var(--primary);
-  background: var(--primary-light);
-  border-color: var(--primary-light);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .admin-tabs {
@@ -188,5 +219,20 @@ function handleLogout() {
   border: 1px solid var(--border);
   padding: 24px;
   box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 640px) {
+  .admin-header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .admin-header h1 {
+    font-size: 16px;
+  }
+  .admin-header-actions {
+    justify-content: flex-start;
+  }
 }
 </style>
