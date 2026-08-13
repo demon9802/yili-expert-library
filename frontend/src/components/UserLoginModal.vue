@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
+  <div class="modal-overlay">
     <div class="user-login-modal">
       <button class="close-btn" title="关闭" @click="$emit('close')">✕</button>
 

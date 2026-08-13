@@ -151,15 +151,15 @@
                 v-for="(m, mIdx) in group.methods"
                 :key="mIdx"
                 class="contact-link"
-                @click.stop="openContact(m)"
+                @click.stop="openContact(m, $event)"
               >
                 <span class="contact-icon">{{ contactTypeIcon(m) }}</span>{{ contactTypeLabel(m.type) }}：{{ displayContactInfo(m) }}
                 <span v-if="mIdx < group.methods.length - 1" class="contact-sep"> / </span>
               </span>
             </span>
           </div>
-          <div v-if="expert.referrer" class="detail-text detail-referrer">
-            内部推荐人：{{ expert.referrer }}
+          <div v-if="expert.referrer" class="detail-contact-line detail-referrer">
+            <span class="detail-contact-text">内部推荐人：{{ expert.referrer }}</span>
           </div>
         </div>
       </div>
@@ -167,7 +167,12 @@
   </div>
 
   <!-- 联系方式操作菜单 -->
-  <ContactActionMenu :contact="activeContact" @close="activeContact = null" />
+  <ContactActionMenu
+    :contact="activeContact"
+    :anchor-x="contactAnchor.x"
+    :anchor-y="contactAnchor.y"
+    @close="activeContact = null"
+  />
 
   <!-- 评分规则弹窗 -->
   <ScoringHelpModal v-if="showHelp" @close="showHelp = false" />
@@ -194,8 +199,10 @@ defineEmits<{
 const store = useAppStore()
 const showHelp = ref(false)
 const activeContact = ref<ContactInfo | null>(null)
+const contactAnchor = ref<{ x: number; y: number }>({ x: 0, y: 0 })
 
-function openContact(m: ContactInfo) {
+function openContact(m: ContactInfo, e: MouseEvent) {
+  contactAnchor.value = { x: e.clientX, y: e.clientY }
   activeContact.value = m
 }
 

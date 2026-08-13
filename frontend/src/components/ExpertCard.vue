@@ -94,7 +94,7 @@
         v-for="(m, idx) in firstContactGroup.methods"
         :key="idx"
         class="card-contact-method"
-        @click.stop="openContact(m)"
+        @click.stop="openContact(m, $event)"
       >
         <span>{{ contactTypeIcon(m) }}</span>
         <span>{{ displayContactInfo(m) }}</span>
@@ -106,7 +106,12 @@
     <div v-if="expert.isSupplier" class="card-supplier-bookmark">库内供应商</div>
 
     <!-- 联系方式操作菜单（PC 复制 / 手机 复制+拨打） -->
-    <ContactActionMenu :contact="activeContact" @close="activeContact = null" />
+    <ContactActionMenu
+      :contact="activeContact"
+      :anchor-x="contactAnchor.x"
+      :anchor-y="contactAnchor.y"
+      @close="activeContact = null"
+    />
   </div>
 </template>
 
@@ -130,8 +135,10 @@ const emit = defineEmits<{
 const store = useAppStore()
 
 const activeContact = ref<ContactInfo | null>(null)
+const contactAnchor = ref<{ x: number; y: number }>({ x: 0, y: 0 })
 
-function openContact(m: ContactInfo) {
+function openContact(m: ContactInfo, e: MouseEvent) {
+  contactAnchor.value = { x: e.clientX, y: e.clientY }
   activeContact.value = m
 }
 

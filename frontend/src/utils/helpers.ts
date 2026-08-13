@@ -194,6 +194,9 @@ export function formatPhoneDisplay(info?: string): string {
     if (digits.length === 12) {
       return `${digits.slice(0, 4)}-${digits.slice(4)}`
     }
+  } else if (digits.length === 8) {
+    // 8 位号码默认为北京本地座机，补 010 区号
+    return `010-${digits}`
   }
   return s
 }

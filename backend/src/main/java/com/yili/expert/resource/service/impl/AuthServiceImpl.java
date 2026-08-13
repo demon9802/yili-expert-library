@@ -51,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setIsAdmin(false);
+        user.setRole("user");
         user.setForcePasswordChange(false);
         user.setSecurityAttempts(0);
         userMapper.insert(user);

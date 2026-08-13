@@ -17,15 +17,15 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="user in users" :key="user.id">
+        <tr v-for="user in normalUsers" :key="user.id">
           <td>{{ user.email }}</td>
           <td>{{ user.isAdmin ? '是' : '否' }}</td>
           <td>{{ user.hasSecurityQuestions ? '是' : '否' }}</td>
           <td>{{ user.forcePasswordChange ? '是' : '否' }}</td>
           <td><button class="btn" @click="resetPassword(user)">重置密码</button></td>
         </tr>
-        <tr v-if="users.length === 0 && !loading">
-          <td colspan="5" class="empty">暂无用户</td>
+        <tr v-if="normalUsers.length === 0 && !loading">
+          <td colspan="5" class="empty">暂无普通用户</td>
         </tr>
       </tbody>
     </table>
@@ -34,13 +34,15 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { authApi } from '@/api/auth'
 import type { UserDTO } from '@/types'
 
 const users = ref<UserDTO[]>([])
 const loading = ref(false)
 const message = ref('')
+
+const normalUsers = computed(() => users.value.filter(u => u.role !== 'master' && u.role !== 'sub' && !u.isAdmin))
 
 async function loadUsers() {
   loading.value = true

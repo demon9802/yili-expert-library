@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_user` (
   `email` VARCHAR(255) NOT NULL COMMENT '邮箱',
   `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
   `is_admin` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否管理员: 0=否, 1=是',
-  `role` VARCHAR(50) DEFAULT 'sub' COMMENT '管理员角色: master=主管理员, sub=子管理员',
+  `role` VARCHAR(50) DEFAULT NULL COMMENT '用户角色: master=主管理员, sub=子管理员, user=普通用户',
   `force_password_change` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否强制改密',
   `security_questions` JSON DEFAULT NULL COMMENT '密保问题(SHA-256哈希数组)',
   `security_attempts` INT NOT NULL DEFAULT 0 COMMENT '密保尝试次数',
@@ -145,7 +145,7 @@ SET @role_exists = (SELECT COUNT(*) FROM information_schema.columns
     AND table_name = 'yl_expert_resource_user'
     AND column_name = 'role');
 SET @add_role = IF(@role_exists = 0,
-  'ALTER TABLE `yl_expert_resource_user` ADD COLUMN `role` VARCHAR(50) DEFAULT \'sub\' COMMENT \'管理员角色: master=主管理员, sub=子管理员\'',
+  'ALTER TABLE `yl_expert_resource_user` ADD COLUMN `role` VARCHAR(50) DEFAULT NULL COMMENT \'用户角色: master=主管理员, sub=子管理员, user=普通用户\'',
   'SELECT 1');
 PREPARE stmt FROM @add_role;
 EXECUTE stmt;

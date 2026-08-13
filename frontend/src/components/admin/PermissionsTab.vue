@@ -134,7 +134,7 @@ const userPermState = reactive<Record<number, Record<string, boolean>>>({})
 
 const shareSettings = ref({ linkActive: true, requireLogin: true })
 
-const subAdmins = computed(() => users.value.filter(u => u.role === 'sub' || (u.isAdmin && u.role !== 'master')))
+const subAdmins = computed(() => users.value.filter(u => u.role === 'sub'))
 
 onMounted(async () => {
   await loadUsers()
