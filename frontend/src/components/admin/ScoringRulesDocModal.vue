@@ -7,7 +7,7 @@
       </div>
       <div class="doc-body">
         <h4>一、评分结构与计算</h4>
-        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项。</p>
+        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项，每项占20%。</p>
         <table class="doc-table">
           <thead>
             <tr><th>维度</th><th>评分项</th></tr>
@@ -20,8 +20,6 @@
             <tr><td>⑤ 职称、管理履历与行业地位</td></tr>
           </tbody>
         </table>
-        <p class="formula">综合评分 = 专业度 × 60% + 影响力 × 40%。每个评分项 1-5★，信息缺失按 2★ 计。</p>
-
         <h4>二、评分规则</h4>
         <table class="doc-table matrix">
           <thead>

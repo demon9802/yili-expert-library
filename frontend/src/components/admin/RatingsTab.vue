@@ -19,119 +19,98 @@
     <div class="config-card">
       <h4>② 评分配置（规则及文档）</h4>
 
-      <div class="doc-embed">
-        <div class="doc-embed-head">
-          <div>
-            <div class="doc-embed-title">评分规则·五星制完整文档（v5.9.3）</div>
-            <div class="doc-embed-sub">覆盖专业度、影响力 2 个维度，共 5 个评分项，含计算公式、赋分标准与测试案例。</div>
-          </div>
-          <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
-        </div>
-
-        <div class="rule-detail-wrap">
-          <table class="rule-detail-table">
-            <thead>
-              <tr><th>维度</th><th>评分项</th><th>评分项构成</th></tr>
-            </thead>
-            <tbody>
-              <tr class="prof-row">
-                <td class="dimension" rowspan="3">专业度</td>
-                <td>① 学历与学术背景</td>
-                <td rowspan="3">共 3 项评分</td>
-              </tr>
-              <tr class="prof-row">
-                <td>② 行业资质与认证</td>
-              </tr>
-              <tr class="prof-row">
-                <td>③ 专业成果与经验</td>
-              </tr>
-              <tr class="infl-row">
-                <td class="dimension" rowspan="2">影响力</td>
-                <td>④ 社会荣誉与奖项</td>
-                <td rowspan="2">共 2 项评分</td>
-              </tr>
-              <tr class="infl-row">
-                <td>⑤ 职称、管理履历与行业地位</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="rule-detail-wrap">
-          <table class="rule-detail-table matrix">
-            <thead>
-              <tr>
-                <th>评分项</th>
-                <th>1★</th>
-                <th>2★</th>
-                <th>3★</th>
-                <th>4★</th>
-                <th>5★</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="item-name">① 学历与学术背景</td>
-                <td>大专 / 中专及以下</td>
-                <td>普通本科（一般院校）</td>
-                <td>较好本科（211 / 双一流）或普通硕士（授课型 / 一般院校）</td>
-                <td>名校硕士（985 / 双一流 / 海外知名）或普通博士</td>
-                <td>博士 + 顶尖院校（清北 / C9 / QS 前 50 等）</td>
-              </tr>
-              <tr>
-                <td class="item-name">② 行业资质与认证</td>
-                <td>无相关认证</td>
-                <td>培训 / 通用认证</td>
-                <td>行业厂商认证（华为 / 微软等）或国家级执业资格（单一）</td>
-                <td>国家级执业 / 行业权威认证（多重领域）</td>
-                <td>国际权威认证（CFA / CPA / ACCA 等）或多项国家级</td>
-              </tr>
-              <tr>
-                <td class="item-name">③ 专业成果与经验</td>
-                <td>一般服务经验 / 仅公开演讲</td>
-                <td>参与级项目 / 普通论文</td>
-                <td>省级 / 行业级项目 · SCI/EI 论文</td>
-                <td>战略级 / 国家级项目 · 顶刊论文</td>
-                <td>标杆级（牵头国标行标 / 高被引 / 重大成果转化）</td>
-              </tr>
-              <tr>
-                <td class="item-name">④ 社会荣誉与奖项</td>
-                <td>无荣誉 / 一般协会成员</td>
-                <td>地市级荣誉 / 国家级学会成员</td>
-                <td>省部级荣誉或称号</td>
-                <td>国家级荣誉或称号</td>
-                <td>顶尖人才（两院院士 / 国家级人才计划）</td>
-              </tr>
-              <tr>
-                <td class="item-name">⑤ 职称、管理履历与行业地位</td>
-                <td>无职称 / 基层岗位</td>
-                <td>经理 / 高工 / 主管（普通企业）</td>
-                <td>副教授 / 总监 / VP / 合伙人（或同级别 · 普通企业）</td>
-                <td>教授 / CEO / 创始人（行业百强 / 大厂）</td>
-                <td>教授 / CEO / 创始人（世界 500 强 / 央企 / 上市公司）</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计。</p>
-
-        <div class="calc-wrap">
-          <div class="calc-title">关键测算结果</div>
-          <table class="calc-table">
-            <thead><tr><th>情形</th><th>①</th><th>②</th><th>③</th><th>④</th><th>⑤</th><th>综合得分</th><th>是否进观察库</th></tr></thead>
-            <tbody>
-              <tr><td>全部缺失（默认 2★）</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2.0</td><td class="hide">是</td></tr>
-              <tr><td>1 项信息缺失，其余中等</td><td>2</td><td>3</td><td>3</td><td>3</td><td>3</td><td>2.8</td><td class="hide">是</td></tr>
-              <tr><td>2 项信息缺失，其余中等</td><td>2</td><td>2</td><td>3</td><td>3</td><td>3</td><td>2.6</td><td class="hide">是</td></tr>
-              <tr><td>中等水平（各项 3★）</td><td>3</td><td>3</td><td>3</td><td>3</td><td>3</td><td>3.0</td><td class="show">否（达标线）</td></tr>
-              <tr><td>良好水平（各项 4★）</td><td>4</td><td>4</td><td>4</td><td>4</td><td>4</td><td>4.0</td><td class="show">否</td></tr>
-              <tr><td>专业度强、影响力弱</td><td>5</td><td>5</td><td>5</td><td>2</td><td>2</td><td>3.8</td><td class="show">否</td></tr>
-              <tr><td>专业度弱、影响力强</td><td>2</td><td>2</td><td>2</td><td>5</td><td>5</td><td>3.2</td><td class="show">否</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="doc-embed-head">
+        <div class="doc-embed-title">评分规则 · 五星制</div>
+        <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
+
+      <div class="rule-detail-wrap">
+        <table class="rule-detail-table">
+          <thead>
+            <tr><th>维度</th><th>评分项</th><th>每项各占20%</th></tr>
+          </thead>
+          <tbody>
+            <tr class="prof-row">
+              <td class="dimension" rowspan="3">专业度</td>
+              <td>① 学历与学术背景</td>
+              <td rowspan="3">每项各占20%</td>
+            </tr>
+            <tr class="prof-row">
+              <td>② 行业资质与认证</td>
+            </tr>
+            <tr class="prof-row">
+              <td>③ 专业成果与经验</td>
+            </tr>
+            <tr class="infl-row">
+              <td class="dimension" rowspan="2">影响力</td>
+              <td>④ 社会荣誉与奖项</td>
+              <td rowspan="2">每项各占20%</td>
+            </tr>
+            <tr class="infl-row">
+              <td>⑤ 职称、管理履历与行业地位</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rule-detail-wrap">
+        <table class="rule-detail-table matrix">
+          <thead>
+            <tr>
+              <th>评分项</th>
+              <th>1★</th>
+              <th>2★</th>
+              <th>3★</th>
+              <th>4★</th>
+              <th>5★</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="item-name">① 学历与学术背景</td>
+              <td>大专 / 中专及以下</td>
+              <td>普通本科（一般院校）</td>
+              <td>较好本科（211 / 双一流）或普通硕士（授课型 / 一般院校）</td>
+              <td>名校硕士（985 / 双一流 / 海外知名）或普通博士</td>
+              <td>博士 + 顶尖院校（清北 / C9 / QS 前 50 等）</td>
+            </tr>
+            <tr>
+              <td class="item-name">② 行业资质与认证</td>
+              <td>无相关认证</td>
+              <td>培训 / 通用认证</td>
+              <td>行业厂商认证（华为 / 微软等）或国家级执业资格（单一）</td>
+              <td>国家级执业 / 行业权威认证（多重领域）</td>
+              <td>国际权威认证（CFA / CPA / ACCA 等）或多项国家级</td>
+            </tr>
+            <tr>
+              <td class="item-name">③ 专业成果与经验</td>
+              <td>一般服务经验 / 仅公开演讲</td>
+              <td>参与级项目 / 普通论文</td>
+              <td>省级 / 行业级项目 · SCI/EI 论文</td>
+              <td>战略级 / 国家级项目 · 顶刊论文</td>
+              <td>标杆级（牵头国标行标 / 高被引 / 重大成果转化）</td>
+            </tr>
+            <tr>
+              <td class="item-name">④ 社会荣誉与奖项</td>
+              <td>无荣誉 / 一般协会成员</td>
+              <td>地市级荣誉 / 国家级学会成员</td>
+              <td>省部级荣誉或称号</td>
+              <td>国家级荣誉或称号</td>
+              <td>顶尖人才（两院院士 / 国家级人才计划）</td>
+            </tr>
+            <tr>
+              <td class="item-name">⑤ 职称、管理履历与行业地位</td>
+              <td>无职称 / 基层岗位</td>
+              <td>经理 / 高工 / 主管（普通企业）</td>
+              <td>副教授 / 总监 / VP / 合伙人（或同级别 · 普通企业）</td>
+              <td>教授 / CEO / 创始人（行业百强 / 大厂）</td>
+              <td>教授 / CEO / 创始人（世界 500 强 / 央企 / 上市公司）</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计。</p>
 
       <div class="toggle-row auto-row">
         <label class="inline-check">
@@ -194,15 +173,22 @@
                 />
               </td>
               <td class="actions">
-                <div class="action-dropdown" v-click-outside="() => closeDropdown(e.id)">
+                <div
+                  class="action-dropdown"
+                  v-click-outside="() => closeDropdown(e.id)"
+                >
                   <button
                     class="btn btn-sm btn-action"
                     type="button"
-                    @click="toggleDropdown(e.id)"
+                    @click="toggleDropdown(e, $event)"
                   >
                     操作 ▼
                   </button>
-                  <div v-if="openDropdownId === e.id" class="action-menu">
+                  <div
+                    v-if="openDropdownId === e.id"
+                    class="action-menu"
+                    :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
+                  >
                     <button type="button" :disabled="runningId === e.id" @click="autoScoreOne(e)">
                       {{ runningId === e.id ? '识别中...' : '重置为自动评分' }}
                     </button>
@@ -226,12 +212,13 @@
       <div v-if="lowExperts.length === 0" class="ok-box">
         <div class="ok-title">无预警 · 所有专家评分正常</div>
       </div>
-      <div v-else>
-        <div class="warn-banner">
-          <span class="warn-icon">⚠</span>
-          <span>共 {{ lowExperts.length }} 位专家综合评分低于 3★，已自动同步至观察库，可前往查看和处理。</span>
-          <button class="doc-link" type="button" @click="goObservation">前往观察库 →</button>
+      <div v-else class="warn-banner">
+        <span class="warn-icon">⚠</span>
+        <div class="warn-text">
+          <strong>共 {{ lowExperts.length }} 位专家综合评分低于 3★</strong>
+          <span>已自动同步至观察库，可前往查看和处理。</span>
         </div>
+        <button class="btn btn-warn btn-sm" type="button" @click="goObservation">前往观察库</button>
       </div>
     </div>
 
@@ -240,7 +227,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import ScoringRulesDocModal from '@/components/admin/ScoringRulesDocModal.vue'
 import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
@@ -257,6 +244,7 @@ const batchMessage = ref('')
 const batchSuccess = ref(true)
 const showRuleDoc = ref(false)
 const openDropdownId = ref<number | null>(null)
+const dropdownPos = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 const hasCloudBackup = ref(false)
 
 const professionalItems = ['学历与学术背景', '行业资质与认证', '专业成果与经验'] as const
@@ -352,10 +340,14 @@ function onToggleShow(e: Event) {
 }
 
 onMounted(async () => {
+  window.addEventListener('scroll', closeAnyDropdown, { passive: true })
   try {
     const v = await settingApi.get('aiScoringEnabled')
     if (v != null) aiEnabled.value = v !== 'false'
   } catch { /* 忽略 */ }
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', closeAnyDropdown)
 })
 
 async function onAiToggle(ev: Event) {
@@ -400,11 +392,21 @@ async function runBatchScoring() {
   }
 }
 
-function toggleDropdown(id: number) {
-  openDropdownId.value = openDropdownId.value === id ? null : id
+function toggleDropdown(e: Expert, event: MouseEvent) {
+  if (openDropdownId.value === e.id) {
+    openDropdownId.value = null
+    return
+  }
+  const btn = event.currentTarget as HTMLElement
+  const rect = btn.getBoundingClientRect()
+  dropdownPos.value = { top: rect.bottom + 4, left: rect.left }
+  openDropdownId.value = e.id
 }
 function closeDropdown(id: number) {
   if (openDropdownId.value === id) openDropdownId.value = null
+}
+function closeAnyDropdown() {
+  openDropdownId.value = null
 }
 
 async function restoreFromCloud(e: Expert) {
@@ -484,22 +486,14 @@ const vClickOutside = {
 .inline-hint { margin: 0; }
 .adjust-hint { margin-bottom: 12px; }
 
-.doc-embed {
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  background: #f8fbff;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-}
 .doc-embed-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
-.doc-embed-title { font-size: 14px; font-weight: 700; color: #1d4ed8; }
-.doc-embed-sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+.doc-embed-title { font-size: 14px; font-weight: 700; color: var(--text); }
 .doc-link { border: none; background: transparent; color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 
 .rule-detail-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
@@ -515,16 +509,6 @@ const vClickOutside = {
 .rule-detail-table .item-name { font-weight: 600; white-space: nowrap; }
 .rule-detail-table.matrix { min-width: 900px; }
 .rule-detail-table.matrix td { font-size: 12px; line-height: 1.45; }
-
-.calc-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
-.calc-title { padding: 8px 10px; font-size: 12px; font-weight: 700; color: var(--text); background: var(--bg); border-bottom: 1px solid var(--border); }
-.calc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 600px; }
-.calc-table th, .calc-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: center; }
-.calc-table th { color: var(--text-secondary); font-weight: 600; }
-.calc-table td:first-child { text-align: left; }
-.calc-table tr:last-child td { border-bottom: none; }
-.calc-table .show { color: #059669; font-weight: 600; }
-.calc-table .hide { color: #dc2626; font-weight: 600; }
 
 .missing-tip { margin: 0 0 12px; padding: 8px 10px; border-radius: 6px; background: #fefce8; color: #854d0e; font-size: 12px; }
 .auto-row { margin-top: 4px; }
@@ -554,10 +538,8 @@ const vClickOutside = {
 .action-dropdown { position: relative; display: inline-block; }
 .btn-action { padding: 5px 10px; font-size: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 .action-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 100;
+  position: fixed;
+  z-index: 1200;
   min-width: 130px;
   background: #fff;
   border: 1px solid var(--border);
@@ -589,6 +571,10 @@ const vClickOutside = {
 .warn-zone h4 { color: #dc2626; }
 .ok-box { padding: 16px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; }
 .ok-title { font-size: 14px; font-weight: 600; color: #059669; }
-.warn-banner { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #fff; border-radius: 8px; border: 1px solid #fde68a; color: #92400e; font-size: 13px; flex-wrap: wrap; }
-.warn-icon { font-size: 16px; }
+.warn-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #fff; border-radius: 8px; border: 1px solid #fde68a; }
+.warn-icon { font-size: 18px; flex-shrink: 0; }
+.warn-text { display: flex; flex-direction: column; gap: 4px; flex: 1; font-size: 13px; color: #92400e; }
+.warn-text strong { color: #b45309; }
+.btn-warn { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+.btn-warn:hover { background: #d97706; }
 </style>
