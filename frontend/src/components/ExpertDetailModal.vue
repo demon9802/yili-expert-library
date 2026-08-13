@@ -137,18 +137,27 @@
           </div>
         </div>
 
-        <!-- 联系方式 (V5: 多联系人依次显示为纯文本行) -->
+        <!-- 联系方式 (V5.9+: PC/手机端均可点击，PC 提供复制/调用，手机端优先原生 tel/mailto) -->
         <div v-if="contacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
           <div
             v-for="(c, idx) in contacts"
             :key="idx"
-            class="detail-text"
-            :style="{ marginBottom: contacts.length > 1 ? '6px' : '0' }"
+            class="detail-contact-line"
           >
-            {{ contacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ c.person || '' }}<span v-if="c.info">，{{ typeLabel(c.type) }}：{{ c.info }}</span>
+            <span class="contact-person">
+              {{ contacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ c.person || '未填写' }}
+            </span>
+            <button
+              v-if="c.info"
+              type="button"
+              class="contact-method"
+              @click="handleContactClick(c)"
+            >
+              <span class="contact-icon">{{ typeIcon(c.type) }}</span>{{ typeLabel(c.type) }}：{{ c.info }}
+            </button>
           </div>
-          <div v-if="expert.referrer" class="detail-text" style="margin-top: 8px;">
+          <div v-if="expert.referrer" class="detail-text detail-referrer">
             内部推荐人：{{ expert.referrer }}
           </div>
         </div>
@@ -246,6 +255,59 @@ function typeLabel(type?: string): string {
   }
 }
 
+function typeIcon(type?: string): string {
+  switch (type) {
+    case 'email': return '📧'
+    case 'wechat': return '💬'
+    case 'phone':
+    case 'mobile': return '📞'
+    default: return '📎'
+  }
+}
+
+function isMobileViewport(): boolean {
+  return window.innerWidth <= 768
+}
+
+function normalizePhone(info?: string): string {
+  return String(info || '').replace(/[^0-9+]/g, '')
+}
+
+function handleContactClick(c: ContactInfo) {
+  const info = c.info || c.value || ''
+  if (!info) return
+
+  if (isMobileViewport()) {
+    copyText(info).catch(() => {})
+    if (c.type === 'email') {
+      window.location.href = 'mailto:' + info
+      return
+    }
+    if (c.type === 'phone' || c.type === 'mobile') {
+      window.location.href = 'tel:' + normalizePhone(info)
+      return
+    }
+    alert('已复制：' + info)
+    return
+  }
+
+  const action = c.type === 'email'
+    ? confirm('是否打开邮件客户端？\n\n选择“确定”：发邮件\n选择“取消”：复制邮箱')
+    : c.type === 'phone' || c.type === 'mobile'
+      ? confirm('是否拨打电话？\n\n选择“确定”：拨号\n选择“取消”：复制号码')
+      : false
+
+  if (action && c.type === 'email') {
+    window.location.href = 'mailto:' + info
+    return
+  }
+  if (action && (c.type === 'phone' || c.type === 'mobile')) {
+    window.location.href = 'tel:' + normalizePhone(info)
+    return
+  }
+  copyText(info).then(() => alert('已复制：' + info)).catch(() => alert('复制失败'))
+}
+
 function getFieldStyle(fieldName: string) {
   const field = store.fields.find(f => f.name === fieldName)
   if (field) {
@@ -261,26 +323,6 @@ function getFieldStyle(fieldName: string) {
 
 async function toggleFav() {
   await store.toggleFavorite(props.expert.id)
-}
-
-function copyContact(info?: string) {
-  if (!info) return
-  copyText(info).then(() => {
-    alert('已复制：' + info)
-  }).catch(() => {
-    alert('复制失败')
-  })
-}
-
-function callPhone(info?: string) {
-  if (!info) return
-  const num = info.replace(/[^0-9\-]/g, '').replace(/-/g, '')
-  window.location.href = 'tel:' + num
-}
-
-function sendEmail(info?: string) {
-  if (!info) return
-  window.location.href = 'mailto:' + info
 }
 </script>
 

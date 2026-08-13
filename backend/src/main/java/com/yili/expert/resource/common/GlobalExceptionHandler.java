@@ -21,6 +21,13 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, e.getMessage());
     }
 
+    @ExceptionHandler(SecurityException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleSecurityException(SecurityException e) {
+        log.warn("权限不足: {}", e.getMessage());
+        return ApiResponse.error(403, e.getMessage() != null ? e.getMessage() : "无权限");
+    }
+
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleRuntimeException(RuntimeException e) {

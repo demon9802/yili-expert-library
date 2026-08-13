@@ -332,12 +332,17 @@ export const useAppStore = defineStore('app', () => {
       return
     }
     try {
-      // 验证 token 有效性 - 通过检查 force password change 接口
-      const forceChange = await authApi.checkForcePasswordChange()
-      // token 有效
+      // 用一个受保护接口校验 token；优先从本地缓存恢复登录身份，避免刷新后只剩 token 无用户态
+      await authApi.checkForcePasswordChange()
+      const cached = lsGet('yili_current_user')
+      if (cached) {
+        currentUser.value = cached
+        isAdmin.value = !!cached.isAdmin
+      }
     } catch {
       // token 无效
       removeToken()
+      lsRemove('yili_current_user')
       currentUser.value = null
       isAdmin.value = false
     }
@@ -348,6 +353,7 @@ export const useAppStore = defineStore('app', () => {
     setToken(result.token)
     currentUser.value = result.user
     isAdmin.value = result.user.isAdmin || false
+    lsSet('yili_current_user', result.user)
     return result
   }
 
@@ -359,12 +365,14 @@ export const useAppStore = defineStore('app', () => {
     setToken(result.token)
     currentUser.value = result.user
     isAdmin.value = false
+    lsSet('yili_current_user', result.user)
     return result
   }
 
   function logout() {
     authApi.logout().catch(() => {})
     removeToken()
+    lsRemove('yili_current_user')
     currentUser.value = null
     isAdmin.value = false
     mode.value = 'frontend'

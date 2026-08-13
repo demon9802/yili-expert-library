@@ -31,8 +31,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
-import { authApi } from '@/api/auth'
-import { setToken } from '@/api/request'
 
 const router = useRouter()
 const store = useAppStore()
@@ -57,14 +55,12 @@ async function handleLogin() {
   }
   try {
     const email = resolveEmail(account.value)
-    const result = await authApi.login(email, pwd)
-    const token = result.token
+    const result = await store.login(email, pwd)
     const user = result.user
-    setToken(token)
-    store.currentUser = {
-      id: user.id,
-      email: user.email,
-      isAdmin: user.isAdmin,
+    if (!user.isAdmin) {
+      error.value = '当前账号不是管理员账号，不能进入管理后台'
+      store.logout()
+      return
     }
     router.push('/admin')
   } catch (e: any) {

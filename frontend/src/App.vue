@@ -26,13 +26,6 @@ onMounted(async () => {
   // 加载应用数据
   await store.loadAppData()
 
-  // 路由守卫
-  router.beforeEach((to, _from, next) => {
-    if (to.meta.requiresAuth && !store.currentUser) {
-      next('/')
-    } else {
-      next()
-    }
-  })
+  // 路由权限统一在 router/index.ts 中处理，避免普通用户 token 被误判为后台权限
 })
 </script>

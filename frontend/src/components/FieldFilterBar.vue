@@ -1,6 +1,6 @@
 <template>
   <div class="filter-bar field-bar-wrapper" style="margin-top:8px">
-    <div class="filter-group">
+    <div class="filter-group field-filter-group">
       <span class="filter-label">适用领域：</span>
       <div id="field-filters" class="field-filters">
         <span
@@ -20,18 +20,15 @@
         >
           {{ displayName(field.name) }}
         </span>
+        <button
+          class="field-toggle-btn field-toggle-inline"
+          :title="store.fieldsCollapsed ? '展开更多领域' : '收起领域标签'"
+          @click="store.fieldsCollapsed = !store.fieldsCollapsed"
+        >
+          <span class="field-toggle-text">{{ store.fieldsCollapsed ? '展开' : '收起' }}</span>
+          <span class="field-toggle-icon" :class="{ collapsed: store.fieldsCollapsed }">▲</span>
+        </button>
       </div>
-      <button
-        class="field-toggle-btn"
-        style="margin-left:8px;display:inline-flex;align-items:center;gap:4px"
-        @click="store.fieldsCollapsed = !store.fieldsCollapsed"
-      >
-        <span
-          style="display:inline-block;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;transition:transform .2s"
-          :style="store.fieldsCollapsed ? 'border-top:4px solid currentColor' : 'border-bottom:4px solid currentColor'"
-        ></span>
-        {{ store.fieldsCollapsed ? '展开' : '收起' }}
-      </button>
     </div>
   </div>
 </template>
@@ -76,9 +73,56 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 function displayName(name: string) {
-  if (isNarrowScreen() && name.length > 4) {
-    return name.slice(0, 2) + '…'
+  if (isNarrowScreen()) {
+    if (name.startsWith('通用')) return '通用…'
+    if (name.startsWith('战略') || name.includes('战略规划') || name.includes('战略解码') || name.includes('战略落地')) return '战略…'
+    if (name.length > 4) return name.slice(0, 2) + '…'
   }
   return name
 }
 </script>
+
+<style scoped>
+.field-filter-group {
+  flex: 1;
+  min-width: 0;
+}
+.field-toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  line-height: 1;
+  vertical-align: middle;
+}
+.field-toggle-inline:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+.field-toggle-icon {
+  font-size: 9px;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+.field-toggle-icon.collapsed {
+  transform: rotate(180deg);
+}
+@media (max-width: 400px) {
+  .field-toggle-inline {
+    min-height: 24px;
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+}
+</style>

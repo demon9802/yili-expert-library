@@ -4,6 +4,7 @@ import com.yili.expert.resource.common.ApiResponse;
 import com.yili.expert.resource.dto.BulkScoreUpdateRequest;
 import com.yili.expert.resource.dto.ExpertDTO;
 import com.yili.expert.resource.service.ExpertService;
+import com.yili.expert.resource.utils.RequestContextUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,27 +33,32 @@ public class ExpertController {
 
     @PostMapping
     public ApiResponse<ExpertDTO> create(@RequestBody ExpertDTO dto) {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(expertService.create(dto));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<ExpertDTO> update(@PathVariable Long id, @RequestBody ExpertDTO dto) {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(expertService.update(id, dto));
     }
 
     @PutMapping("/upsert")
     public ApiResponse<ExpertDTO> upsert(@RequestBody ExpertDTO dto) {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(expertService.upsert(dto));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        RequestContextUtil.requireAdmin();
         expertService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/bulk-update-scores")
     public ApiResponse<Integer> bulkUpdateScores(@RequestBody List<BulkScoreUpdateRequest> requests) {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(expertService.bulkUpdateScores(requests));
     }
 }

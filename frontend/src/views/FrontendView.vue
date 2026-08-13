@@ -16,19 +16,24 @@
             {{ isMobile ? '💻 桌面版' : '📱 手机版' }}
           </button>
           <button
-            v-if="!store.currentUser"
+            v-if="!store.currentUser || !store.isAdmin"
             class="btn btn-sm"
             style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
             @click="goAdminLogin"
           >
             管理员入口
           </button>
-          <template v-else>
+          <template v-if="store.currentUser && store.isAdmin">
             <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="goAdmin">
               管理后台
             </button>
             <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="handleLogout">
               退出后台
+            </button>
+          </template>
+          <template v-else-if="store.currentUser">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="handleLogout">
+              退出登录
             </button>
           </template>
         </div>
@@ -204,8 +209,15 @@
         :search-query="store.searchQuery"
         @click="openDetail(expert)"
       />
+    </div>
+
+    <!-- Floating page navigation (V5: appears when filters scroll out of view) -->
+    <div
+      v-if="store.totalPages > 1"
+      class="page-navigation-float"
+      :class="{ visible: showFloatingNav }"
+    >
       <PaginationControl
-        v-if="store.totalPages > 1"
         :current-page="store.currentPage"
         :total-pages="store.totalPages"
         @change="onPageChange"
@@ -229,7 +241,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import type { Expert } from '@/types'
@@ -250,6 +262,24 @@ const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
+const showFloatingNav = ref(false)
+
+// V5: 浮动页码导航在顶部筛选栏滚出视口后显示
+function updateFloatingNav() {
+  const lastFilterBar = document.querySelector('.merged-bar-wrapper, .search-bar')
+  if (lastFilterBar) {
+    showFloatingNav.value = lastFilterBar.getBoundingClientRect().bottom < 0
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', updateFloatingNav, { passive: true })
+  updateFloatingNav()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', updateFloatingNav)
+})
 
 // 分值区间筛选（用户输入最低-最高，最多一位小数，空值表示半开放区间）
 const scoreMin = ref<number | null>(store.scoreFilter.min)

@@ -37,6 +37,12 @@ public class RequestContextUtil {
         return admin != null && (Boolean) admin;
     }
 
+    public static void requireAdmin() {
+        if (!isAdmin()) {
+            throw new SecurityException("无管理员权限");
+        }
+    }
+
     public static void setCurrentUser(HttpServletRequest request, Long userId, String email, boolean isAdmin) {
         request.setAttribute(CURRENT_USER_ID, userId);
         request.setAttribute(CURRENT_USER_EMAIL, email);

@@ -1,38 +1,56 @@
 <template>
   <div class="admin-view">
-    <!-- Admin Header -->
-    <header class="admin-header">
-      <div class="admin-header-inner">
-        <div class="admin-header-left">
-          <h1>{{ store.platformTitle }} · 管理后台</h1>
-          <span class="role-badge">{{ roleLabel }}</span>
+    <!-- Admin Header (V5: same style as frontend header) -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="header-left">
+          <div class="header-title" style="font-size: 20px">{{ store.platformTitle }} - 管理后台</div>
         </div>
-        <div class="admin-header-actions">
-          <button class="btn btn-text" @click="goFrontend">返回前台</button>
-          <button class="btn btn-text" @click="handleLogout">退出登录</button>
+        <div class="header-actions">
+          <div
+            style="font-size:11px;color:rgba(255,255,255,0.7);padding:2px 10px;background:rgba(255,255,255,0.1);border-radius:10px"
+          >
+            {{ roleLabel }}
+          </div>
+          <div class="header-update">数据更新：{{ updateTimeText }}</div>
+          <button
+            class="btn btn-sm"
+            style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
+            @click="goFrontend"
+          >
+            ← 返回前台
+          </button>
+          <button
+            class="btn btn-sm"
+            style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
+            @click="handleLogout"
+          >
+            退出登录
+          </button>
         </div>
       </div>
     </header>
 
-    <!-- Tab Navigation -->
-    <nav class="admin-tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="admin-tab"
-        :class="{ active: store.adminTab === tab.key }"
-        @click="store.setAdminTab(tab.key)"
-      >
-        {{ tab.label }}
-      </button>
-    </nav>
+    <!-- Admin Container -->
+    <div class="admin-container">
+      <!-- Tab Navigation -->
+      <nav class="admin-nav">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          class="admin-nav-item"
+          :class="{ active: store.adminTab === tab.key }"
+          @click="store.setAdminTab(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
 
-    <!-- Tab Content -->
-    <main class="admin-content">
-      <div class="admin-content-inner">
+      <!-- Panel Content -->
+      <div id="admin-panel" class="admin-panel">
         <component :is="currentTabComponent" />
       </div>
-    </main>
+    </div>
   </div>
 </template>
 
@@ -41,6 +59,7 @@ import { computed, defineAsyncComponent, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import type { AdminTab } from '@/types'
+import { formatDate } from '@/utils/helpers'
 
 const store = useAppStore()
 const router = useRouter()
@@ -51,9 +70,13 @@ const roleLabel = computed(() => {
   return '管理员'
 })
 
+const updateTimeText = computed(() => {
+  return store.updateTime ? formatDate(store.updateTime) : formatDate(new Date().toISOString())
+})
+
 const allTabs: { key: AdminTab; label: string; masterOnly?: boolean }[] = [
   { key: 'experts', label: '专家管理' },
-  { key: 'projects', label: '合作项目' },
+  { key: 'projects', label: '合作项目管理' },
   { key: 'ratings', label: '评分管理' },
   { key: 'sort', label: '排序标签' },
   { key: 'dashboard', label: '数据看板' },
@@ -110,143 +133,9 @@ function handleLogout() {
 </script>
 
 <style scoped>
+/* Keep minimal scoped styles; rely on global .header/.admin-container/.admin-nav/.admin-panel */
 .admin-view {
   min-height: 100vh;
   background: var(--bg);
-}
-
-.admin-header {
-  background: linear-gradient(135deg, #1e3a5f 0%, #1a56db 50%, #2563eb 100%);
-  border-bottom: none;
-  box-shadow: 0 2px 12px rgba(30, 58, 95, 0.25);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.admin-header-inner {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 16px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.admin-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.admin-header h1 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.role-badge {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-  padding: 2px 10px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.admin-header-actions {
-  display: flex;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.admin-header-actions .btn {
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  font-weight: 500;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  transition: var(--transition);
-}
-
-.admin-header-actions .btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.28);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.admin-tabs {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: 4px;
-  padding: 0 24px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.admin-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.admin-tab {
-  padding: 14px 18px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  transition: var(--transition);
-}
-
-.admin-tab:hover {
-  color: var(--primary);
-}
-
-.admin-tab.active {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
-  font-weight: 600;
-}
-
-.admin-content {
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.admin-content-inner {
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  padding: 24px;
-  box-shadow: var(--shadow-sm);
-}
-
-@media (max-width: 640px) {
-  .admin-header-inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 12px 16px;
-  }
-  .admin-header h1 {
-    font-size: 16px;
-  }
-  .admin-header-actions {
-    justify-content: flex-start;
-  }
 }
 </style>

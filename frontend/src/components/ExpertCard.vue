@@ -149,8 +149,10 @@ function fieldStyle(fieldName: string) {
 }
 
 function displayFieldName(name: string) {
-  if (isNarrowScreen() && name.length > 4) {
-    return name.slice(0, 2) + '…'
+  if (isNarrowScreen()) {
+    if (name.startsWith('通用')) return '通用…'
+    if (name.startsWith('战略') || name.includes('战略规划') || name.includes('战略解码') || name.includes('战略落地')) return '战略…'
+    if (name.length > 4) return name.slice(0, 2) + '…'
   }
   return name
 }

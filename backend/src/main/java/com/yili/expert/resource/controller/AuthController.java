@@ -3,6 +3,7 @@ package com.yili.expert.resource.controller;
 import com.yili.expert.resource.common.ApiResponse;
 import com.yili.expert.resource.dto.*;
 import com.yili.expert.resource.service.AuthService;
+import com.yili.expert.resource.utils.RequestContextUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -93,28 +94,33 @@ public class AuthController {
 
     @GetMapping("/users")
     public ApiResponse<List<UserDTO>> fetchUserList() {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(authService.fetchUserList());
     }
 
     @PostMapping("/users/reset-password")
     public ApiResponse<Void> adminResetUserPassword(@RequestBody AdminResetPasswordRequest request) {
+        RequestContextUtil.requireAdmin();
         authService.adminResetUserPassword(request);
         return ApiResponse.success();
     }
 
     @PostMapping("/users/sub-admin")
     public ApiResponse<UserDTO> createSubAdmin(@RequestBody CreateSubAdminRequest request) {
+        RequestContextUtil.requireAdmin();
         return ApiResponse.success(authService.createSubAdmin(request));
     }
 
     @DeleteMapping("/users/{userId}")
     public ApiResponse<Void> deleteUser(@PathVariable Long userId) {
+        RequestContextUtil.requireAdmin();
         authService.deleteUser(userId);
         return ApiResponse.success();
     }
 
     @PutMapping("/users/permissions")
     public ApiResponse<Void> updateUserPermissions(@RequestBody UpdateUserPermissionsRequest request) {
+        RequestContextUtil.requireAdmin();
         authService.updateUserPermissions(request);
         return ApiResponse.success();
     }

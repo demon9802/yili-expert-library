@@ -54,7 +54,7 @@
             </td>
             <td>{{ project.year || '-' }}</td>
             <td>{{ project.month ? project.month + '月' : '-' }}</td>
-            <td>{{ project.satisfaction || '—' }}</td>
+            <td>{{ satisfactionDisplay(project.satisfaction) || '—' }}</td>
             <td>
               <span
                 v-if="project.expertId"
@@ -89,16 +89,55 @@
       <div class="form-modal">
         <h3>{{ editing ? '编辑项目' : '新建项目' }}</h3>
         <div class="form-grid">
-          <div class="form-group"><label>项目标题 *</label><input v-model="formData.title" type="text" /></div>
-          <div class="form-group"><label>关联讲师</label>
-            <select v-model="formData.expertId"><option :value="null">请选择</option>
-              <option v-for="e in store.experts" :key="e.id" :value="e.id">{{ e.name }}</option></select></div>
-          <div class="form-group"><label>待定讲师姓名（未录入库中时）</label><input v-model="formData.pendingExpertName" type="text" /></div>
-          <div class="form-group"><label>年份 *</label><input v-model.number="formData.year" type="number" /></div>
-          <div class="form-group"><label>月份</label><input v-model.number="formData.month" type="number" min="1" max="12" /></div>
-          <div class="form-group"><label>满意度</label><input v-model="formData.satisfaction" type="text" placeholder="如 8.6" /></div>
-          <div class="form-group"><label>项目描述</label><textarea v-model="formData.desc" rows="3" /></div>
-          <div class="form-group"><label>是否可见</label><input v-model="formData.visible" type="checkbox" /></div>
+          <div class="form-group">
+            <label>关联讲师</label>
+            <select v-model="formData.expertId">
+              <option :value="null">请选择</option>
+              <option v-for="e in store.experts" :key="e.id" :value="e.id">{{ e.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>项目名称 *</label>
+            <input v-model="formData.title" type="text" />
+          </div>
+          <div class="form-group">
+            <label>待定讲师姓名（未录入库中时）</label>
+            <input v-model="formData.pendingExpertName" type="text" />
+          </div>
+          <div class="form-group">
+            <label>合作年份 *</label>
+            <select v-model.number="formData.year">
+              <option :value="0">请选择</option>
+              <option v-for="y in yearSelectOptions" :key="y" :value="y">{{ y }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>合作月份</label>
+            <select v-model.number="formData.month">
+              <option :value="null">请选择</option>
+              <option v-for="m in 12" :key="m" :value="m">{{ m }}月</option>
+            </select>
+          </div>
+          <div class="form-group satisfaction-group">
+            <label>满意度</label>
+            <div class="satisfaction-inputs">
+              <input v-model.number="formData.satisfactionValue" type="number" min="0" step="0.01" placeholder="分值" />
+              <select v-model.number="formData.satisfactionScale">
+                <option :value="10">10分制</option>
+                <option :value="5">5分制</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group form-group-full">
+            <label>项目描述</label>
+            <textarea v-model="formData.desc" rows="3" />
+          </div>
+          <div class="form-group form-group-full">
+            <label class="inline-check">
+              <input v-model="formData.visible" type="checkbox" />
+              前端显示
+            </label>
+          </div>
         </div>
         <div class="form-actions">
           <button class="btn btn-primary" @click="handleSave">保存</button>
@@ -113,6 +152,7 @@
 import { ref, reactive, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Project } from '@/types'
+import { satisfactionDisplay, parseSatisfaction } from '@/utils/satisfaction'
 
 const store = useAppStore()
 const showForm = ref(false)
@@ -166,23 +206,62 @@ async function toggleVisible(project: Project) {
   await store.saveProject({ id: project.id, visible: !project.visible })
 }
 
-const formData = reactive<Partial<Project>>({
+interface ProjectForm extends Partial<Project> {
+  satisfactionValue: number | null
+  satisfactionScale: 5 | 10
+}
+
+const formData = reactive<ProjectForm>({
   title: '', expertId: null, pendingExpertName: '', year: new Date().getFullYear(),
-  month: null, satisfaction: '', desc: '', visible: true,
+  month: null, satisfaction: '', satisfactionValue: null, satisfactionScale: 10,
+  desc: '', visible: true,
+})
+
+const yearSelectOptions = computed(() => {
+  const current = new Date().getFullYear()
+  const arr: number[] = []
+  for (let y = current + 1; y >= current - 8; y--) arr.push(y)
+  return arr
 })
 
 function openCreate() { editing.value = null; resetForm(); showForm.value = true }
 function editProject(p: Project) { editing.value = p; resetForm(p); showForm.value = true }
 function resetForm(data: Partial<Project> = {}) {
+  const parsed = parseSatisfaction(data.satisfaction)
   Object.assign(formData, {
     id: undefined, title: '', expertId: null, pendingExpertName: '', year: new Date().getFullYear(),
-    month: null, satisfaction: '', desc: '', visible: true,
-  }, data)
+    month: null, satisfaction: '', satisfactionValue: null, satisfactionScale: 10,
+    desc: '', visible: true,
+  }, data, {
+    satisfactionValue: parsed ? parsed.raw : null,
+    satisfactionScale: parsed ? parsed.scale : 10,
+  })
 }
 async function handleSave() {
-  if (!formData.title?.trim()) { alert('请填写项目标题'); return }
-  if (!formData.year) { alert('请填写年份'); return }
-  await store.saveProject(formData)
+  if (!formData.title?.trim()) { alert('请填写项目名称'); return }
+  if (!formData.year) { alert('请选择合作年份'); return }
+
+  const payload: Partial<Project> = {
+    id: formData.id,
+    title: formData.title,
+    expertId: formData.expertId,
+    pendingExpertName: formData.pendingExpertName,
+    year: formData.year,
+    month: formData.month,
+    desc: formData.desc,
+    visible: formData.visible,
+  }
+
+  if (formData.satisfactionValue != null && Number.isFinite(formData.satisfactionValue) && formData.satisfactionValue > 0) {
+    payload.satisfaction = JSON.stringify({
+      value: formData.satisfactionValue,
+      scale: formData.satisfactionScale,
+    })
+  } else {
+    payload.satisfaction = null
+  }
+
+  await store.saveProject(payload)
   showForm.value = false
 }
 async function handleDelete(p: Project) { if (confirm(`确认删除「${p.title}」？`)) await store.deleteProject(p.id) }
@@ -230,6 +309,12 @@ async function handleDelete(p: Project) { if (confirm(`确认删除「${p.title}
 .form-group label { font-size: 13px; font-weight: 600; color: var(--text); }
 .form-group input, .form-group select, .form-group textarea { padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
 .form-group textarea { min-height: 70px; resize: vertical; }
+.form-group-full { grid-column: 1 / -1; }
+.satisfaction-group .satisfaction-inputs { display: flex; gap: 8px; }
+.satisfaction-group .satisfaction-inputs input { flex: 1; }
+.satisfaction-group .satisfaction-inputs select { width: 100px; flex-shrink: 0; }
+.inline-check { display: flex !important; align-items: center; gap: 6px; font-weight: 500 !important; cursor: pointer; }
+.inline-check input { margin: 0; }
 .form-actions { margin-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
 .btn-text { background: none; border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
 </style>

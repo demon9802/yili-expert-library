@@ -25,11 +25,28 @@ export function parseSatisfaction(sat: any): SatisfactionValue | null {
     }
   }
 
-  // 字符串格式：尝试解析第一个数字，并识别 /5 或 /10 量表
+  // 字符串格式：先尝试 JSON 解析（V6 后端存储格式）
   const s = String(sat).trim()
   if (!s) return null
 
-  // 先去掉常见非数字前缀/后缀，提取数字部分
+  try {
+    const parsed = JSON.parse(s)
+    if (parsed && typeof parsed === 'object') {
+      const v = Number(parsed.value ?? parsed.raw)
+      if (Number.isFinite(v) && v > 0) {
+        const scale = parsed.scale === 5 ? 5 : 10
+        return {
+          raw: v,
+          scale,
+          display: scale === 5 ? v * 2 : v,
+        }
+      }
+    }
+  } catch {
+    // 非 JSON，继续走兜底正则
+  }
+
+  // 兜底：提取第一个数字，并识别 /5 或 /10 量表
   const m = s.match(/(\d+(?:\.\d+)?)/)
   if (!m) return null
   const v = Number(m[1])
