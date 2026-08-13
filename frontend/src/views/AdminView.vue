@@ -4,7 +4,7 @@
     <header class="admin-header">
       <div class="admin-header-inner">
         <div class="admin-header-left">
-          <h1>DACC·数智化赋能优质专家资源库 · 管理后台</h1>
+          <h1>{{ store.platformTitle }} · 管理后台</h1>
           <span class="role-badge">{{ roleLabel }}</span>
         </div>
         <div class="admin-header-actions">

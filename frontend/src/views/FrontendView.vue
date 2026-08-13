@@ -4,7 +4,7 @@
     <header class="header">
       <div class="header-inner">
         <div class="header-left">
-          <div class="header-title">DACC·数智化赋能优质专家资源库</div>
+          <div class="header-title">{{ store.platformTitle }}</div>
           <div class="header-subtitle"></div>
         </div>
         <div class="header-actions">

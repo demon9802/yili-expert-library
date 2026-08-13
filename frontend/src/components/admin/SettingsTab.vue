@@ -2,56 +2,264 @@
   <section class="admin-tab settings-tab">
     <div class="admin-toolbar">
       <h3>系统设置</h3>
-      <button class="btn primary" :disabled="saving" @click="saveSettings">保存设置</button>
     </div>
 
-    <label>应用标题<input v-model.trim="settings.appTitle" /></label>
-    <label>应用描述<textarea v-model="settings.description" rows="4" /></label>
+    <!-- 主标题名称 -->
+    <div class="setting-card">
+      <h4>主标题名称</h4>
+      <p class="setting-hint">将作为前台顶部标题、后台标题与浏览器标签名称。</p>
+      <div class="setting-row">
+        <input v-model="titleInput" class="setting-input" placeholder="输入主标题..." />
+        <button class="btn primary" :disabled="saving || !titleInput.trim()" @click="saveTitle">保存并应用</button>
+        <button class="btn" @click="resetTitle">恢复默认</button>
+      </div>
+    </div>
+
+    <!-- 配色方案 -->
+    <div class="setting-card">
+      <h4>配色方案</h4>
+      <p class="setting-hint">选择后即时生效，应用于全站主色。</p>
+      <div class="scheme-grid">
+        <button
+          v-for="(scheme, key) in schemes"
+          :key="key"
+          class="scheme-btn"
+          :class="{ active: store.colorScheme === key }"
+          @click="pickScheme(key)"
+        >
+          <span class="scheme-dots">
+            <i :style="{ background: scheme.primary }"></i>
+            <i :style="{ background: scheme.light }"></i>
+            <i :style="{ background: scheme.dark }"></i>
+          </span>
+          <span class="scheme-name">{{ scheme.name }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 应用描述 -->
+    <div class="setting-card">
+      <h4>应用描述</h4>
+      <textarea v-model="descInput" class="setting-textarea" rows="3" placeholder="用于前台副标题/分享说明（可选）" />
+      <button class="btn primary" :disabled="saving" @click="saveDesc">保存描述</button>
+    </div>
+
+    <!-- 数据更新时间 -->
+    <div class="setting-card">
+      <h4>数据更新时间</h4>
+      <div class="setting-row">
+        <span class="update-text">当前：{{ updateTimeText }}</span>
+        <button class="btn" @click="refreshTime">刷新</button>
+      </div>
+    </div>
+
+    <!-- 危险操作 -->
+    <div class="setting-card danger">
+      <h4>危险操作</h4>
+      <p class="setting-hint">
+        清除本地缓存会移除浏览器中保存的收藏等本地数据，并重新从服务器加载。不会删除服务器上的专家数据。
+      </p>
+      <button class="btn danger" @click="clearCache">清除本地缓存并重载</button>
+    </div>
+
     <p v-if="message" class="message">{{ message }}</p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { settingApi } from '@/api/setting'
+import { onMounted, ref, computed } from 'vue'
+import { useAppStore } from '@/store/appStore'
 
-const settings = reactive({
-  appTitle: '伊利专家资源库',
-  description: '',
-})
+const store = useAppStore()
+const DEFAULT_TITLE = 'DACC·数智化赋能优质专家资源库'
+
+const titleInput = ref(store.platformTitle || DEFAULT_TITLE)
+const descInput = ref(store.appDescription || '')
 const saving = ref(false)
 const message = ref('')
 
-async function loadSettings() {
-  const [appTitle, description] = await Promise.all([
-    settingApi.get('appTitle'),
-    settingApi.get('description'),
-  ])
-  settings.appTitle = appTitle || settings.appTitle
-  settings.description = description || ''
-}
+const schemes = computed(() => store.COLOR_SCHEMES)
 
-async function saveSettings() {
+const updateTimeText = computed(() => {
+  const t = store.updateTime
+  if (!t) return '尚未设置'
+  const d = new Date(t)
+  if (isNaN(d.getTime())) return t
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+})
+
+onMounted(() => {
+  titleInput.value = store.platformTitle || DEFAULT_TITLE
+  descInput.value = store.appDescription || ''
+})
+
+async function saveTitle() {
+  const t = titleInput.value.trim()
+  if (!t) {
+    message.value = '主标题不能为空'
+    return
+  }
   saving.value = true
   try {
-    await Promise.all([
-      settingApi.save('appTitle', settings.appTitle),
-      settingApi.save('description', settings.description),
-    ])
-    message.value = '系统设置已保存'
+    await store.setPlatformTitle(t)
+    message.value = '主标题已更新'
   } finally {
     saving.value = false
   }
 }
 
-onMounted(loadSettings)
+function resetTitle() {
+  titleInput.value = DEFAULT_TITLE
+  store.setPlatformTitle(DEFAULT_TITLE)
+  message.value = '已恢复默认主标题'
+}
+
+function pickScheme(key: string) {
+  store.setColorScheme(key)
+  message.value = '配色方案已更新：' + (schemes.value[key]?.name || key)
+}
+
+async function saveDesc() {
+  saving.value = true
+  try {
+    await store.setAppDescription(descInput.value)
+    message.value = '应用描述已保存'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function refreshTime() {
+  await store.refreshUpdateTime()
+  message.value = '更新时间已刷新'
+}
+
+function clearCache() {
+  if (!confirm('确认清除本地缓存？将移除浏览器收藏等本地数据并重新加载。')) return
+  localStorage.removeItem('yili_expert_db')
+  localStorage.removeItem('yili_search_history')
+  location.reload()
+}
 </script>
 
 <style scoped>
-.admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.settings-tab label { display: block; margin-bottom: 14px; }
-.settings-tab input, .settings-tab textarea { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 8px; }
-.btn { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; }
-.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-.message { color: #059669; }
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.setting-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+.setting-card h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.setting-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.setting-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.setting-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+}
+.setting-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.scheme-grid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.scheme-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 2px solid var(--border);
+  background: #fff;
+  transition: all 0.2s;
+}
+.scheme-btn.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.scheme-dots {
+  display: flex;
+  gap: 4px;
+}
+.scheme-dots i {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.scheme-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.update-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.setting-card.danger {
+  border-color: var(--danger, #dc2626);
+}
+.message {
+  color: var(--success, #059669);
+  font-size: 13px;
+}
+.btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn.danger {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>
