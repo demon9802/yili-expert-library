@@ -63,11 +63,11 @@
                   <text
                     v-if="slice.percent >= 3"
                     :x="slice.labelX" :y="slice.labelY"
-                    text-anchor="middle" font-size="14" font-weight="900" fill="white"
-                    style="text-shadow:0 1px 3px rgba(0,0,0,0.45); paint-order:stroke; stroke:#00000055; stroke-width:2.5px"
+                    text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff"
+                    style="paint-order:stroke; stroke:rgba(15,23,42,0.35); stroke-width:3px"
                   >{{ slice.percent.toFixed(1) }}%</text>
                 </g>
-                <text :x="cx" :y="cy - 8" text-anchor="middle" font-size="26" font-weight="800" fill="#1e293b">{{ scoreTotal }}</text>
+                <text :x="cx" :y="cy - 6" text-anchor="middle" font-size="30" font-weight="800" fill="#1e293b">{{ scoreTotal }}</text>
                 <text :x="cx" :y="cy + 18" text-anchor="middle" font-size="13" fill="#64748b">位专家</text>
 
                 <g v-for="(item, idx) in scoreLegend" :key="'l'+idx" :transform="`translate(220, ${legendStartY + idx * 40})`">
@@ -87,17 +87,14 @@
               <div class="score-numeric-item">
                 <div class="label">专业度</div>
                 <div class="value blue">{{ avgScores.professional }}</div>
-                <div class="sub">满分5分</div>
               </div>
               <div class="score-numeric-item">
                 <div class="label">影响力</div>
                 <div class="value amber">{{ avgScores.influence }}</div>
-                <div class="sub">满分5分</div>
               </div>
               <div class="score-numeric-item">
                 <div class="label">综合评分</div>
                 <div class="value green">{{ avgScores.overall }}</div>
-                <div class="sub">加权平均</div>
               </div>
             </div>
           </div>
@@ -135,7 +132,6 @@ const fieldStats = computed(() => {
   return visible
     .map(f => ({ name: f.name, count: counts[f.name], color: f.color }))
     .filter(f => f.count > 0)
-    .sort((a, b) => b.count - a.count)
 })
 
 const maxFieldCount = computed(() => Math.max(...fieldStats.value.map(f => f.count), 1))
