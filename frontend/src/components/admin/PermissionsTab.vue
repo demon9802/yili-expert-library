@@ -3,21 +3,18 @@
     <h3>权限管理</h3>
 
     <!-- 主管理员 -->
-    <div class="perm-section">
-      <h4>主管理员</h4>
-      <div class="master-card">
-        <div class="master-info">
-          <div class="master-name">主管理员</div>
-          <div class="master-desc">全部功能权限（专家管理、合作项目管理、评分管理、排序标签、数据看板、分类管理、观察库、权限管理、系统设置）</div>
-        </div>
+    <div class="perm-section master-section">
+      <div class="master-title-row">
+        <h4>主管理员</h4>
         <button class="btn btn-secondary btn-sm" @click="changeMasterPassword">修改密码</button>
       </div>
+      <p class="master-desc">全部功能权限（专家管理、合作项目管理、评分管理、排序标签、仪表盘、分类管理、观察库、权限管理、系统设置）</p>
     </div>
 
     <!-- 子管理员 -->
     <div class="perm-section">
       <h4>子管理员</h4>
-      <p class="section-desc">子管理员默认拥有：专家导入/导出/新增/编辑、分类标签新增、具体专家评分调整。可以在此调整各权限开关。</p>
+      <p class="section-desc">子管理员默认拥有：专家管理（新增/编辑/导入导出）、合作项目管理、评分管理（仅查看）、观察库、仪表盘（数据查看/导出）。可以在此调整各权限开关。</p>
 
       <div v-if="subAdmins.length === 0" class="empty-box">暂无子管理员</div>
 
@@ -98,7 +95,7 @@ const permDefs: PermDef[] = [
   { key: 'expertExport', name: '导出专家', desc: '导出专家数据为文件' },
   { key: 'expertScore', name: '评分调整', desc: '手动调整专家评分' },
   { key: 'categoryManage', name: '分类管理', desc: '新增/编辑/删除适用领域' },
-  { key: 'dashboardManage', name: '数据看板', desc: '查看和管理数据看板' },
+  { key: 'dashboardManage', name: '仪表盘', desc: '查看和导出' },
   { key: 'projectsManage', name: '合作项目管理', desc: '新增/编辑/删除合作项目记录' },
   { key: 'observationManage', name: '观察库', desc: '管理观察中的专家' },
   { key: 'sortManage', name: '排序标签', desc: '管理排序选项（通常关闭）' },
@@ -114,8 +111,8 @@ const defaultSubPerms: Record<string, boolean> = {
   expertDelete: false,
   expertImport: true,
   expertExport: true,
-  expertScore: true,
-  categoryManage: true,
+  expertScore: false,
+  categoryManage: false,
   dashboardManage: true,
   projectsManage: true,
   observationManage: true,
@@ -261,18 +258,15 @@ async function generateSubAdmin() {
 .perm-section h4 { font-size: 15px; font-weight: 600; margin: 0 0 10px; color: var(--text); }
 .section-desc { font-size: 12px; color: var(--text-muted); margin: -4px 0 12px; }
 
-.master-card {
+.master-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
 }
-.master-name { font-weight: 600; font-size: 14px; }
-.master-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.master-title-row h4 { margin: 0; }
+.master-desc { font-size: 12px; color: var(--text-muted); margin: 0; }
 
 .sub-admin-card {
   padding: 16px;
