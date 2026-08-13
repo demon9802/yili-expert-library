@@ -1,11 +1,10 @@
 <template>
   <section class="admin-tab ratings-tab">
     <div class="tab-header"><h3>评分管理</h3></div>
-    <p class="tab-desc">管理评分的展示、规则文档及所有专家的 5 个评分项分值。调整后自动重新计算专业度、影响力与综合得分。</p>
 
-    <!-- 前端展示控制 -->
+    <!-- ① 前端展示控制 -->
     <div class="config-card">
-      <h4>前端展示控制</h4>
+      <h4>① 前端展示控制</h4>
       <div class="toggle-row">
         <span>在前端展示评分信息（专家卡片 &amp; 详情页）：</span>
         <label class="checkbox-toggle">
@@ -16,52 +15,72 @@
       <p class="hint">关闭后，专家卡片和详情页将不再显示任何评分数字及评分项信息，仅管理员在后台可见评分。</p>
     </div>
 
-    <!-- 评分配置（规则及文档） -->
+    <!-- ② 评分配置（规则及文档） -->
     <div class="config-card">
-      <h4>评分配置（规则及文档）</h4>
+      <h4>② 评分配置（规则及文档）</h4>
 
-      <div class="doc-card">
-        <div>
-          <div class="doc-title">评分规则</div>
-          <div class="doc-name">五星制完整文档（v5.9.3）</div>
+      <div class="doc-embed">
+        <div class="doc-embed-head">
+          <div>
+            <div class="doc-embed-title">评分规则与测算文档（10分制 · 主管理员口径）</div>
+            <div class="doc-embed-sub">综合分 = 专业度×0.6 + 影响力×0.4；信息缺失统一 5.0；综合 &lt;7 不展示。</div>
+          </div>
+          <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
         </div>
-        <button class="doc-link" type="button" @click="showRuleDoc = true">打开完整文档 →</button>
-      </div>
 
-      <div class="rule-table-wrap">
-        <table class="rule-table">
-          <thead>
-            <tr>
-              <th>维度</th>
-              <th>评分项</th>
-              <th>评分项构成</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="prof-row">
-              <td class="dimension" :rowspan="professionalItems.length">专业度</td>
-              <td>{{ professionalItems[0] }}</td>
-              <td>学历层次、院校背景、学术经历、研究背景等。</td>
-            </tr>
-            <tr class="prof-row">
-              <td>{{ professionalItems[1] }}</td>
-              <td>行业证书、执业资格、权威认证、专业资质等。</td>
-            </tr>
-            <tr class="prof-row">
-              <td>{{ professionalItems[2] }}</td>
-              <td>项目经验、研究成果、方法论沉淀、服务案例等。</td>
-            </tr>
-            <tr class="infl-row">
-              <td class="dimension" :rowspan="influenceItems.length">影响力</td>
-              <td>{{ influenceItems[0] }}</td>
-              <td>社会荣誉、专业奖项、行业表彰、学会/协会角色等。</td>
-            </tr>
-            <tr class="infl-row">
-              <td>{{ influenceItems[1] }}</td>
-              <td>职称头衔、管理履历、行业身份、组织职位与影响范围等。</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="rule-detail-wrap">
+          <table class="rule-detail-table">
+            <thead>
+              <tr><th>一级维度</th><th>权重</th><th>子维度</th><th>子权重</th><th>评分主锚（档位要点）</th><th>缺失默认</th></tr>
+            </thead>
+            <tbody>
+              <tr class="prof-row">
+                <td class="dimension" :rowspan="3">专业度</td>
+                <td class="weight" :rowspan="3">0.6</td>
+                <td>学历与学术背景</td><td>0.35</td>
+                <td>学历层次 × 院校实力(T0–T4) 矩阵：博士×顶尖 9.5 … 专科 3.0–4.0</td><td class="miss">5.0</td>
+              </tr>
+              <tr class="prof-row">
+                <td>行业资质与认证</td><td>0.30</td>
+                <td>认证层级：A0 国际权威 9.0 / A1 国家级 8.0 / A2 厂商 6.0 / A3 通用 4.0</td><td class="miss">5.0</td>
+              </tr>
+              <tr class="prof-row">
+                <td>专业成果与经验</td><td>0.35</td>
+                <td>学术/企业路径取高：顶刊·战略级 9.0 / 省级 8.0 / 参与 6.0 / 一般服务 4.0</td><td class="miss">5.0</td>
+              </tr>
+              <tr class="infl-row">
+                <td class="dimension" :rowspan="2">影响力</td>
+                <td class="weight" :rowspan="2">0.4</td>
+                <td>社会荣誉与奖项</td><td>0.35</td>
+                <td>行政级别：国家级 9.0 / 省部级 7.5 / 地市 6.0 / 县级 4.0</td><td class="miss">5.0</td>
+              </tr>
+              <tr class="infl-row">
+                <td>职称·管理履历·行业地位</td><td>0.65</td>
+                <td>职级(J0–J3) × 机构(C0–C2) 矩阵：J0×C0 = 9.5，基层 4.5–5.5</td><td class="miss">5.0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="calc-wrap">
+          <div class="calc-title">关键测算结果（权重 60/40 + 缺失 5.0）</div>
+          <table class="calc-table">
+            <thead><tr><th>专家类型</th><th>综合分</th><th>展示</th></tr></thead>
+            <tbody>
+              <tr><td>顶尖学者（清北博士+院士）</td><td>9.2</td><td class="show">展示</td></tr>
+              <tr><td>行业高管（985硕士+世界500强CEO）</td><td>8.5</td><td class="show">展示</td></tr>
+              <tr><td>普通高校讲师（博士+副教授）</td><td>6.8</td><td class="hide">不展示</td></tr>
+              <tr><td>低学历实务专家（专科+多年经验）</td><td>5.3</td><td class="hide">不展示</td></tr>
+              <tr><td>缺1项+其余强</td><td>8.3</td><td class="show">展示</td></tr>
+              <tr><td>缺2项+其余中上</td><td>6.4</td><td class="hide">不展示</td></tr>
+              <tr><td>全平庸（均6.5）</td><td>6.5</td><td class="hide">不展示</td></tr>
+              <tr><td>1缺失+全平庸</td><td>6.2</td><td class="hide">不展示</td></tr>
+              <tr><td>强者带2缺失</td><td>7.6</td><td class="show">展示</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="doc-note">说明：上述为 10 分制管理口径（主管理员汇报/对外说明用）。本系统前端实际以 5★ 制展示，缺失项默认 2★，综合 &lt;3★ 不展示；点「查看完整文档」可见全部矩阵与测算明细。</p>
       </div>
 
       <p class="missing-tip">信息缺失（未填/未公开/无法核实）的评分项，默认按 2★ 计。</p>
@@ -76,7 +95,7 @@
 
     <!-- 专家评分调整 -->
     <div class="config-card">
-      <h4>专家评分调整</h4>
+      <h4>③ 专家评分调整</h4>
       <p class="hint adjust-hint">直接修改表格中 5 个评分项的整数分值（1-5，最高 5★）；专业度、影响力、综合得分由系统自动计算，不可直接编辑。</p>
       <div class="quick-row">
         <input v-model="searchQuery" type="search" placeholder="搜索专家姓名..." class="search-input" />
@@ -142,7 +161,7 @@
 
     <!-- 评分预警区 -->
     <div class="config-card warn-zone">
-      <h4>评分预警区</h4>
+      <h4>④ 评分预警区</h4>
       <div v-if="lowExperts.length === 0" class="ok-box">
         <div class="ok-title">无预警 · 所有专家评分正常</div>
       </div>
@@ -187,13 +206,13 @@
       </form>
     </div>
 
-    <ScoringHelpModal v-if="showRuleDoc" @close="showRuleDoc = false" />
+    <ScoringRulesDocModal v-if="showRuleDoc" @close="showRuleDoc = false" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
+import ScoringRulesDocModal from '@/components/admin/ScoringRulesDocModal.vue'
 import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
@@ -456,31 +475,47 @@ async function saveScores() {
 .inline-hint { margin: 0; }
 .adjust-hint { margin-bottom: 12px; }
 
-.doc-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.doc-embed {
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
   padding: 14px 16px;
   margin-bottom: 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  background: #eff6ff;
 }
-.doc-title { color: #1d4ed8; font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-.doc-name { color: #334155; font-size: 13px; }
-.doc-link { border: none; background: transparent; color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.doc-embed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.doc-embed-title { font-size: 14px; font-weight: 700; color: #1d4ed8; }
+.doc-embed-sub { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+.doc-link { border: none; background: transparent; color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 
-.rule-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-.rule-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
-.rule-table th, .rule-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-.rule-table th { background: var(--surface); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
-.rule-table tr:last-child td { border-bottom: none; }
-.rule-table .dimension { width: 90px; font-weight: 700; text-align: center; vertical-align: middle; }
-.prof-row { background: #eff6ff; }
-.prof-row .dimension { color: #1d4ed8; }
-.infl-row { background: #fffbeb; }
-.infl-row .dimension { color: #b45309; }
+.rule-detail-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
+.rule-detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 760px; }
+.rule-detail-table th, .rule-detail-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.rule-detail-table th { background: var(--surface); color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+.rule-detail-table tr:last-child td { border-bottom: none; }
+.rule-detail-table .dimension { width: 72px; font-weight: 700; text-align: center; vertical-align: middle; }
+.rule-detail-table .weight { width: 52px; text-align: center; font-weight: 700; }
+.rule-detail-table .miss { text-align: center; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.rule-detail-table .prof-row { background: #eff6ff; }
+.rule-detail-table .prof-row .dimension { color: #1e40af; background: #dbeafe; }
+.rule-detail-table .infl-row { background: #fffbeb; }
+.rule-detail-table .infl-row .dimension { color: #b45309; background: #fef3c7; }
+
+.calc-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+.calc-title { padding: 8px 10px; font-size: 12px; font-weight: 700; color: var(--text); background: var(--bg); border-bottom: 1px solid var(--border); }
+.calc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.calc-table th, .calc-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+.calc-table th { color: var(--text-secondary); font-weight: 600; }
+.calc-table tr:last-child td { border-bottom: none; }
+.calc-table .show { color: #059669; font-weight: 600; }
+.calc-table .hide { color: #dc2626; font-weight: 600; }
+
+.doc-note { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
 .missing-tip { margin: 10px 0 12px; padding: 8px 10px; border-radius: 6px; background: #f8fafc; color: #64748b; font-size: 12px; }
 .auto-row { margin-top: 4px; }
 
@@ -491,7 +526,7 @@ async function saveScores() {
 .batch-message.error { color: #dc2626; }
 .table-scroll-wrapper { overflow: auto; max-height: 45vh; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1060px; }
-.data-table th, .data-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table th, .data-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .data-table th { background: var(--surface); font-weight: 600; color: var(--text-secondary); font-size: 12px; }
 .data-table tr:hover { background: #f8fafc; }
 .sub-head.prof { color: #1d4ed8; }
@@ -514,7 +549,7 @@ async function saveScores() {
 .empty { text-align: center; color: #888; padding: 24px; }
 
 .warn-zone { border-color: #fde68a; background: #fffbeb; }
-.warn-zone h4 { color: #b45309; }
+.warn-zone h4 { color: #dc2626; }
 .ok-box { padding: 16px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; }
 .ok-title { font-size: 14px; font-weight: 600; color: #059669; }
 .warn-item { background: #fff; padding: 14px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #fde68a; }

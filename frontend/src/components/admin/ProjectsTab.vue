@@ -2,7 +2,6 @@
   <div class="admin-tab projects-tab">
     <div class="tab-header">
       <h2>合作项目管理</h2>
-      <button class="btn btn-primary btn-small" @click="openCreate">+ 新建项目</button>
     </div>
 
     <!-- Toolbar / Filters -->
@@ -30,6 +29,7 @@
           <button class="btn btn-secondary btn-small" @click="exportProjects">导出Excel</button>
           <button class="btn btn-secondary btn-small" @click="exportProjectsCSV">导出CSV</button>
           <button class="btn btn-secondary btn-small" @click="showImportModal = true">导入Excel</button>
+          <button class="btn btn-primary btn-small" @click="openCreate">+ 新建项目</button>
         </div>
       </div>
       <div class="sort-row">
@@ -220,23 +220,32 @@
     </div>
 
     <!-- Import modal -->
-    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
-      <div class="confirm-modal import-modal">
+    <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+      <div class="import-modal-card">
         <h3>批量导入合作项目</h3>
-        <div class="import-steps">
-          <div class="import-step">
-            <strong>① 下载导入模板</strong>
+        <div class="import-step">
+          <div class="step-index">①</div>
+          <div class="step-content">
+            <div class="step-title">下载导入模板</div>
             <p>按模板填写项目名称、关联讲师、合作年份、合作月份等信息。</p>
-            <button class="btn btn-secondary btn-small" @click="downloadProjectImportTemplate">下载导入模板</button>
-          </div>
-          <div class="import-step">
-            <strong>② 选择文件并导入</strong>
-            <p>仅支持 .xlsx / .xls 文件。系统会按讲师姓名匹配专家，未匹配到的讲师将记为待关联。</p>
-            <input ref="importFileInput" type="file" accept=".xlsx,.xls" @change="onImportFile" />
+            <button type="button" class="btn btn-secondary btn-small" @click="downloadProjectImportTemplate">下载导入模板</button>
           </div>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-text btn-small" @click="showImportModal = false">关闭</button>
+        <div class="import-step">
+          <div class="step-index">②</div>
+          <div class="step-content">
+            <div class="step-title">选择文件并导入</div>
+            <p>仅支持 .xlsx / .xls 文件。系统会按讲师姓名匹配专家，未匹配到的讲师将记为待关联。</p>
+            <div class="import-file-row">
+              <button type="button" class="btn btn-secondary btn-small" @click="importFileInput?.click()">选择文件</button>
+              <span class="import-file-name">{{ importFileName || '未选择文件' }}</span>
+            </div>
+            <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFileSelected" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary btn-small" :disabled="!pendingImportFile" @click="uploadImportFile">上传并导入</button>
+          <button type="button" class="btn btn-text btn-small" @click="closeImportModal">取消</button>
         </div>
       </div>
     </div>
@@ -255,6 +264,8 @@ const showForm = ref(false)
 const editing = ref<Project | null>(null)
 const importFileInput = ref<HTMLInputElement | null>(null)
 const showImportModal = ref(false)
+const pendingImportFile = ref<File | null>(null)
+const importFileName = ref('')
 
 // Filters
 const searchQuery = ref('')
@@ -570,10 +581,26 @@ function downloadProjectImportTemplate() {
   XLSX.writeFile(wb, '合作项目导入模板.xlsx')
 }
 
-function onImportFile(e: Event) {
+function onImportFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
+  const file = input.files?.[0] || null
+  pendingImportFile.value = file
+  importFileName.value = file?.name || ''
+}
+
+function closeImportModal() {
+  showImportModal.value = false
+  pendingImportFile.value = null
+  importFileName.value = ''
+  if (importFileInput.value) importFileInput.value.value = ''
+}
+
+function uploadImportFile() {
+  if (!pendingImportFile.value) return
+  importProjectsFromFile(pendingImportFile.value)
+}
+
+function importProjectsFromFile(file: File) {
   const reader = new FileReader()
   reader.onload = async () => {
     try {
@@ -610,11 +637,11 @@ function onImportFile(e: Event) {
         ok++
       }
       window.alert(`成功导入 ${ok} 个合作项目`)
-      showImportModal.value = false
+      closeImportModal()
     } catch (err) {
       window.alert('导入失败：' + (err as Error).message)
     } finally {
-      input.value = ''
+      if (importFileInput.value) importFileInput.value.value = ''
     }
   }
   reader.readAsArrayBuffer(file)
@@ -695,11 +722,18 @@ function onImportFile(e: Event) {
 .quick-field { margin-bottom: 12px; }
 .field-checkboxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: 220px; overflow: auto; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
 .field-check { display: flex; align-items: center; gap: 6px; font-weight: 400 !important; }
-.import-modal { width: min(520px, 92vw); }
-.import-steps { display: flex; flex-direction: column; gap: 14px; }
-.import-step { padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
-.import-step p { margin: 6px 0 10px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
-.import-step input { font-size: 12px; }
+.import-modal-card { width: min(620px, 92vw); max-height: 88vh; overflow: auto; padding: 22px; border-radius: 10px; background: #fff; box-shadow: 0 20px 60px rgb(15 23 42 / 24%); }
+.import-modal-card h3 { margin-top: 0; }
+.import-step { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--border); }
+.import-step:first-of-type { border-top: 0; }
+.step-index { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-light, #dbeafe); color: var(--primary); display: grid; place-items: center; font-weight: 700; flex-shrink: 0; }
+.step-title { font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.step-content { flex: 1; min-width: 0; }
+.step-content p { margin: 4px 0 10px; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.import-file-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.import-file-name { font-size: 12px; color: var(--text-secondary); }
+.modal-actions { margin-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
 @media (max-width: 720px) {
   .toolbar-actions, .pagination { margin-left: 0; }
   .form-grid, .field-checkboxes { grid-template-columns: 1fr; }

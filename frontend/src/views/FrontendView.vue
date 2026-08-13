@@ -461,7 +461,8 @@ function toggleMobileMode() {
 </script>
 
 <style scoped>
-/* V5 原版：轻盈毛玻璃，固定在视口底部，出现/隐藏用 opacity + pointer-events 控制 */
+/* V5 原版：轻盈毛玻璃，固定在视口底部，出现/隐藏用 opacity + pointer-events 控制。
+   按钮沿用 V5 实心描边质感（border + surface 背景 + 13px），并整体压缩高度。 */
 .page-navigation-float {
   position: fixed;
   bottom: 0;
@@ -472,7 +473,7 @@ function toggleMobileMode() {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 4px 12px;
+  padding: 5px 12px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -488,19 +489,47 @@ function toggleMobileMode() {
   transform: translateY(0);
   pointer-events: auto;
 }
-.page-navigation-float :deep(.page-nav-inline-btn),
-.page-navigation-float :deep(.page-nav-inline-num) {
-  padding: 2px 8px;
-  font-size: 11px;
-  min-height: 22px;
-  line-height: 1;
+.page-navigation-float :deep(.page-navigation-inline) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.page-navigation-float :deep(.page-nav-inline-btn) {
+  padding: 0 12px;
+  height: 28px;
+  font-size: 13px;
+  line-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 22px;
-  height: 22px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 4px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  white-space: nowrap;
 }
 </style>

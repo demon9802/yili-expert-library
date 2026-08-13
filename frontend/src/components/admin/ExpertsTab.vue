@@ -1,5 +1,10 @@
 <template>
   <section class="admin-tab">
+    <!-- Tab title -->
+    <div class="tab-header">
+      <h2>专家管理</h2>
+    </div>
+
     <!-- Toolbar -->
     <div class="admin-toolbar">
       <input
@@ -314,6 +319,8 @@ const filterStatus = ref('')
 const adminSortOptions = [
   { id: 'default', name: '默认（姓名）' },
   { id: 'overall', name: '综合评分 ▼' },
+  { id: 'professional', name: '专业度 ▼' },
+  { id: 'influence', name: '影响力 ▼' },
   { id: 'createdAt', name: '录入时间 ▼' },
 ]
 
@@ -349,6 +356,8 @@ const filteredExperts = computed(() => {
   const arr = [...list]
   const sort = filterSort.value
   if (sort === 'overall') arr.sort((a, b) => (b.scores?.overall ?? 0) - (a.scores?.overall ?? 0))
+  else if (sort === 'professional') arr.sort((a, b) => (b.scores?.professional ?? 0) - (a.scores?.professional ?? 0))
+  else if (sort === 'influence') arr.sort((a, b) => (b.scores?.influence ?? 0) - (a.scores?.influence ?? 0))
   else if (sort === 'createdAt') arr.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
   else arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'))
   return arr
@@ -530,28 +539,25 @@ function onImportFileSelected(e: Event) {
 }
 
 function downloadImportTemplate() {
-  const fieldHint = store.fields.map(f => f.name).join('、')
-  const rows = [
-    {
-      姓名: '',
-      适用领域: fieldHint,
-      学历: '',
-      库内供应商: '',
-      核心优势: '■行业经验：20年乳业咨询',
-      专家卡优势概括: '1-3条，每行一条，显示在专家卡片上',
-      专家卡资历概括: '1-3条，每行一条，显示在专家卡片上',
-      资历资质: '',
-      参考案例: '',
-      联系人: '',
-      联系方式: '',
-      内部推荐人: '',
-      专业度: '',
-      影响力: '',
-      综合评分: '',
-      状态: '',
-    },
-  ]
-  const ws = XLSX.utils.json_to_sheet(rows)
+  const fieldList = store.fields.map(f => f.name).join('、')
+  const cols = ['姓名', '适用领域', '学历', '库内供应商', '核心优势', '专家卡优势概括', '专家卡资历概括', '资历资质', '参考案例', '联系人', '联系方式', '内部推荐人']
+  const hints: Record<string, string> = {
+    姓名: '',
+    适用领域: '领域包括（多项请用逗号分隔）：' + fieldList,
+    学历: '',
+    库内供应商: '是/否',
+    核心优势: '每行一条，用■开头，如：■行业经验：20年乳业咨询',
+    专家卡优势概括: '1-3条，每行一条，显示在专家卡片上',
+    专家卡资历概括: '1-3条，每行一条，显示在专家卡片上',
+    资历资质: '【职称/荣誉头衔】\n【社会职务】\n【履历经历】',
+    参考案例: '【核心课程】\n【服务经历】',
+    联系人: '必填，如不便提供，可填写内部推荐人联系方式',
+    联系方式: '',
+    内部推荐人: '非必填',
+  }
+  const row: Record<string, string> = {}
+  cols.forEach(c => { row[c] = hints[c] ?? '' })
+  const ws = XLSX.utils.json_to_sheet([row], { header: cols })
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '导入模板')
   XLSX.writeFile(wb, '专家导入模板.xlsx')
@@ -570,11 +576,11 @@ function importExpertsFromFile(file: File) {
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
       let ok = 0
-      let fail = 0
       let skipped = 0
       for (const r of rows) {
         const name = String(r['姓名'] || r['name'] || '').trim()
-        if (!name) { fail++; continue }
+        // 空姓名行（如模板的「填写说明」行）直接跳过，不计为失败
+        if (!name) continue
         if (store.experts.some(e => e.name === name)) { skipped++; continue }
         const fields = String(r['适用领域'] || r['fields'] || '')
           .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
@@ -617,7 +623,7 @@ function importExpertsFromFile(file: File) {
           ok++
         }
       }
-      window.alert(`成功导入 ${ok} 条专家${skipped ? `，${skipped} 条重复姓名已跳过` : ''}${fail ? `，${fail} 条因缺少姓名跳过` : ''}`)
+      window.alert(`成功导入 ${ok} 条专家${skipped ? `，${skipped} 条重复姓名已跳过` : ''}`)
       closeImportModal()
     } catch (err) {
       window.alert('导入失败：' + (err as Error).message)
@@ -629,7 +635,7 @@ function importExpertsFromFile(file: File) {
 // ===== Create / Edit =====
 const showModal = ref(false)
 const advantagesText = ref('')
-const qualSubtitleOptions = ['职称/荣誉头衔', '社会职务', '履历资历']
+const qualSubtitleOptions = ['职称/荣誉头衔', '社会职务', '履历经历']
 const qualPairs = ref<{ subtitle: string; content: string }[]>([])
 const casePairs = ref<{ subtitle: string; content: string }[]>([])
 const contacts = ref<ContactInfo[]>([])
@@ -764,6 +770,17 @@ async function removeExpert(expert: Expert) {
   margin-bottom: 16px;
   flex-wrap: wrap;
   align-items: center;
+}
+.tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.tab-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
 }
 .search-input {
   flex: 1;
