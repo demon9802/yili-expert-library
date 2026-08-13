@@ -2,7 +2,6 @@
   <div class="admin-tab dashboard-tab">
     <div class="tab-header">
       <h2>仪表盘管理</h2>
-      <p>配置前端仪表盘的展示内容和图表形式，点击图表区域可跳转至对应的管理页面。</p>
     </div>
 
     <section class="dashboard-section">
@@ -32,7 +31,7 @@
     </section>
 
     <section class="dashboard-section">
-      <h4>实时预览</h4>
+      <h4>实时预览 <span class="preview-note">（不包含观察库专家）</span></h4>
       <div ref="dashboardExportRef" class="dashboard-grid">
         <div v-if="visibleModules.fields" class="dashboard-card full">
           <h4>领域分布情况</h4>
@@ -76,17 +75,14 @@
             <div class="score-numeric-item">
               <div class="label">专业度</div>
               <div class="value blue">{{ avgProfessional }}</div>
-              <div class="sub">满分5分</div>
             </div>
             <div class="score-numeric-item">
               <div class="label">影响力</div>
               <div class="value amber">{{ avgInfluence }}</div>
-              <div class="sub">满分5分</div>
             </div>
             <div class="score-numeric-item">
               <div class="label">综合评分</div>
               <div class="value green">{{ avgOverall }}</div>
-              <div class="sub">加权平均</div>
             </div>
           </div>
         </div>
@@ -292,10 +288,10 @@ function exportCSV() {
 </script>
 
 <style scoped>
-.tab-header p {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--text-secondary, #64748b);
+.preview-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted, #94a3b8);
 }
 
 .dashboard-section {
