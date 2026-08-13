@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_user` (
   `security_lock_until` DATETIME DEFAULT NULL COMMENT '密保锁定截止时间',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `last_login_at` DATETIME DEFAULT NULL COMMENT '最近登录时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
@@ -150,3 +151,15 @@ SET @add_role = IF(@role_exists = 0,
 PREPARE stmt FROM @add_role;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+
+-- 兼容：为已创建的用户表追加 last_login_at 字段（若不存在则添加）
+SET @ll_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'yl_expert_resource_user'
+    AND column_name = 'last_login_at');
+SET @add_ll = IF(@ll_exists = 0,
+  'ALTER TABLE `yl_expert_resource_user` ADD COLUMN `last_login_at` DATETIME DEFAULT NULL COMMENT \'最近登录时间\'',
+  'SELECT 1');
+PREPARE stmt_ll FROM @add_ll;
+EXECUTE stmt_ll;
+DEALLOCATE PREPARE stmt_ll;

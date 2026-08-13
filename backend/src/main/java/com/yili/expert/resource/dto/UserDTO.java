@@ -16,6 +16,7 @@ public class UserDTO {
     private Boolean hasSecurityQuestions;
     private Boolean forcePasswordChange;
     private String createdAt;
+    private String lastLoginAt;
     private List<String> permissions;
     private Map<String, Object> extra;
 }

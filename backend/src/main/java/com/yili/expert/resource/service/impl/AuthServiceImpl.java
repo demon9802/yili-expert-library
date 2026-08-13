@@ -84,6 +84,9 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+        // 记录最近登录时间
+        user.setLastLoginAt(java.time.LocalDateTime.now());
+        userMapper.updateById(user);
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> userMap = new HashMap<>();
         userMap.put("id", user.getId());
@@ -301,6 +304,7 @@ public class AuthServiceImpl implements AuthService {
             dto.setHasSecurityQuestions(false);
             dto.setForcePasswordChange(u.getForcePasswordChange() != null && u.getForcePasswordChange());
             dto.setCreatedAt(u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
+            dto.setLastLoginAt(u.getLastLoginAt() != null ? u.getLastLoginAt().toString() : null);
             dto.setPermissions(u.getSecurityQuestions());
             return dto;
         }).collect(Collectors.toList());
