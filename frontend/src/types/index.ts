@@ -91,6 +91,7 @@ export interface User {
   id: number
   email: string
   isAdmin: boolean
+  role?: 'master' | 'sub'
   forcePasswordChange?: boolean
 }
 
@@ -98,9 +99,12 @@ export interface UserDTO {
   id: number
   email: string
   isAdmin: boolean
+  role?: 'master' | 'sub'
   hasSecurityQuestions: boolean
   forcePasswordChange: boolean
   createdAt: string
+  permissions?: string[]
+  extra?: Record<string, any>
 }
 
 // ===== 认证 =====

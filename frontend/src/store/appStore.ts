@@ -60,6 +60,14 @@ export const useAppStore = defineStore('app', () => {
   // 前端评分展示开关（评分管理 → 前端展示控制）
   const showScores = ref<boolean>(true)
 
+  // 排序选项（V5 管理后台可配置）
+  const sortOptions = ref<{ id: string; name: string }[]>([
+    { id: 'default', name: '默认排序' },
+    { id: 'overall', name: '按综合评分' },
+    { id: 'professional', name: '按专业度' },
+    { id: 'influence', name: '按影响力' }
+  ])
+
   // ===== Getters =====
   const filteredExperts = computed(() => {
     // 基础过滤：排除已淘汰专家（V5 getFilteredExperts 逻辑）
@@ -188,12 +196,34 @@ export const useAppStore = defineStore('app', () => {
     } catch {
       /* 忽略 */
     }
+
+    // 加载排序选项配置（失败使用默认值）
+    try {
+      const v = await settingApi.get('sortOptions')
+      if (v) {
+        const parsed = JSON.parse(v)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          sortOptions.value = parsed
+        }
+      }
+    } catch {
+      /* 忽略 */
+    }
   }
 
   async function setShowScores(v: boolean) {
     showScores.value = v
     try {
       await settingApi.save('showScores', v ? 'true' : 'false')
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  async function saveSortOptions(options: { id: string; name: string }[]) {
+    sortOptions.value = options
+    try {
+      await settingApi.save('sortOptions', JSON.stringify(options))
     } catch {
       /* 忽略 */
     }
@@ -225,6 +255,9 @@ export const useAppStore = defineStore('app', () => {
     isAdmin.value = result.user.isAdmin || false
     return result
   }
+
+  const isMaster = computed(() => isAdmin.value && currentUser.value?.role === 'master')
+  const isSubAdmin = computed(() => isAdmin.value && currentUser.value?.role === 'sub')
 
   async function signUp(email: string, password: string) {
     const result = await authApi.signUp(email, password)
@@ -425,14 +458,14 @@ export const useAppStore = defineStore('app', () => {
     currentSort, scoreFilter, fieldFilter, supplierFilter,
     favoritesFilter, cooperationFilter, searchQuery, adminSearchQuery,
     adminTab, adminSubTab, editingExpert, fieldsCollapsed,
-    currentPage, PAGE_SIZE, searchHistory, loading, showScores,
+    currentPage, PAGE_SIZE, searchHistory, loading, showScores, sortOptions,
     // Getters
-    filteredExperts, totalPages, paginatedExperts,
+    filteredExperts, totalPages, paginatedExperts, isMaster, isSubAdmin,
     // Actions
     loadAppData, checkAuthState, login, signUp, logout,
     saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts,
     saveProject, deleteProject,
-    saveField, deleteField, toggleFavorite, isFavorited, setShowScores,
+    saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
     toggleFieldFilter, clearFilters, setMode, setAdminTab,
   }

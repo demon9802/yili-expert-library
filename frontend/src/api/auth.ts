@@ -62,4 +62,16 @@ export const authApi = {
   adminResetUserPassword(userId: number, tempPassword: string): Promise<void> {
     return api.post('/auth/users/reset-password', { userId, tempPassword })
   },
+
+  createSubAdmin(email: string, password: string, name: string): Promise<UserDTO> {
+    return api.post('/auth/users/sub-admin', { email, password, name })
+  },
+
+  deleteUser(userId: number): Promise<void> {
+    return api.delete(`/auth/users/${userId}`)
+  },
+
+  updateUserPermissions(userId: number, permissions: Record<string, boolean>): Promise<void> {
+    return api.put('/auth/users/permissions', { userId, permissions })
+  },
 }

@@ -16,6 +16,9 @@ public interface AuthService {
     void changePasswordAfterSecurityVerification(Long userId, String newPassword);
     List<UserDTO> fetchUserList();
     void adminResetUserPassword(AdminResetPasswordRequest request);
+    UserDTO createSubAdmin(CreateSubAdminRequest request);
+    void deleteUser(Long userId);
+    void updateUserPermissions(UpdateUserPermissionsRequest request);
     boolean checkForcePasswordChange();
     void clearForcePasswordChange();
 }

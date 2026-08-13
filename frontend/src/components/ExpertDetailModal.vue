@@ -106,22 +106,16 @@
           </div>
         </div>
 
-        <!-- 资历资质 -->
-        <div v-if="expert.qualifications && expert.qualifications !== '未公开'" class="detail-section">
+        <!-- 资历资质（优先使用结构化 qualDisplay，fallback 到 qualifications） -->
+        <div v-if="qualDisplayText" class="detail-section">
           <div class="detail-section-title">资历资质</div>
-          <div class="detail-text" v-html="formatRichText(expert.qualifications)"></div>
+          <div class="detail-text" v-html="formatRichText(qualDisplayText)"></div>
         </div>
 
         <!-- 参考案例 -->
         <div v-if="expert.courses" class="detail-section">
           <div class="detail-section-title">参考案例</div>
           <div class="detail-text" v-html="formatRichText(expert.courses)"></div>
-        </div>
-
-        <!-- 优势展示 -->
-        <div v-if="expert.advDisplay" class="detail-section">
-          <div class="detail-section-title">优势展示</div>
-          <div class="detail-text" v-html="formatRichText(expert.advDisplay)"></div>
         </div>
 
         <!-- 合作项目 -->
@@ -195,6 +189,11 @@ const advantageItems = computed(() => {
     if (a.title && a.desc) return a.title + '：' + a.desc
     return a.title || a.desc || String(a)
   })
+})
+
+const qualDisplayText = computed(() => {
+  const q = (props.expert.qualDisplay || props.expert.qualifications || '').trim()
+  return q && q !== '未公开' ? q : ''
 })
 
 const subScores = computed(() => {

@@ -61,6 +61,7 @@ public class AuthServiceImpl implements AuthService {
         userMap.put("id", user.getId());
         userMap.put("email", user.getEmail());
         userMap.put("is_admin", false);
+        userMap.put("role", user.getRole());
         result.put("user", userMap);
         result.put("token", token);
         return result;
@@ -87,6 +88,7 @@ public class AuthServiceImpl implements AuthService {
         userMap.put("id", user.getId());
         userMap.put("email", user.getEmail());
         userMap.put("is_admin", user.getIsAdmin() != null && user.getIsAdmin());
+        userMap.put("role", user.getRole());
         result.put("user", userMap);
         result.put("token", token);
         return result;
@@ -294,9 +296,11 @@ public class AuthServiceImpl implements AuthService {
             dto.setId(u.getId());
             dto.setEmail(u.getEmail());
             dto.setIsAdmin(u.getIsAdmin() != null && u.getIsAdmin());
-            dto.setHasSecurityQuestions(u.getSecurityQuestions() != null && !u.getSecurityQuestions().isEmpty());
+            dto.setRole(u.getRole());
+            dto.setHasSecurityQuestions(false);
             dto.setForcePasswordChange(u.getForcePasswordChange() != null && u.getForcePasswordChange());
             dto.setCreatedAt(u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
+            dto.setPermissions(u.getSecurityQuestions());
             return dto;
         }).collect(Collectors.toList());
     }
@@ -317,6 +321,74 @@ public class AuthServiceImpl implements AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(tempPassword));
         user.setForcePasswordChange(true);
+        userMapper.updateById(user);
+    }
+
+    @Override
+    public UserDTO createSubAdmin(CreateSubAdminRequest request) {
+        String email = request.getEmail();
+        String password = request.getPassword();
+
+        if (email == null || email.trim().isEmpty()) {
+            throw new RuntimeException("邮箱不能为空");
+        }
+        if (password == null || password.length() < 6) {
+            throw new RuntimeException("密码至少6位");
+        }
+
+        UserEntity existing = userMapper.selectOne(
+                new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
+        if (existing != null) {
+            throw new RuntimeException("该邮箱已存在");
+        }
+
+        UserEntity user = new UserEntity();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setIsAdmin(true);
+        user.setRole("sub");
+        user.setForcePasswordChange(false);
+        user.setSecurityAttempts(0);
+        userMapper.insert(user);
+
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setEmail(user.getEmail());
+        dto.setIsAdmin(true);
+        dto.setRole(user.getRole());
+        dto.setForcePasswordChange(false);
+        dto.setCreatedAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null);
+        return dto;
+    }
+
+    @Override
+    public void deleteUser(Long userId) {
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if ("master".equals(user.getRole())) {
+            throw new RuntimeException("不能删除主管理员");
+        }
+        userMapper.deleteById(userId);
+    }
+
+    @Override
+    public void updateUserPermissions(UpdateUserPermissionsRequest request) {
+        Long userId = request.getUserId();
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        // 将权限 map 序列化为 JSON 存储到 security_questions 字段旁边的扩展字段不够，
+        // 这里复用 securityQuestions 字段作为权限 JSON（该字段对子管理员通常为空）
+        List<String> perms = request.getPermissions() != null
+                ? request.getPermissions().entrySet().stream()
+                        .filter(e -> e.getValue() != null && e.getValue())
+                        .map(e -> e.getKey())
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
+        user.setSecurityQuestions(perms);
         userMapper.updateById(user);
     }
 

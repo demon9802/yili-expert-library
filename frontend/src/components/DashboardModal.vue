@@ -57,23 +57,23 @@
                     :d="slice.path"
                     :fill="slice.color"
                     stroke="#ffffff"
-                    stroke-width="2"
+                    stroke-width="3"
                     opacity="0.95"
                   />
                   <text
-                    v-if="slice.percent >= 4"
+                    v-if="slice.percent >= 3"
                     :x="slice.labelX" :y="slice.labelY"
-                    text-anchor="middle" font-size="12" font-weight="800" fill="white"
-                    style="text-shadow:0 1px 2px rgba(0,0,0,0.35); paint-order:stroke; stroke:#00000033; stroke-width:2px"
+                    text-anchor="middle" font-size="14" font-weight="900" fill="white"
+                    style="text-shadow:0 1px 3px rgba(0,0,0,0.45); paint-order:stroke; stroke:#00000055; stroke-width:2.5px"
                   >{{ slice.percent.toFixed(1) }}%</text>
                 </g>
-                <text :x="cx" :y="cy - 6" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">{{ scoreTotal }}</text>
-                <text :x="cx" :y="cy + 16" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>
+                <text :x="cx" :y="cy - 8" text-anchor="middle" font-size="26" font-weight="800" fill="#1e293b">{{ scoreTotal }}</text>
+                <text :x="cx" :y="cy + 18" text-anchor="middle" font-size="13" fill="#64748b">位专家</text>
 
-                <g v-for="(item, idx) in scoreLegend" :key="'l'+idx" :transform="`translate(210, ${legendStartY + idx * 44})`">
-                  <rect x="0" y="1" width="14" height="14" rx="3" :fill="item.color"/>
-                  <text x="20" y="13" font-size="13" fill="#334155">{{ item.label }}</text>
-                  <text x="20" y="32" font-size="12" font-weight="600" fill="#1e293b">{{ item.count }}人 ({{ item.percent.toFixed(1) }}%)</text>
+                <g v-for="(item, idx) in scoreLegend" :key="'l'+idx" :transform="`translate(220, ${legendStartY + idx * 40})`">
+                  <rect x="0" y="2" width="14" height="14" rx="3" :fill="item.color"/>
+                  <text x="22" y="14" font-size="13" font-weight="600" fill="#334155">{{ item.label }}</text>
+                  <text x="22" y="30" font-size="12" fill="#64748b">{{ item.count }}人 ({{ item.percent.toFixed(1) }}%)</text>
                 </g>
               </svg>
               <div v-else class="empty-chart">暂无可评分数据</div>
@@ -169,10 +169,10 @@ const scoreCounts = computed(() => buckets.map(b => {
 }))
 const scoreTotal = computed(() => scoreCounts.value.reduce((a, b) => a + b, 0))
 
-const cx = 90
+const cx = 95
 const cy = 125
-const r = 80
-const innerR = 50
+const r = 90
+const innerR = 55
 
 const scoreSlices = computed(() => {
   let start = -Math.PI / 2

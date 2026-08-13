@@ -25,20 +25,26 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        ensureAdminUser("master@yili.local", "yili2026");
-        ensureAdminUser("subj5dpcw@yili.local", "ceshi123");
+        ensureAdminUser("master@yili.local", "yili2026", "master");
+        ensureAdminUser("subj5dpcw@yili.local", "ceshi123", "sub");
     }
 
-    private void ensureAdminUser(String email, String rawPassword) {
+    private void ensureAdminUser(String email, String rawPassword, String role) {
         UserEntity existing = userMapper.selectOne(
                 new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
         if (existing != null) {
+            // 兼容：为老数据补 role
+            if (existing.getRole() == null) {
+                existing.setRole(role);
+                userMapper.updateById(existing);
+            }
             return;
         }
         UserEntity user = new UserEntity();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setIsAdmin(true);
+        user.setRole(role);
         user.setForcePasswordChange(false);
         userMapper.insert(user);
     }

@@ -20,6 +20,7 @@ public class UserEntity {
     private String email;
     private String passwordHash;
     private Boolean isAdmin;
+    private String role; // master / sub
     private Boolean forcePasswordChange;
 
     @TableField(typeHandler = JacksonTypeHandler.class)

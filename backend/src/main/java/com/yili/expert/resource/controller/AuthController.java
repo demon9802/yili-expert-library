@@ -101,4 +101,21 @@ public class AuthController {
         authService.adminResetUserPassword(request);
         return ApiResponse.success();
     }
+
+    @PostMapping("/users/sub-admin")
+    public ApiResponse<UserDTO> createSubAdmin(@RequestBody CreateSubAdminRequest request) {
+        return ApiResponse.success(authService.createSubAdmin(request));
+    }
+
+    @DeleteMapping("/users/{userId}")
+    public ApiResponse<Void> deleteUser(@PathVariable Long userId) {
+        authService.deleteUser(userId);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/users/permissions")
+    public ApiResponse<Void> updateUserPermissions(@RequestBody UpdateUserPermissionsRequest request) {
+        authService.updateUserPermissions(request);
+        return ApiResponse.success();
+    }
 }

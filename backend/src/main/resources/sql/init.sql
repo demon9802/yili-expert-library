@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_user` (
   `email` VARCHAR(255) NOT NULL COMMENT '邮箱',
   `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希(BCrypt)',
   `is_admin` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否管理员: 0=否, 1=是',
+  `role` VARCHAR(50) DEFAULT 'sub' COMMENT '管理员角色: master=主管理员, sub=子管理员',
   `force_password_change` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否强制改密',
   `security_questions` JSON DEFAULT NULL COMMENT '密保问题(SHA-256哈希数组)',
   `security_attempts` INT NOT NULL DEFAULT 0 COMMENT '密保尝试次数',
@@ -137,3 +138,15 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_page_view` (
 
 -- 注意：初始管理员账号由 DataInitializer 在应用启动时自动创建，
 -- 避免在 SQL 中硬编码 BCrypt hash。
+
+-- 兼容：为已创建的用户表追加 role 字段（若不存在则添加）
+SET @role_exists = (SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE()
+    AND table_name = 'yl_expert_resource_user'
+    AND column_name = 'role');
+SET @add_role = IF(@role_exists = 0,
+  'ALTER TABLE `yl_expert_resource_user` ADD COLUMN `role` VARCHAR(50) DEFAULT \'sub\' COMMENT \'管理员角色: master=主管理员, sub=子管理员\'',
+  'SELECT 1');
+PREPARE stmt FROM @add_role;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

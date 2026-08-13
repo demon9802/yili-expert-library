@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import type { AdminTab } from '@/types'
@@ -46,24 +46,38 @@ const store = useAppStore()
 const router = useRouter()
 
 const roleLabel = computed(() => {
-  if (!store.currentUser) return '主管理员'
-  return store.isAdmin ? '主管理员' : `子管理员：${store.currentUser.email || ''}`
+  if (store.isMaster) return '主管理员'
+  if (store.isSubAdmin) return `子管理员：${store.currentUser?.email || ''}`
+  return '管理员'
 })
 
-const tabs: { key: AdminTab; label: string }[] = [
+const allTabs: { key: AdminTab; label: string; masterOnly?: boolean }[] = [
   { key: 'experts', label: '专家管理' },
   { key: 'projects', label: '合作项目' },
   { key: 'ratings', label: '评分管理' },
-  { key: 'sort', label: '排序管理' },
+  { key: 'sort', label: '排序标签' },
   { key: 'dashboard', label: '数据看板' },
   { key: 'categories', label: '分类管理' },
   { key: 'observation', label: '观察库' },
-  { key: 'permissions', label: '权限管理' },
-  { key: 'settings', label: '系统设置' },
-  { key: 'users', label: '用户管理' },
-  { key: 'docs', label: '文档' },
-  { key: 'monthlyReport', label: '月报' },
+  { key: 'permissions', label: '权限管理', masterOnly: true },
+  { key: 'settings', label: '系统设置', masterOnly: true },
+  { key: 'users', label: '用户管理', masterOnly: true },
+  { key: 'docs', label: '文档', masterOnly: true },
+  { key: 'monthlyReport', label: '月度报告', masterOnly: true },
 ]
+
+const tabs = computed(() => {
+  if (store.isMaster) return allTabs
+  return allTabs.filter(t => !t.masterOnly)
+})
+
+const visibleTabKeys = computed(() => tabs.value.map(t => t.key))
+
+watch(visibleTabKeys, keys => {
+  if (!keys.includes(store.adminTab)) {
+    store.setAdminTab('experts')
+  }
+}, { immediate: true })
 
 const tabComponentMap: Record<AdminTab, string> = {
   experts: 'ExpertsTab',

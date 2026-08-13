@@ -232,15 +232,12 @@ const isMobile = ref(false)
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
 
-const scoreLabels = ['全部', '5★', '4★+', '3★+', '2★+']
-const scoreValues: (number | null)[] = [null, 5, 4, 3, 2]
+// 与仪表盘分值分布保持一致的五星级分段（4★+ 包含 5★）
+const scoreLabels = ['全部', '4.5-5.0★', '4.0-4.5★', '3.5-4.0★', '3.0-3.5★']
+const scoreValues: (number | null)[] = [null, 4.5, 4.0, 3.5, 3.0]
 
-const sortOptions = [
-  { id: 'default', name: '默认排序' },
-  { id: 'overall', name: '按综合评分' },
-  { id: 'professional', name: '按专业度' },
-  { id: 'influence', name: '按影响力' }
-]
+// sortOptions 现在由管理后台的「排序标签」配置并持久化到 settingApi
+const sortOptions = computed(() => store.sortOptions)
 
 const supplierOptions = [
   { label: '全部', value: null },
