@@ -50,20 +50,26 @@
                   :key="i"
                   :d="slice.path"
                   :fill="slice.color"
+                  stroke="#ffffff"
+                  stroke-width="2"
                   opacity="0.9"
                 />
+                <text
+                  v-for="(slice, i) in scoreDistSlices.filter(s => s.percent >= 3)"
+                  :key="'t' + i"
+                  :x="slice.labelX" :y="slice.labelY + 4"
+                  text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff"
+                >{{ slice.percent.toFixed(1) }}%</text>
               </g>
               <circle v-else :cx="distCx" :cy="distCy" :r="distR" fill="#e2e8f0" />
               <circle :cx="distCx" :cy="distCy" :r="innerR" fill="#fff" />
-              <text :x="distCx" :y="distCy - 6" text-anchor="middle" font-size="22" font-weight="700" fill="#1e293b">{{ scoreDistTotal }}</text>
+              <text :x="distCx" :y="distCy - 4" text-anchor="middle" font-size="24" font-weight="600" fill="#1e293b">{{ scoreDistTotal }}</text>
               <text :x="distCx" :y="distCy + 16" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>
 
               <g v-for="(item, i) in scoreDistItems" :key="'legend-' + i">
-                <rect :x="legendX" :y="legendY + i * 30" width="12" height="12" rx="3" :fill="item.color" />
-                <text :x="legendX + 18" :y="legendY + i * 30 + 10" font-size="12" fill="#475569">{{ item.range }}</text>
-                <text :x="legendValueX" :y="legendY + i * 30 + 10" font-size="12" font-weight="600" fill="#1e293b" text-anchor="end">
-                  {{ item.count }}人 {{ item.percent.toFixed(1) }}%
-                </text>
+                <rect :x="legendX" :y="legendY + i * 34" width="12" height="12" rx="3" :fill="item.color" />
+                <text :x="legendX + 18" :y="legendY + i * 34 + 10" font-size="13" font-weight="600" fill="#334155">{{ item.range }}</text>
+                <text :x="legendX + 18" :y="legendY + i * 34 + 26" font-size="12" fill="#64748b">{{ item.count }}人 ({{ item.percent.toFixed(1) }}%)</text>
               </g>
             </svg>
           </div>
@@ -183,12 +189,12 @@ const distCy = computed(() => distChartWidth.value < 520 ? 120 : distChartHeight
 const distR = computed(() => Math.min(distChartWidth.value * 0.2, 82))
 const innerR = computed(() => distR.value * 0.58)
 const legendX = computed(() => distChartWidth.value < 520 ? 24 : distChartWidth.value * 0.58)
-const legendY = computed(() => distChartWidth.value < 520 ? 235 : 64)
-const legendValueX = computed(() => distChartWidth.value - 24)
+const legendY = computed(() => distChartWidth.value < 520 ? 220 : 66)
 
 const scoreDistSlices = computed(() => {
   const total = scoreDistTotal.value
   let startAngle = -Math.PI / 2
+  const labelR = (distR.value + innerR.value) / 2
   return scoreDistItems.value.map(item => {
     const angle = total > 0 ? (item.count / total) * 2 * Math.PI : 0
     const endAngle = startAngle + angle
@@ -204,8 +210,12 @@ const scoreDistSlices = computed(() => {
     const y2i = distCy.value + innerR.value * Math.sin(endAngle)
 
     const path = `M${x1o.toFixed(1)},${y1o.toFixed(1)} A${distR.value},${distR.value} 0 ${largeArc} 1 ${x2o.toFixed(1)},${y2o.toFixed(1)} L${x2i.toFixed(1)},${y2i.toFixed(1)} A${innerR.value},${innerR.value} 0 ${largeArc} 0 ${x1i.toFixed(1)},${y1i.toFixed(1)} Z`
+    const mid = startAngle + angle / 2
+    const percent = total > 0 ? (item.count / total) * 100 : 0
+    const labelX = distCx.value + labelR * Math.cos(mid)
+    const labelY = distCy.value + labelR * Math.sin(mid)
     startAngle = endAngle
-    return { path, color: item.color }
+    return { path, color: item.color, percent, labelX, labelY }
   })
 })
 
