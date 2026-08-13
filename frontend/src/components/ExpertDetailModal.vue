@@ -129,8 +129,8 @@
           >
             <div style="font-weight:600;margin-bottom:4px">{{ proj.title }}</div>
             <div style="font-size:12px;color:#15803d">{{ proj.year }}年{{ proj.month ? proj.month + '月' : '' }}</div>
-            <div v-if="satisfactionValue(proj.satisfaction) != null" style="font-size:13px;color:#f59e0b">
-              <span style="letter-spacing:2px">{{ satisfactionStars(proj.satisfaction) }}</span>
+            <div v-if="satisfactionHasValue(proj.satisfaction)" style="font-size:13px;color:#f59e0b">
+              <span style="letter-spacing:1px">{{ satisfactionStars(proj.satisfaction) }}</span>
               <span style="color:#166534;margin-left:6px;font-size:12px">{{ satisfactionDisplay(proj.satisfaction) }}/10</span>
             </div>
             <div v-if="proj.desc" style="font-size:13px;color:#15803d;margin-top:4px;line-height:1.6">{{ proj.desc }}</div>
@@ -165,6 +165,7 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, ContactInfo, SubScores } from '@/types'
 import { formatRichText, copyText } from '@/utils/helpers'
+import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 import StarRating from '@/components/StarRating.vue'
 import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
 
@@ -260,25 +261,6 @@ function getFieldStyle(fieldName: string) {
 
 async function toggleFav() {
   await store.toggleFavorite(props.expert.id)
-}
-
-function satisfactionValue(s: any): number | null {
-  if (s == null) return null
-  const v = typeof s === 'object' ? (s.value ?? s.raw) : s
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
-function satisfactionStars(s: any): string {
-  const val = satisfactionValue(s)
-  if (val == null) return ''
-  const full = Math.round(val / 2)
-  return '★'.repeat(full) + '☆'.repeat(5 - full)
-}
-
-function satisfactionDisplay(s: any): string {
-  const val = satisfactionValue(s)
-  return val != null ? val.toFixed(1) : ''
 }
 
 function copyContact(info?: string) {

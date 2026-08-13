@@ -72,6 +72,7 @@ const activeExperts = computed(() =>
 )
 
 const fieldStats = computed(() => {
+  // 对齐 V5：按领域定义顺序（而非按数量排序）展示，图例左右分布更平衡
   const used = new Set(activeExperts.value.flatMap(e => e.fields || []))
   const visible = store.fields.filter(f => {
     if (f.hideWhenEmpty && !used.has(f.name)) return false
@@ -87,7 +88,6 @@ const fieldStats = computed(() => {
   return visible
     .map(f => ({ name: f.name, count: counts[f.name], color: f.color || '#3B82F6' }))
     .filter(f => f.count > 0)
-    .sort((a, b) => b.count - a.count)
 })
 
 const maxVal = computed(() => Math.max(...fieldStats.value.map(f => f.count), 1))
