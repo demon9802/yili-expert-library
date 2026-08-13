@@ -452,20 +452,35 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // ===== 领域 CRUD =====
-  async function saveField(field: Partial<Field>) {
+  // field 可携带 _oldName 表示改名（对齐 V5：改名级联专家、删除清理专家引用）
+  async function saveField(field: Partial<Field> & { _oldName?: string }) {
+    const oldName = field._oldName
+    const keyName = oldName ?? field.name!
     if (field.id) {
-      await fieldApi.update(field.name!, field)
-      const idx = fields.value.findIndex(f => f.name === field.name)
+      await fieldApi.update(keyName, field)
+      const idx = fields.value.findIndex(f => f.name === keyName)
       if (idx >= 0) fields.value[idx] = { ...fields.value[idx], ...field } as Field
     } else {
       const created = await fieldApi.create(field)
       fields.value.push(created)
+    }
+    // 改名后同步本地专家缓存（后端已级联 DB，前端缓存保持一致避免脏筛选）
+    if (oldName && field.name && oldName !== field.name) {
+      experts.value = experts.value.map(e => ({
+        ...e,
+        fields: (e.fields || []).map(f => (f === oldName ? field.name! : f)),
+      }))
     }
   }
 
   async function deleteField(name: string) {
     await fieldApi.delete(name)
     fields.value = fields.value.filter(f => f.name !== name)
+    // 同步清理本地专家身上的领域引用（后端已级联 DB）
+    experts.value = experts.value.map(e => ({
+      ...e,
+      fields: (e.fields || []).filter(f => f !== name),
+    }))
   }
 
   // ===== 收藏 =====

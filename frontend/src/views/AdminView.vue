@@ -57,7 +57,7 @@ const allTabs: { key: AdminTab; label: string; masterOnly?: boolean }[] = [
   { key: 'ratings', label: '评分管理' },
   { key: 'sort', label: '排序标签' },
   { key: 'dashboard', label: '数据看板' },
-  { key: 'categories', label: '分类管理' },
+  { key: 'categories', label: '分类管理', masterOnly: true },
   { key: 'observation', label: '观察库' },
   { key: 'permissions', label: '权限管理', masterOnly: true },
   { key: 'settings', label: '系统设置', masterOnly: true },

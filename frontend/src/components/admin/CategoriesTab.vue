@@ -2,53 +2,159 @@
   <div class="admin-tab categories-tab">
     <div class="tab-header">
       <h2>分类管理</h2>
-      <button class="btn btn-primary" @click="showForm = true; editing = null">新增分类</button>
+      <p class="tab-desc">管理"适用领域"标签的名称与颜色。改名会同步到所有相关专家，删除会清理专家身上的引用。</p>
     </div>
+
     <div class="fields-list">
-      <div v-for="field in store.fields" :key="field.name" class="field-row">
-        <span class="field-color" :style="{ background: field.color, color: field.textColor }">{{ field.name }}</span>
-        <span class="field-info">排序: {{ field.sortOrder }}</span>
-        <span class="field-info">{{ field.hideWhenEmpty ? '无专家时隐藏' : '始终显示' }}</span>
+      <div v-for="field in store.fields" :key="field.id ?? field.name" class="field-row">
+        <input
+          class="field-name-input"
+          :value="field.name"
+          @change="onRename(field, ($event.target as HTMLInputElement).value)"
+        />
+        <input
+          class="field-color-input"
+          type="color"
+          :value="field.color"
+          @change="onColorChange(field, ($event.target as HTMLInputElement).value)"
+        />
+        <span class="field-preview" :style="{ background: field.color, color: field.textColor || '#fff' }">
+          {{ field.name }}
+        </span>
         <div class="actions">
-          <button class="btn-link" @click="editField(field)">编辑</button>
-          <button class="btn-link danger" @click="handleDelete(field)">删除</button>
+          <button class="btn-link danger" @click="onDelete(field)">删除</button>
         </div>
       </div>
     </div>
-    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
-      <div class="form-modal">
-        <h3>{{ editing ? '编辑分类' : '新增分类' }}</h3>
-        <div class="form-grid">
-          <div class="form-group"><label>名称 *</label><input v-model="formData.name" type="text" :disabled="!!editing" /></div>
-          <div class="form-group"><label>背景色</label><input v-model="formData.color" type="color" /></div>
-          <div class="form-group"><label>文字色</label><input v-model="formData.textColor" type="color" /></div>
-          <div class="form-group"><label>排序权重</label><input v-model.number="formData.sortOrder" type="number" /></div>
-          <div class="form-group"><label>无专家时隐藏</label><input v-model="formData.hideWhenEmpty" type="checkbox" /></div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-primary" @click="handleSave">保存</button>
-          <button class="btn btn-text" @click="showForm = false">取消</button>
-        </div>
-      </div>
+
+    <div class="add-row">
+      <input v-model="newName" class="field-name-input" placeholder="标签名称" />
+      <input v-model="newColor" class="field-color-input" type="color" />
+      <button class="btn btn-primary" :disabled="!canAdd" @click="onAdd">添加</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Field } from '@/types'
 
 const store = useAppStore()
-const showForm = ref(false)
-const editing = ref<Field | null>(null)
-const formData = reactive<Partial<Field>>({ name: '', color: '#2563EB', textColor: '#ffffff', hideWhenEmpty: false, sortOrder: 0 })
+const newName = ref('')
+const newColor = ref('#2563EB')
 
-function editField(f: Field) { editing.value = f; Object.assign(formData, f); showForm.value = true }
-async function handleSave() {
-  if (!formData.name?.trim()) { alert('请填写名称'); return }
-  await store.saveField(formData); showForm.value = false
-  Object.assign(formData, { name: '', color: '#2563EB', textColor: '#ffffff', hideWhenEmpty: false, sortOrder: 0 }); editing.value = null
+const canAdd = computed(
+  () => newName.value.trim().length > 0 && !store.fields.some(f => f.name === newName.value.trim())
+)
+
+function onRename(field: Field, raw: string) {
+  const name = raw.trim()
+  if (!name || name === field.name) return
+  if (store.fields.some(f => f.name === name)) {
+    window.alert('标签名称已存在')
+    return
+  }
+  store.saveField({ ...field, name, _oldName: field.name })
 }
-async function handleDelete(f: Field) { if (confirm(`确认删除分类「${f.name}」？`)) await store.deleteField(f.name) }
+
+function onColorChange(field: Field, color: string) {
+  store.saveField({ ...field, color })
+}
+
+function onDelete(field: Field) {
+  const affected = store.experts.filter(e => (e.fields || []).includes(field.name))
+  if (affected.length > 0) {
+    const preview = affected.slice(0, 5).map(e => e.name).join('、')
+    const msg = `有 ${affected.length} 位专家使用此标签（${preview}${affected.length > 5 ? ' 等' : ''}），删除后将同步清理这些专家的引用，确认删除？`
+    if (!window.confirm(msg)) return
+  }
+  store.deleteField(field.name)
+}
+
+async function onAdd() {
+  if (!canAdd.value) return
+  await store.saveField({
+    name: newName.value.trim(),
+    color: newColor.value,
+    textColor: '#ffffff',
+    hideWhenEmpty: false,
+    sortOrder: store.fields.length,
+  })
+  newName.value = ''
+}
 </script>
+
+<style scoped>
+.tab-header { margin-bottom: 16px; }
+.tab-header h2 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.tab-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+.fields-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.field-name-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.field-name-input:focus { outline: none; border-color: var(--primary); }
+.field-color-input {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.field-preview {
+  padding: 4px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.actions { margin-left: auto; }
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+.btn-link.danger { color: #dc2626; }
+
+.add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.btn-primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+</style>
