@@ -149,10 +149,15 @@ export interface ApiResponse<T> {
 export type AppMode = 'frontend' | 'admin'
 export type AdminTab = 'experts' | 'projects' | 'ratings' | 'sort' | 'dashboard' | 'categories' | 'observation' | 'permissions' | 'settings' | 'users' | 'docs' | 'monthlyReport'
 
+export interface ScoreRangeFilter {
+  min: number | null
+  max: number | null
+}
+
 export interface AppState {
   mode: AppMode
   currentSort: string
-  scoreFilter: number | null
+  scoreFilter: ScoreRangeFilter
   fieldFilter: Set<string>
   supplierFilter: boolean | null
   favoritesFilter: boolean | null

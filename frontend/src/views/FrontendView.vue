@@ -4,7 +4,7 @@
     <header class="header">
       <div class="header-inner">
         <div class="header-left">
-          <div class="header-title">伊利集团·数智化赋能优质专家资源库</div>
+          <div class="header-title">DACC·数智化赋能优质专家资源库</div>
           <div class="header-subtitle"></div>
         </div>
         <div class="header-actions">
@@ -94,14 +94,33 @@
       <div class="filter-group">
         <span class="filter-label">分值：</span>
         <div class="score-filters">
+          <input
+            v-model.number="scoreMin"
+            type="number"
+            min="0"
+            max="5"
+            step="0.1"
+            placeholder="最低"
+            class="score-input"
+            @change="applyScoreRange"
+          />
+          <span class="score-range-sep">-</span>
+          <input
+            v-model.number="scoreMax"
+            type="number"
+            min="0"
+            max="5"
+            step="0.1"
+            placeholder="最高"
+            class="score-input"
+            @change="applyScoreRange"
+          />
           <button
-            v-for="(label, i) in scoreLabels"
-            :key="label"
+            v-if="scoreFilterActive"
             class="score-btn"
-            :class="{ active: scoreValues[i] === store.scoreFilter }"
-            @click="setScoreFilter(scoreValues[i])"
+            @click="clearScoreFilter"
           >
-            {{ label }}
+            清除
           </button>
         </div>
       </div>
@@ -210,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import type { Expert } from '@/types'
@@ -232,9 +251,37 @@ const isMobile = ref(false)
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
 
-// 与仪表盘分值分布保持一致的五星级分段（4★+ 包含 5★）
-const scoreLabels = ['全部', '4.5-5.0★', '4.0-4.5★', '3.5-4.0★', '3.0-3.5★']
-const scoreValues: (number | null)[] = [null, 4.5, 4.0, 3.5, 3.0]
+// 分值区间筛选（用户输入最低-最高，最多一位小数，空值表示半开放区间）
+const scoreMin = ref<number | null>(store.scoreFilter.min)
+const scoreMax = ref<number | null>(store.scoreFilter.max)
+
+watch(() => store.scoreFilter, (f) => {
+  scoreMin.value = f.min
+  scoreMax.value = f.max
+}, { deep: true })
+
+const scoreFilterActive = computed(() => scoreMin.value != null || scoreMax.value != null)
+
+function roundScoreInput(v: number | string | null): number | null {
+  if (v == null || v === '') return null
+  const n = Math.round(Number(v) * 10) / 10
+  return Number.isFinite(n) ? n : null
+}
+
+function applyScoreRange() {
+  store.scoreFilter = {
+    min: roundScoreInput(scoreMin.value),
+    max: roundScoreInput(scoreMax.value)
+  }
+  store.currentPage = 1
+}
+
+function clearScoreFilter() {
+  scoreMin.value = null
+  scoreMax.value = null
+  store.scoreFilter = { min: null, max: null }
+  store.currentPage = 1
+}
 
 // sortOptions 现在由管理后台的「排序标签」配置并持久化到 settingApi
 const sortOptions = computed(() => store.sortOptions)
@@ -308,11 +355,6 @@ function useHistory(query: string) {
 
 function hideHistoryDelayed() {
   setTimeout(() => { showHistory.value = false }, 200)
-}
-
-function setScoreFilter(v: number | null) {
-  store.scoreFilter = store.scoreFilter === v ? null : v
-  store.currentPage = 1
 }
 
 function setSupplierFilter(v: boolean | null) {

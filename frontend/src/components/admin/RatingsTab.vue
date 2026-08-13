@@ -1,7 +1,7 @@
 <template>
   <section class="admin-tab ratings-tab">
     <div class="tab-header"><h3>评分管理</h3></div>
-    <p class="tab-desc">管理前端评分展示开关、执行自动评分、手动调整专家分值及处理评分预警。评分项与权重由系统统一锁定，主管理员可查看评分说明文档。</p>
+    <p class="tab-desc">管理评分的维度配置、子维度权重及所有专家的各项分值。调整后自动重新计算综合评分。</p>
 
     <!-- 前端展示控制 -->
     <div class="config-card">
@@ -14,25 +14,42 @@
         </label>
         <span class="toggle-state">{{ store.showScores ? '展示中' : '已隐藏' }}</span>
       </div>
-      <p class="hint">关闭后，专家卡片和详情页将不再显示任何评分数字，仅管理员在后台可见评分。</p>
+      <p class="hint">关闭后，专家卡片和详情页将不再显示任何评分数字及子维度信息，仅管理员在后台可见评分。</p>
     </div>
 
-    <!-- 自动评分引擎 -->
+    <!-- 评分体系配置 -->
     <div class="config-card">
-      <h4>自动评分引擎</h4>
-      <p class="hint">系统根据专家的学历、履历、职务、资质、荣誉、合作项目等信息自动识别并计算五星制评分。识别规则经过多轮调优，对“资深行业实战派”等特殊履历做单独保护，避免分值失真。</p>
-      <div class="engine-actions">
-        <button class="btn primary" :disabled="batchRunning" @click="runBatchScoring">
-          {{ batchRunning ? `正在重算 ${batchProgress}...` : '一键重算全部专家评分' }}
-        </button>
+      <h4>评分体系配置</h4>
+      <p class="hint">权重与评分项由系统统一锁定（专业度 60% / 影响力 40%），综合评分 = 专业度 × 60% + 影响力 × 40%。子维度按等权平均计入对应维度。</p>
+      <div
+        v-for="dim in ratingDimensions"
+        :key="dim.id"
+        class="dim-card"
+        :style="{ borderColor: dim.border }"
+      >
+        <div class="dim-head">
+          <strong :style="{ color: dim.color }">{{ dim.name }}</strong>
+          <span class="dim-weight">权重 {{ dim.weight }}%</span>
+        </div>
+        <div class="dim-desc">{{ dim.desc }}</div>
+        <ul class="dim-items">
+          <li v-for="it in dim.items" :key="it">{{ it }}</li>
+        </ul>
       </div>
-      <div v-if="batchMessage" class="batch-message" :class="batchSuccess ? 'success' : 'error'">{{ batchMessage }}</div>
     </div>
 
-    <!-- 评分说明文档（V5 仅主管理员可见；当前 V6 暂未区分主/子管理员角色，待权限管理模块接入后按角色控制） -->
+    <!-- AI 自主评分 -->
     <div class="config-card">
-      <h4>评分说明文档</h4>
-      <pre class="rules-doc">{{ rulesDoc }}</pre>
+      <h4>AI 自主评分</h4>
+      <div class="toggle-row">
+        <span>启用AI自动评分：</span>
+        <label class="switch">
+          <input type="checkbox" :checked="aiEnabled" @change="onAiToggle($event)" />
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-state">{{ aiEnabled ? '已启用' : '已关闭' }}</span>
+      </div>
+      <p class="hint">AI 根据专家学历、资历、履历等信息自动生成各子维度评分。关闭后可手动在下方调整每位专家的评分。</p>
     </div>
 
     <!-- 专家评分调整 -->
@@ -45,30 +62,48 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>姓名</th>
-              <th>专业度</th>
-              <th>影响力</th>
-              <th>综合</th>
-              <th>操作</th>
+              <th rowspan="2">姓名</th>
+              <th rowspan="2">专业度</th>
+              <th rowspan="2">影响力</th>
+              <th rowspan="2">综合</th>
+              <th v-for="it in ratingDimensions[0].items" :key="it" class="sub-head prof">{{ it }}</th>
+              <th v-for="it in ratingDimensions[1].items" :key="it" class="sub-head infl">{{ it }}</th>
+              <th rowspan="2">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="e in filteredExperts" :key="e.id">
               <td class="cell-name">{{ e.name }}</td>
-              <td class="cell-prof">{{ e.scores?.professional != null ? e.scores.professional.toFixed(1) : '-' }}</td>
-              <td class="cell-infl">{{ e.scores?.influence != null ? e.scores.influence.toFixed(1) : '-' }}</td>
+              <td class="cell-prof">{{ num(e.scores?.professional) }}</td>
+              <td class="cell-infl">{{ num(e.scores?.influence) }}</td>
               <td class="cell-overall" :style="{ color: overallColor(e.scores?.overall), fontWeight: '700' }">
-                {{ e.scores?.overall != null ? e.scores.overall.toFixed(1) : '-' }}
+                {{ num(e.scores?.overall) }}
+              </td>
+              <td v-for="it in ratingDimensions[0].items" :key="it" class="sub-cell">
+                <input
+                  class="sub-input"
+                  type="number" min="0" max="5" step="0.1"
+                  :value="subsFor(e).professional[it]"
+                  @change="onSubChange(e, 'professional', it, $event)"
+                />
+              </td>
+              <td v-for="it in ratingDimensions[1].items" :key="it" class="sub-cell">
+                <input
+                  class="sub-input infl"
+                  type="number" min="0" max="5" step="0.1"
+                  :value="subsFor(e).influence[it]"
+                  @change="onSubChange(e, 'influence', it, $event)"
+                />
               </td>
               <td class="actions">
                 <button class="btn btn-ai btn-sm" :disabled="runningId === e.id" @click="autoScoreOne(e)">
-                  {{ runningId === e.id ? '计算中' : '自动评分' }}
+                  {{ runningId === e.id ? '计算中' : '重置AI' }}
                 </button>
                 <button class="btn btn-secondary btn-sm" @click="openEdit(e)">编辑评分</button>
               </td>
             </tr>
             <tr v-if="filteredExperts.length === 0">
-              <td colspan="5" class="empty">暂无专家</td>
+              <td colspan="12" class="empty">暂无专家</td>
             </tr>
           </tbody>
         </table>
@@ -83,14 +118,14 @@
       </div>
       <div v-for="e in lowExperts" :key="e.id" class="warn-item">
         <div class="warn-head">
-          <strong>{{ e.name }}　综合：{{ e.scores?.overall != null ? e.scores.overall.toFixed(1) : '-' }}</strong>
+          <strong>{{ e.name }}　综合：{{ num(e.scores?.overall) }}</strong>
           <div class="warn-actions">
             <button class="btn btn-sm btn-ai" @click="autoScoreOne(e)">重新识别评分</button>
             <button class="btn btn-sm btn-ok" @click="adjustToThreshold(e)">调整至 3.5★</button>
             <button class="btn btn-sm btn-warn" @click="moveToObservation(e)">移入观察库</button>
           </div>
         </div>
-        <div class="warn-sub">专业度：{{ e.scores?.professional != null ? e.scores.professional.toFixed(1) : '-' }} ｜ 影响力：{{ e.scores?.influence != null ? e.scores.influence.toFixed(1) : '-' }}</div>
+        <div class="warn-sub">专业度：{{ num(e.scores?.professional) }} ｜ 影响力：{{ num(e.scores?.influence) }}</div>
         <div v-if="lowReasons(e).length" class="warn-reasons">
           <div v-for="r in lowReasons(e)" :key="r" class="warn-reason">• {{ r }}</div>
         </div>
@@ -114,25 +149,110 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { expertApi } from '@/api/expert'
+import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
-import { autoScoreExpert, RATING_RULES_DOC } from '@/utils/scoring'
+import { autoScoreExpert } from '@/utils/scoring'
 import type { Expert, Scores } from '@/types'
 
 const store = useAppStore()
 const searchQuery = ref('')
 const runningId = ref<number | null>(null)
-const batchRunning = ref(false)
-const batchProgress = ref('')
-const batchMessage = ref('')
-const batchSuccess = ref(true)
+const aiEnabled = ref(true)
 
-const rulesDoc = RATING_RULES_DOC
+const ratingDimensions = [
+  {
+    id: 'professional',
+    name: '专业度',
+    weight: 60,
+    color: '#1d4ed8',
+    border: '#dbeafe',
+    desc: '由学历与学术背景、行业资质与认证、专业成果与经验、课程与培训体系四项等权平均得出。',
+    items: ['学历与学术背景', '行业资质与认证', '专业成果与经验', '课程与培训体系'],
+  },
+  {
+    id: 'influence',
+    name: '影响力',
+    weight: 40,
+    color: '#b45309',
+    border: '#fef3c7',
+    desc: '由社会荣誉与奖项、职称与专业头衔、管理履历与行业地位三项等权平均得出。',
+    items: ['社会荣誉与奖项', '职称与专业头衔', '管理履历与行业地位'],
+  },
+]
+
+// ===== 子维度评分（用于表格展示/编辑）=====
+const expertBreakdowns = computed(() => {
+  const map = new Map<number, { professional: Record<string, number>; influence: Record<string, number> }>()
+  store.experts.forEach(e => {
+    if (e.subScores?.professional && e.subScores?.influence) {
+      map.set(e.id, {
+        professional: e.subScores.professional as Record<string, number>,
+        influence: e.subScores.influence as Record<string, number>,
+      })
+    } else {
+      const bd = autoScoreExpert(e, store.yiliProjects)
+      map.set(e.id, { professional: bd.professionalItems, influence: bd.influenceItems })
+    }
+  })
+  return map
+})
+
+function subsFor(e: Expert) {
+  return expertBreakdowns.value.get(e.id) || { professional: {} as Record<string, number>, influence: {} as Record<string, number> }
+}
+
+function clampInput(v: number): number {
+  if (isNaN(v)) return 0
+  return Math.min(5, Math.max(0, Math.round(v * 10) / 10))
+}
+
+function computeFromSubs(profMap: Record<string, number>, inflMap: Record<string, number>) {
+  const pVals = Object.values(profMap).map(Number).filter(n => Number.isFinite(n))
+  const iVals = Object.values(inflMap).map(Number).filter(n => Number.isFinite(n))
+  const professional = pVals.length ? clampInput(pVals.reduce((s, n) => s + n, 0) / pVals.length) : 0
+  const influence = iVals.length ? clampInput(iVals.reduce((s, n) => s + n, 0) / iVals.length) : 0
+  const overall = clampInput(professional * 0.6 + influence * 0.4)
+  return { professional, influence, overall }
+}
+
+async function onSubChange(e: Expert, dim: 'professional' | 'influence', item: string, ev: Event) {
+  const raw = parseFloat((ev.target as HTMLInputElement).value)
+  const v = clampInput(raw)
+  const cur = subsFor(e)
+  const profMap = { ...cur.professional }
+  const inflMap = { ...cur.influence }
+  if (dim === 'professional') profMap[item] = v
+  else inflMap[item] = v
+  const { professional, influence, overall } = computeFromSubs(profMap, inflMap)
+  const updated = await expertApi.update(e.id, {
+    scores: { professional, influence, overall },
+    subScores: { professional: profMap, influence: inflMap },
+  })
+  syncExpert(updated)
+}
 
 // ===== 前端展示控制 =====
 function onToggleShow(e: Event) {
   store.setShowScores((e.target as HTMLInputElement).checked)
+}
+
+// ===== AI 自主评分 =====
+onMounted(async () => {
+  try {
+    const v = await settingApi.get('aiScoringEnabled')
+    if (v != null) aiEnabled.value = v !== 'false'
+  } catch { /* 忽略 */ }
+})
+
+async function onAiToggle(ev: Event) {
+  const checked = (ev.target as HTMLInputElement).checked
+  aiEnabled.value = checked
+  try {
+    await settingApi.save('aiScoringEnabled', checked ? 'true' : 'false')
+  } catch { /* 忽略 */ }
+  if (checked) await runBatchScoring()
 }
 
 // ===== 自动评分 =====
@@ -145,16 +265,20 @@ async function autoScoreOne(e: Expert) {
   }
 }
 
+const batchRunning = ref(false)
+const batchProgress = ref('')
+const batchMessage = ref('')
+const batchSuccess = ref(true)
+
 async function runBatchScoring() {
   batchRunning.value = true
   batchProgress.value = '0%'
   batchMessage.value = ''
   try {
     const total = store.experts.length
-    // 前端先本地计算进度显示
     for (let i = 0; i <= total; i += Math.max(1, Math.floor(total / 10))) {
       batchProgress.value = Math.round((i / total) * 100) + '%'
-      await new Promise(r => setTimeout(r, 30))
+      await new Promise(r => setTimeout(r, 20))
     }
     const updated = await store.autoScoreAllExperts()
     batchSuccess.value = true
@@ -176,6 +300,10 @@ const filteredExperts = computed(() => {
     .filter(e => !q || e.name.toLowerCase().includes(q))
 })
 
+function num(v: number | null | undefined): string {
+  return v == null ? '-' : v.toFixed(1)
+}
+
 function overallColor(v: number | null | undefined): string {
   if (v == null) return 'inherit'
   if (v >= 4.0) return '#059669'
@@ -183,7 +311,7 @@ function overallColor(v: number | null | undefined): string {
   return '#dc2626'
 }
 
-// ===== 评分预警区（V5 阈值 7/10 映射为 5 星制 3.5）=====
+// ===== 评分预警区（阈值 3.5★）=====
 const WARN_THRESHOLD = 3.5
 const lowExperts = computed(() =>
   store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) < WARN_THRESHOLD)
@@ -192,7 +320,7 @@ const lowExperts = computed(() =>
 function lowReasons(e: Expert): string[] {
   const result = autoScoreExpert(e, store.yiliProjects)
   return result.reasons.length ? result.reasons : [
-    `专业度（${e.scores?.professional?.toFixed(1) ?? '-'}）或影响力（${e.scores?.influence?.toFixed(1) ?? '-'}）偏低，建议补充材料后重新识别评分。`
+    `专业度（${num(e.scores?.professional)}）或影响力（${num(e.scores?.influence)}）偏低，建议补充材料后重新识别评分。`
   ]
 }
 
@@ -202,7 +330,7 @@ async function adjustToThreshold(e: Expert) {
       ...(e.scores || {}),
       professional: Math.max(e.scores?.professional ?? 0, WARN_THRESHOLD),
       influence: Math.max(e.scores?.influence ?? 0, WARN_THRESHOLD),
-      overall: WARN_THRESHOLD
+      overall: WARN_THRESHOLD,
     },
   })
   syncExpert(updated)
@@ -267,46 +395,41 @@ async function saveScores() {
 
 .hint { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
 
-/* Engine */
-.engine-actions { display: flex; gap: 10px; margin-top: 12px; }
-.batch-message { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-.batch-message.success { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
-.batch-message.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-
-/* Rules doc */
-.rules-doc {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px 14px;
-  font-size: 12px;
-  line-height: 1.8;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  margin: 0;
-}
+/* 评分体系配置 */
+.dim-card { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 12px; }
+.dim-head { display: flex; align-items: baseline; gap: 10px; }
+.dim-head strong { font-size: 15px; }
+.dim-weight { font-size: 13px; color: var(--text-muted); }
+.dim-desc { font-size: 12px; color: var(--text-secondary); margin: 6px 0 8px; }
+.dim-items { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
+.dim-items li { font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; }
 
 /* Tables */
 .quick-row { margin-bottom: 12px; }
 .search-input { width: 100%; max-width: 280px; padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
 .search-input:focus { outline: none; border-color: var(--primary); }
 .table-scroll-wrapper { overflow: auto; max-height: 45vh; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
-.data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1080px; }
+.data-table th, .data-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .data-table th { background: var(--surface); font-weight: 600; color: var(--text-secondary); font-size: 12px; }
 .data-table tr:hover { background: #f8fafc; }
-.cell-name { font-weight: 600; }
+.sub-head.prof { color: #1d4ed8; }
+.sub-head.infl { color: #b45309; }
+.cell-name { font-weight: 600; text-align: left; }
 .cell-prof { color: #3B82F6; font-weight: 600; }
 .cell-infl { color: #F59E0B; font-weight: 600; }
 .cell-overall { font-weight: 700; }
-.actions { display: flex; gap: 6px; }
+.sub-cell { padding: 4px 6px; }
+.sub-input { width: 52px; padding: 3px 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; text-align: center; }
+.sub-input:focus { outline: none; border-color: var(--primary); }
+.sub-input.infl { border-color: #fde68a; }
+.actions { display: flex; gap: 6px; justify-content: center; }
 .btn { padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-secondary { background: var(--bg); color: var(--text-secondary); }
 .btn-ai { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 .btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
 .primary { background: #2563eb; color: #fff; border-color: #2563eb; }
-.primary:disabled { opacity: 0.7; cursor: not-allowed; }
 .empty { text-align: center; color: #888; padding: 24px; }
 
 /* Warning zone */

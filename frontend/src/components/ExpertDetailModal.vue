@@ -129,7 +129,7 @@
           >
             <div style="font-weight:600;margin-bottom:4px">{{ proj.title }}</div>
             <div style="font-size:12px;color:#15803d">{{ proj.year }}年{{ proj.month ? proj.month + '月' : '' }}</div>
-            <div v-if="proj.satisfaction" style="font-size:13px;color:#f59e0b">
+            <div v-if="satisfactionValue(proj.satisfaction) != null" style="font-size:13px;color:#f59e0b">
               <span style="letter-spacing:2px">{{ satisfactionStars(proj.satisfaction) }}</span>
               <span style="color:#166534;margin-left:6px;font-size:12px">{{ satisfactionDisplay(proj.satisfaction) }}/10</span>
             </div>
@@ -192,7 +192,8 @@ const advantageItems = computed(() => {
 })
 
 const qualDisplayText = computed(() => {
-  const q = (props.expert.qualDisplay || props.expert.qualifications || '').trim()
+  // 对齐 V5：资历资质读取 qualifications 字段（旧数据/迁移数据均以此为准）
+  const q = (props.expert.qualifications || '').trim()
   return q && q !== '未公开' ? q : ''
 })
 
@@ -261,15 +262,23 @@ async function toggleFav() {
   await store.toggleFavorite(props.expert.id)
 }
 
+function satisfactionValue(s: any): number | null {
+  if (s == null) return null
+  const v = typeof s === 'object' ? (s.value ?? s.raw) : s
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 function satisfactionStars(s: any): string {
-  const val = typeof s === 'object' ? (s.value || 0) : (Number(s) || 0)
+  const val = satisfactionValue(s)
+  if (val == null) return ''
   const full = Math.round(val / 2)
   return '★'.repeat(full) + '☆'.repeat(5 - full)
 }
 
 function satisfactionDisplay(s: any): string {
-  const val = typeof s === 'object' ? (s.value || 0) : (Number(s) || 0)
-  return val.toFixed(1)
+  const val = satisfactionValue(s)
+  return val != null ? val.toFixed(1) : ''
 }
 
 function copyContact(info?: string) {

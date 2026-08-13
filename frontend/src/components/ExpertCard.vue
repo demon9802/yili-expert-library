@@ -54,7 +54,7 @@
       <template v-if="visibleProjects.length === 1">
         <div class="proj-count-line">📋 最近合作：{{ latestProject.title }}</div>
         <div class="proj-detail-line">{{ projectMeta(latestProject) }}</div>
-        <div v-if="latestProject.satisfaction" class="proj-detail-line">
+        <div v-if="satisfactionValue(latestProject.satisfaction) != null" class="proj-detail-line">
           <span style="color:#eab308;letter-spacing:2px">{{ satisfactionStars(latestProject.satisfaction) }}</span>
           <span style="color:#166534;margin-left:6px;font-size:11px">{{ satisfactionDisplay(latestProject.satisfaction) }}/10</span>
         </div>
@@ -63,7 +63,7 @@
         <div class="proj-count-line">📋 已合作 {{ visibleProjects.length }} 次</div>
         <div class="proj-detail-line" style="font-weight:600">最近合作：{{ latestProject.title }}</div>
         <div class="proj-detail-line">{{ projectMeta(latestProject) }}</div>
-        <div v-if="latestProject.satisfaction" class="proj-detail-line">
+        <div v-if="satisfactionValue(latestProject.satisfaction) != null" class="proj-detail-line">
           <span style="color:#eab308;letter-spacing:2px">{{ satisfactionStars(latestProject.satisfaction) }}</span>
           <span style="color:#166534;margin-left:6px;font-size:11px">{{ satisfactionDisplay(latestProject.satisfaction) }}/10</span>
         </div>
@@ -179,16 +179,23 @@ function projectMeta(p: Project) {
   return s
 }
 
+function satisfactionValue(sat: any): number | null {
+  if (sat == null) return null
+  const v = typeof sat === 'object' ? (sat.value ?? sat.raw) : sat
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 function satisfactionStars(sat: any) {
-  const val = Number(sat.value || sat)
-  if (!val) return ''
+  const val = satisfactionValue(sat)
+  if (val == null) return ''
   const full = Math.round(val / 2)
   return '★'.repeat(full) + '☆'.repeat(5 - full)
 }
 
 function satisfactionDisplay(sat: any) {
-  const val = Number(sat.value || sat)
-  return val.toFixed ? val.toFixed(1) : String(val)
+  const val = satisfactionValue(sat)
+  return val != null ? val.toFixed(1) : ''
 }
 
 // V5 卡片资历高亮：优先 qualDisplay，fallback 解析 qualifications

@@ -3,24 +3,28 @@
     <div class="tab-header">
       <h3>观察库</h3>
     </div>
-    <p class="tab-desc">综合评分低于 3.5★ 或暂不适合在前端展示的专家。可在此持续评估、淘汰或恢复。</p>
+    <p class="tab-desc">综合评分 3.5★ 以下或不适合在前端展示的专家。可在此持续评估、淘汰或恢复。</p>
 
     <div v-if="obsExperts.length === 0" class="empty-box">
       观察库为空
     </div>
 
-    <div v-for="expert in obsExperts" :key="expert.id" class="obs-card" :class="{ eliminated: expert.observationStatus === 'eliminated' }">
+    <div
+      v-for="expert in obsExperts"
+      :key="expert.id"
+      class="obs-card"
+      :class="{ eliminated: expert.observationStatus === 'eliminated' }"
+    >
       <div class="obs-head">
         <div class="obs-title">
           <strong>{{ expert.name }}</strong>
-          <span class="obs-score">综合：{{ expert.scores?.overall != null ? expert.scores.overall.toFixed(1) : '-' }}</span>
+          <span class="obs-score">综合评分：{{ expert.scores?.overall != null ? expert.scores.overall.toFixed(1) : '-' }}</span>
         </div>
         <div class="obs-actions">
           <select v-model="expert.observationStatus" class="status-select" @change="onStatusChange(expert)">
             <option value="evaluating">持续评估</option>
             <option value="eliminated">淘汰</option>
           </select>
-          <button class="btn btn-restore btn-sm" @click="restore(expert)">恢复</button>
           <button class="btn btn-danger btn-sm" @click="remove(expert)">删除</button>
         </div>
       </div>
@@ -82,18 +86,10 @@ async function onStatusChange(expert: Expert) {
     payload.status = 'eliminated'
     payload.observationDate = new Date().toISOString()
   } else {
+    // 持续评估 = 恢复展示
     payload.status = 'observation'
   }
   const updated = await expertApi.update(expert.id, payload)
-  syncExpert(updated)
-}
-
-async function restore(expert: Expert) {
-  const updated = await expertApi.update(expert.id, {
-    status: 'active',
-    observationStatus: '',
-    observationDate: '',
-  })
   syncExpert(updated)
 }
 
@@ -179,7 +175,6 @@ function syncExpert(updated: Expert) {
   cursor: pointer;
   font-size: 12px;
 }
-.btn-restore { background: #f0fdf4; color: #059669; border-color: #bbf7d0; }
 .btn-danger { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 
 .obs-meta {

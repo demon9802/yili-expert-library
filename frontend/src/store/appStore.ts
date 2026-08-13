@@ -33,7 +33,7 @@ export const useAppStore = defineStore('app', () => {
 
   // 筛选状态
   const currentSort = ref('default')
-  const scoreFilter = ref<number | null>(null)
+  const scoreFilter = ref<{ min: number | null; max: number | null }>({ min: null, max: null })
   const fieldFilter = ref<Set<string>>(new Set())
   const supplierFilter = ref<boolean | null>(null)
   const favoritesFilter = ref<boolean | null>(null)
@@ -73,12 +73,14 @@ export const useAppStore = defineStore('app', () => {
     // 基础过滤：排除已淘汰专家（V5 getFilteredExperts 逻辑）
     let result = experts.value.filter(e => e.status !== 'eliminated')
 
-    // 评分筛选：默认 >=3（V5.9.5 五星制观察库阈值：综合<3★不展示），有显式筛选时用显式值
-    const minScore = scoreFilter.value !== null ? scoreFilter.value : 3
+    // 评分筛选：基础规则排除 <3★（V5.9.5 观察库阈值），再通过 min/max 区间做前端自定义筛选
     result = result.filter(e => {
       const overall = e.scores?.overall
       if (overall === null || overall === undefined) return false
-      return overall >= minScore
+      if (overall < 3) return false
+      if (scoreFilter.value.min != null && overall < scoreFilter.value.min) return false
+      if (scoreFilter.value.max != null && overall > scoreFilter.value.max) return false
+      return true
     })
 
     // 领域筛选（V5 使用 AND 逻辑：专家必须包含所有选中领域）
@@ -299,11 +301,17 @@ export const useAppStore = defineStore('app', () => {
     const idx = experts.value.findIndex(e => e.id === id)
     if (idx < 0) return null
     const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
-    const updated = await expertApi.update(id, { scores: {
-      professional: result.professional,
-      influence: result.influence,
-      overall: result.overall,
-    }})
+    const updated = await expertApi.update(id, {
+      scores: {
+        professional: result.professional,
+        influence: result.influence,
+        overall: result.overall,
+      },
+      subScores: {
+        professional: result.professionalItems,
+        influence: result.influenceItems,
+      },
+    })
     experts.value[idx] = updated
     return result
   }
@@ -317,6 +325,10 @@ export const useAppStore = defineStore('app', () => {
           professional: result.professional,
           influence: result.influence,
           overall: result.overall,
+          subScores: {
+            professional: result.professionalItems,
+            influence: result.influenceItems,
+          },
         }
       }
     })
@@ -435,7 +447,7 @@ export const useAppStore = defineStore('app', () => {
 
   function clearFilters() {
     fieldFilter.value.clear()
-    scoreFilter.value = null
+    scoreFilter.value = { min: null, max: null }
     supplierFilter.value = null
     favoritesFilter.value = null
     cooperationFilter.value = null
