@@ -462,19 +462,16 @@ function toggleMobileMode() {
 
 <style scoped>
 /* V5 原版：轻盈毛玻璃，固定在视口底部，出现/隐藏用 opacity + pointer-events 控制 */
-/* V5 原版：轻盈毛玻璃，固定在视口底部，出现/隐藏用 opacity + pointer-events 控制 */
 .page-navigation-float {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  right: auto;
-  width: 100%;
-  max-width: var(--max-width);
+  left: 0;
+  right: 0;
   z-index: 888;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   padding: 4px 12px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
@@ -482,28 +479,28 @@ function toggleMobileMode() {
   border-top: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
   opacity: 0;
-  transform: translateX(-50%) translateY(100%);
+  transform: translateY(100%);
   transition: opacity 0.3s ease, transform 0.3s ease;
   pointer-events: none;
 }
 .page-navigation-float.visible {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 .page-navigation-float :deep(.page-nav-inline-btn),
 .page-navigation-float :deep(.page-nav-inline-num) {
-  padding: 3px 10px;
-  font-size: 12px;
-  min-height: 24px;
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 22px;
   line-height: 1;
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 24px;
-  height: 24px;
+  min-width: 22px;
+  height: 22px;
   padding: 0 4px;
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 11px;
+  font-size: 10px;
 }
 </style>

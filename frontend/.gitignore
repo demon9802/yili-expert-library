@@ -23,3 +23,6 @@ npm-debug.log*
 
 # Vite temp files
 *.timestamp-*.mjs
+
+# Temp verification build (used during local build checks)
+.build-verify/
