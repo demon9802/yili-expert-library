@@ -658,8 +658,8 @@ function importProjectsFromFile(file: File) {
 .btn-secondary { background: #fff; color: var(--text-secondary); border: 1px solid var(--border); padding: 6px 10px; }
 .btn-secondary:hover { background: var(--bg); color: var(--text); }
 .admin-toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.toolbar-main { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.toolbar-actions { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+.toolbar-main { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+.toolbar-actions { display: inline-flex; gap: 6px; align-items: center; }
 .search-input { flex: 1; max-width: 280px; min-width: 180px; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
 .search-input:focus { outline: none; border-color: var(--primary); }
 .filter-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface); min-width: 118px; }
