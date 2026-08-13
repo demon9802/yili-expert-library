@@ -158,37 +158,52 @@ export function normalizePhone(info?: string): string {
   return String(info || '').replace(/[^0-9+]/g, '')
 }
 
+// V5.9.4: 座机强带区号显示，例如 010-12345678
+export function formatPhoneDisplay(info?: string): string {
+  if (!info) return ''
+  const s = String(info).trim()
+  // 邮箱、微信、已有 - 或国际号不重新格式化
+  if (s.includes('@') || s.startsWith('+')) return s
+  const digits = s.replace(/[^0-9]/g, '')
+  if (!digits) return s
+  if (digits.startsWith('0')) {
+    if (digits.length === 10) {
+      return `${digits.slice(0, 3)}-${digits.slice(3)}`
+    }
+    if (digits.length === 11) {
+      if (digits.startsWith('01') || digits.startsWith('02')) {
+        return `${digits.slice(0, 3)}-${digits.slice(3)}`
+      }
+      return `${digits.slice(0, 4)}-${digits.slice(4)}`
+    }
+    if (digits.length === 12) {
+      return `${digits.slice(0, 4)}-${digits.slice(4)}`
+    }
+  }
+  return s
+}
+
+// V5.9.4: 联系方式统一走原生协议，PC 端点击直接调用邮件/电话应用，不再弹窗确认
 export function handleContactClick(c: { type?: string; info?: string; value?: string }) {
   const info = c.info || c.value || ''
   if (!info) return
 
-  if (window.innerWidth <= 768) {
-    copyText(info).catch(() => {})
-    if (c.type === 'email') {
-      window.location.href = 'mailto:' + info
-      return
-    }
-    if (c.type === 'phone' || c.type === 'mobile') {
-      window.location.href = 'tel:' + normalizePhone(info)
-      return
-    }
-    alert('已复制：' + info)
-    return
-  }
-
-  const action = c.type === 'email'
-    ? confirm('是否打开邮件客户端？\n\n选择“确定”：发邮件\n选择“取消”：复制邮箱')
-    : c.type === 'phone' || c.type === 'mobile'
-      ? confirm('是否拨打电话？\n\n选择“确定”：拨号\n选择“取消”：复制号码')
-      : false
-
-  if (action && c.type === 'email') {
+  if (c.type === 'email') {
     window.location.href = 'mailto:' + info
     return
   }
-  if (action && (c.type === 'phone' || c.type === 'mobile')) {
+  if (c.type === 'phone' || c.type === 'mobile') {
     window.location.href = 'tel:' + normalizePhone(info)
     return
   }
-  copyText(info).then(() => alert('已复制：' + info)).catch(() => alert('复制失败'))
+  // 微信等其他联系方式：复制到剪贴板
+  copyText(info).catch(() => {})
+}
+
+export function contactHref(c: { type?: string; info?: string; value?: string }): string {
+  const info = c.info || c.value || ''
+  if (!info) return '#'
+  if (c.type === 'email') return 'mailto:' + info
+  if (c.type === 'phone' || c.type === 'mobile') return 'tel:' + normalizePhone(info)
+  return '#'
 }

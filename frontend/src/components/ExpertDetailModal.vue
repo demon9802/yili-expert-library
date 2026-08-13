@@ -137,7 +137,7 @@
           </div>
         </div>
 
-        <!-- 联系方式 (V5.9+: PC/手机端均可点击，PC 提供复制/调用，手机端优先原生 tel/mailto) -->
+        <!-- 联系方式 (V5.9.4: PC/手机端均走原生协议，文字样式不加粗) -->
         <div v-if="groupedContacts.length > 0 || expert.referrer" class="detail-section">
           <div class="detail-section-title">联系方式</div>
           <div
@@ -145,17 +145,18 @@
             :key="idx"
             class="detail-contact-line"
           >
-            <span class="contact-person">
+            <span class="detail-contact-text">
               {{ groupedContacts.length === 1 ? '联系人' : ('联系人' + (idx + 1)) }}：{{ group.person || '未填写' }}
-            </span>
-            <span
-              v-for="(m, mIdx) in group.methods"
-              :key="mIdx"
-              class="contact-method"
-              @click="handleContactClick(m)"
-            >
-              <span class="contact-icon">{{ contactTypeIcon(m.type) }}</span>{{ contactTypeLabel(m.type) }}：{{ m.info }}
-              <span v-if="mIdx < group.methods.length - 1" class="contact-sep"> / </span>
+              <a
+                v-for="(m, mIdx) in group.methods"
+                :key="mIdx"
+                class="contact-link"
+                :href="contactHref(m)"
+                @click.stop
+              >
+                <span class="contact-icon">{{ contactTypeIcon(m.type) }}</span>{{ contactTypeLabel(m.type) }}：{{ displayContactInfo(m) }}
+                <span v-if="mIdx < group.methods.length - 1" class="contact-sep"> / </span>
+              </a>
             </span>
           </div>
           <div v-if="expert.referrer" class="detail-text detail-referrer">
@@ -174,7 +175,7 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, ContactInfo, SubScores } from '@/types'
-import { formatRichText, handleContactClick, contactTypeIcon, contactTypeLabel } from '@/utils/helpers'
+import { formatRichText, contactHref, contactTypeIcon, contactTypeLabel, formatPhoneDisplay } from '@/utils/helpers'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 import StarRating from '@/components/StarRating.vue'
 import ScoringHelpModal from '@/components/ScoringHelpModal.vue'
@@ -276,6 +277,14 @@ function getFieldStyle(fieldName: string) {
 async function toggleFav() {
   await store.toggleFavorite(props.expert.id)
 }
+
+function displayContactInfo(m: ContactInfo): string {
+  const info = m.info || m.value || ''
+  if (m.type === 'phone' || m.type === 'mobile') {
+    return formatPhoneDisplay(info)
+  }
+  return info
+}
 </script>
 
 <style scoped>
@@ -285,53 +294,30 @@ async function toggleFav() {
   flex-wrap: wrap;
   gap: 6px 12px;
   margin-bottom: 6px;
-}
-.contact-person {
-  font-weight: 600;
-}
-.contact-info {
-  color: var(--text-secondary);
-}
-.contact-type-label {
-  color: var(--text-secondary);
-}
-.contact-actions {
-  display: inline-flex;
-  gap: 6px;
-  margin-left: auto;
-}
-.contact-action-btn {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  font-size: 14px;
   color: var(--text);
-  cursor: pointer;
-  transition: all 0.2s;
 }
-.contact-action-btn:hover {
-  background: var(--primary-light);
-  border-color: var(--primary);
+.detail-contact-text {
+  line-height: 1.6;
+}
+.contact-link {
+  display: inline;
   color: var(--primary);
+  text-decoration: none;
+  margin-left: 4px;
 }
-.detail-referrer {
-  margin-top: 8px;
-}
-.contact-method {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--primary);
-  cursor: pointer;
-  user-select: none;
-}
-.contact-method:hover {
+.contact-link:hover {
   text-decoration: underline;
+}
+.contact-icon {
+  margin-right: 2px;
 }
 .contact-sep {
   color: var(--text-secondary);
   margin: 0 4px;
   pointer-events: none;
+}
+.detail-referrer {
+  margin-top: 8px;
 }
 </style>

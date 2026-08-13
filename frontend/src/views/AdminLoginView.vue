@@ -66,7 +66,7 @@ async function handleLogin() {
   } catch (e: any) {
     const msg = e.message || '登录失败'
     if (msg.includes('500') || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('超时')) {
-      error.value = '无法连接后端服务（localhost:8080）。请先启动 backend：\nmvn spring-boot:run'
+      error.value = '无法连接后端服务。请先启动 backend：\nmvn spring-boot:run'
     } else {
       error.value = msg
     }

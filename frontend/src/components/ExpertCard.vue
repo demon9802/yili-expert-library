@@ -90,16 +90,17 @@
     <!-- Contact (V5: 卡片只显示第一位联系人，多个方式用 / 分隔) -->
     <div v-if="firstContactGroup" class="card-contact" @click.stop>
       <span v-if="firstContactGroup.person">👤 {{ firstContactGroup.person }}</span>
-      <span
+      <a
         v-for="(m, idx) in firstContactGroup.methods"
         :key="idx"
         class="card-contact-method"
-        @click.stop="handleContactClick(m)"
+        :href="contactHref(m)"
+        @click.stop
       >
         <span>{{ contactTypeIcon(m.type) }}</span>
-        <span>{{ displayContactInfo(m.info) }}</span>
+        <span>{{ displayContactInfo(m) }}</span>
         <span v-if="idx < firstContactGroup.methods.length - 1" class="card-contact-sep">/</span>
-      </span>
+      </a>
     </div>
 
     <!-- Supplier bookmark -->
@@ -111,7 +112,7 @@
 import { computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project, ContactInfo } from '@/types'
-import { isNarrowScreen, handleContactClick, contactTypeIcon } from '@/utils/helpers'
+import { isNarrowScreen, contactHref, contactTypeIcon, formatPhoneDisplay } from '@/utils/helpers'
 import { satisfactionDisplay, satisfactionStars, satisfactionHasValue } from '@/utils/satisfaction'
 
 const props = defineProps<{
@@ -265,8 +266,13 @@ function typeLabel(type: string): string {
   }
 }
 
-function displayContactInfo(info?: string): string {
+function displayContactInfo(m: ContactInfo): string {
+  const info = m.info || m.value || ''
   if (!info) return ''
+  if (m.type === 'phone' || m.type === 'mobile') {
+    const formatted = formatPhoneDisplay(info)
+    return formatted.length > 25 ? formatted.substring(0, 25) + '...' : formatted
+  }
   return info.length > 25 ? info.substring(0, 25) + '...' : info
 }
 </script>
@@ -276,8 +282,8 @@ function displayContactInfo(info?: string): string {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--primary);
-  cursor: pointer;
+  color: var(--text-secondary);
+  text-decoration: none;
 }
 .card-contact-method:hover {
   text-decoration: underline;
