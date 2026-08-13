@@ -25,7 +25,7 @@
           ></span>
         </div>
       </div>
-      <div v-if="expert.scores?.overall != null" class="card-score-box">
+      <div v-if="store.showScores && expert.scores?.overall != null" class="card-score-box">
         <span class="card-score-main">
           <span class="score-star">★</span> {{ expert.scores.overall.toFixed(1) }}
         </span>

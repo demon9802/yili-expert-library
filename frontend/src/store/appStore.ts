@@ -11,6 +11,7 @@ import { projectApi } from '@/api/project'
 import { fieldApi } from '@/api/field'
 import { favoriteApi } from '@/api/favorite'
 import { authApi } from '@/api/auth'
+import { settingApi } from '@/api/setting'
 import { setToken, removeToken, getToken } from '@/api/request'
 import { lsGet, lsSet, lsRemove, debounce } from '@/utils/helpers'
 
@@ -54,6 +55,9 @@ export const useAppStore = defineStore('app', () => {
 
   // 加载状态
   const loading = ref(false)
+
+  // 前端评分展示开关（评分管理 → 前端展示控制）
+  const showScores = ref<boolean>(true)
 
   // ===== Getters =====
   const filteredExperts = computed(() => {
@@ -173,6 +177,23 @@ export const useAppStore = defineStore('app', () => {
       }
     } finally {
       loading.value = false
+    }
+
+    // 加载评分前端展示开关（失败不阻断主流程）
+    try {
+      const v = await settingApi.get('showScores')
+      if (v != null) showScores.value = v !== 'false'
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  async function setShowScores(v: boolean) {
+    showScores.value = v
+    try {
+      await settingApi.save('showScores', v ? 'true' : 'false')
+    } catch {
+      /* 忽略 */
     }
   }
 
@@ -369,13 +390,13 @@ export const useAppStore = defineStore('app', () => {
     currentSort, scoreFilter, fieldFilter, supplierFilter,
     favoritesFilter, cooperationFilter, searchQuery, adminSearchQuery,
     adminTab, adminSubTab, editingExpert, fieldsCollapsed,
-    currentPage, PAGE_SIZE, searchHistory, loading,
+    currentPage, PAGE_SIZE, searchHistory, loading, showScores,
     // Getters
     filteredExperts, totalPages, paginatedExperts,
     // Actions
     loadAppData, checkAuthState, login, signUp, logout,
     saveExpert, deleteExpert, saveProject, deleteProject,
-    saveField, deleteField, toggleFavorite, isFavorited,
+    saveField, deleteField, toggleFavorite, isFavorited, setShowScores,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
     toggleFieldFilter, clearFilters, setMode, setAdminTab,
   }

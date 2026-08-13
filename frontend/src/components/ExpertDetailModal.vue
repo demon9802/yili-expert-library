@@ -17,7 +17,7 @@
 
       <div class="modal-body">
         <!-- 评分信息 -->
-        <div v-if="expert.scores" class="detail-section">
+        <div v-if="store.showScores && expert.scores" class="detail-section">
           <div class="detail-section-title score-title-row">
             评分信息
             <button class="score-help-btn" type="button" title="评分规则说明（点击查看）" @click="showHelp = true">?</button>
