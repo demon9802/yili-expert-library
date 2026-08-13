@@ -465,28 +465,28 @@ function toggleMobileMode() {
    按钮沿用 V5 实心描边质感（border + surface 背景 + 13px），并整体压缩高度。 */
 .page-navigation-float {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 8px;
+  left: 50%;
   z-index: 888;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 3px 10px;
-  background: rgba(255, 255, 255, 0.75);
+  gap: 2px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   opacity: 0;
-  transform: translateY(100%);
+  transform: translateX(-50%) translateY(100%);
   transition: opacity 0.3s ease, transform 0.3s ease;
   pointer-events: none;
 }
 .page-navigation-float.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   pointer-events: auto;
 }
 .page-navigation-float :deep(.page-navigation-inline) {
@@ -497,10 +497,10 @@ function toggleMobileMode() {
   flex-wrap: wrap;
 }
 .page-navigation-float :deep(.page-nav-inline-btn) {
-  padding: 0 10px;
-  height: 24px;
-  font-size: 12px;
-  line-height: 24px;
+  padding: 0 8px;
+  height: 22px;
+  font-size: 11px;
+  line-height: 22px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -511,10 +511,10 @@ function toggleMobileMode() {
   transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 24px;
-  height: 24px;
-  padding: 0 4px;
-  font-size: 12px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 3px;
+  font-size: 11px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
@@ -527,7 +527,7 @@ function toggleMobileMode() {
   transition: all var(--transition);
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
   margin-left: 4px;
   white-space: nowrap;
