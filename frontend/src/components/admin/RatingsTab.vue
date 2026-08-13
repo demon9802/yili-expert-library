@@ -215,7 +215,7 @@ const influenceItems = ['社会荣誉与奖项', '职称/管理履历与行业�
 type RatingDim = 'professional' | 'influence'
 type FiveItemScores = { professional: Record<string, number>; influence: Record<string, number> }
 
-type AutoScorePayload = { scores: Scores; subScores: SubScores }
+type AutoScorePayload = { scores: Scores; subScores: FiveItemScores }
 
 function round1(v: number) {
   return Math.round(v * 10) / 10
@@ -256,7 +256,7 @@ function buildAutoScores(e: Expert): AutoScorePayload {
 const expertBreakdowns = computed(() => {
   const map = new Map<number, FiveItemScores>()
   store.experts.forEach(e => {
-    const auto = buildAutoScores(e).subScores
+    const auto = buildAutoScores(e).subScores as FiveItemScores
     const existingProf = e.subScores?.professional || {}
     const existingInfl = e.subScores?.influence || {}
     const combinedInfluence = existingInfl['职称/管理履历与行业地位']
@@ -278,8 +278,8 @@ const expertBreakdowns = computed(() => {
   return map
 })
 
-function subsFor(e: Expert) {
-  return expertBreakdowns.value.get(e.id) || buildAutoScores(e).subScores
+function subsFor(e: Expert): FiveItemScores {
+  return expertBreakdowns.value.get(e.id) || (buildAutoScores(e).subScores as FiveItemScores)
 }
 
 function computeFromSubs(profMap: Record<string, number>, inflMap: Record<string, number>): Scores {
