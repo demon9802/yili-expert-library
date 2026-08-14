@@ -11,8 +11,12 @@
 
     <div ref="reportExportRef" class="report-body" :class="{ exporting: isExporting }">
       <div class="report-header">
-        <h2>月度系统数据报告</h2>
-        <p class="report-date">统计日期：{{ todayText }}</p>
+        <div class="month-selector">
+          <button class="btn btn-sm" @click="prevMonth">← 上月</button>
+          <span class="month-label">{{ selectedMonthLabel }}</span>
+          <button class="btn btn-sm" :disabled="isCurrentMonthSelected" @click="nextMonth">下月 →</button>
+        </div>
+        <p class="report-date">统计范围：按自然月（{{ monthRangeText }}，含观察库 / 已淘汰专家）</p>
       </div>
 
       <p class="report-note">
@@ -23,12 +27,12 @@
       <h4 class="report-section-title">① 本月专家变动</h4>
       <div class="detail-section">
         <div class="detail-summary">
-          <span>本月新增 <strong>{{ newExperts.length }}</strong> 位专家，修改 <strong>{{ modifiedExperts.length }}</strong> 位专家。</span>
+          <span>本月专家变动：新增 <strong>{{ expertChangeCount('new') }}</strong> 位、调整 <strong>{{ expertChangeCount('adjust') }}</strong> 位、观察 <strong>{{ expertChangeCount('observe') }}</strong> 位、淘汰 <strong>{{ expertChangeCount('eliminate') }}</strong> 位。</span>
           <button class="btn btn-sm" @click="expertDetailExpanded = !expertDetailExpanded">
             {{ expertDetailExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
-        <div v-if="expertDetailExpanded || isExporting" class="detail-body">
+        <div v-show="expertDetailExpanded" class="detail-body">
           <table class="admin-table">
             <thead>
               <tr>
@@ -43,7 +47,7 @@
               <tr v-for="item in paginatedExpertChanges" :key="item.expert.id + '-' + item.type">
                 <td>{{ item.expert.name }}</td>
                 <td>
-                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                  <span class="tag" :class="item.type">{{ expertChangeLabel(item.type) }}</span>
                 </td>
                 <td>{{ formatDateTime(item.time) }}</td>
                 <td>{{ statusLabel(item.expert.status) }}</td>
@@ -66,12 +70,12 @@
       <h4 class="report-section-title">② 本月合作项目变动</h4>
       <div class="detail-section">
         <div class="detail-summary">
-          <span>本月新增 <strong>{{ newProjects.length }}</strong> 个项目，修改 <strong>{{ modifiedProjects.length }}</strong> 个项目。</span>
+          <span>本月合作项目变动：新增 <strong>{{ projectChangeCount('new') }}</strong> 个、修改 <strong>{{ projectChangeCount('modified') }}</strong> 个、待关联 <strong>{{ projectChangeCount('pending') }}</strong> 个。</span>
           <button class="btn btn-sm" @click="projectDetailExpanded = !projectDetailExpanded">
             {{ projectDetailExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
-        <div v-if="projectDetailExpanded || isExporting" class="detail-body">
+        <div v-show="projectDetailExpanded" class="detail-body">
           <table class="admin-table">
             <thead>
               <tr>
@@ -86,7 +90,7 @@
               <tr v-for="item in paginatedProjectChanges" :key="item.project.id + '-' + item.type">
                 <td>{{ item.project.title }}</td>
                 <td>
-                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                  <span class="tag" :class="item.type">{{ projectChangeLabel(item.type) }}</span>
                 </td>
                 <td>{{ formatDateTime(item.time) }}</td>
                 <td>{{ relatedExpertName(item.project) }}</td>
@@ -221,7 +225,7 @@
             {{ obsLogExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
-        <div v-if="obsLogExpanded || isExporting" class="detail-body">
+        <div v-show="obsLogExpanded" class="detail-body">
           <table class="admin-table obs-log-table">
             <thead>
               <tr>
@@ -230,6 +234,7 @@
                 <th>操作者</th>
                 <th>类型</th>
                 <th>综合分变化</th>
+                <th>调整内容</th>
                 <th>操作意见</th>
               </tr>
             </thead>
@@ -237,15 +242,16 @@
               <tr v-for="log in paginatedObsLogs" :key="log.id">
                 <td>{{ formatDateTime(log.createdAt) }}</td>
                 <td>{{ log.expertName }}</td>
-                <td>{{ log.operatorName }}（{{ roleText(log.operatorRole) }}）</td>
+                <td>{{ roleText(log.operatorRole) }}/{{ log.operatorName || '-' }}</td>
                 <td>
                   <span class="log-type" :class="'type-' + typeClass(log.operation)">{{ log.operation }}</span>
                 </td>
                 <td>{{ scoreChangeText(log) }}</td>
+                <td>{{ adjustContentText(log) }}</td>
                 <td>{{ log.note || '-' }}</td>
               </tr>
               <tr v-if="paginatedObsLogs.length === 0">
-                <td colspan="6" class="empty-cell">暂无操作记录</td>
+                <td colspan="7" class="empty-cell">暂无操作记录</td>
               </tr>
             </tbody>
           </table>
@@ -299,12 +305,6 @@ interface MonthlyStats {
   [key: string]: any
 }
 
-interface ChangeItem<T> {
-  type: 'new' | 'modified'
-  time: string
-  entity: T
-}
-
 const store = useAppStore()
 const stats = ref<MonthlyStats>({})
 const userList = ref<UserDTO[]>([])
@@ -330,20 +330,58 @@ const todayText = computed(() => {
   return `${today.getFullYear()}/${p(today.getMonth() + 1)}/${p(today.getDate())}`
 })
 
-const currentMonthStart = computed(() => {
-  const d = new Date(today.getFullYear(), today.getMonth(), 1)
-  return d.getTime()
+// ===== 选中月份（自然月统计） =====
+const now = new Date()
+const selectedYear = ref(now.getFullYear())
+const selectedMonth = ref(now.getMonth() + 1)
+
+const selectedMonthLabel = computed(() => `${selectedYear.value}年${String(selectedMonth.value).padStart(2, '0')}月`)
+const isCurrentMonthSelected = computed(
+  () => selectedYear.value === now.getFullYear() && selectedMonth.value === now.getMonth() + 1
+)
+
+const selectedMonthStart = computed(() => new Date(selectedYear.value, selectedMonth.value - 1, 1).getTime())
+const selectedMonthEnd = computed(
+  () => new Date(selectedYear.value, selectedMonth.value, 0, 23, 59, 59, 999).getTime()
+)
+
+const monthRangeText = computed(() => {
+  const p = (n: number) => String(n).padStart(2, '0')
+  const lastDay = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
+  return `${selectedYear.value}/${p(selectedMonth.value)}/01 - ${selectedYear.value}/${p(selectedMonth.value)}/${p(lastDay)}`
 })
 
-const currentMonthEnd = computed(() => {
-  const d = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
-  return d.getTime()
-})
+function resetReportPages() {
+  expertPage.value = 1
+  projectPage.value = 1
+  obsLogPage.value = 1
+}
 
-function inCurrentMonth(iso: string | null | undefined): boolean {
+function prevMonth() {
+  if (selectedMonth.value === 1) {
+    selectedMonth.value = 12
+    selectedYear.value--
+  } else {
+    selectedMonth.value--
+  }
+  resetReportPages()
+}
+
+function nextMonth() {
+  if (isCurrentMonthSelected.value) return
+  if (selectedMonth.value === 12) {
+    selectedMonth.value = 1
+    selectedYear.value++
+  } else {
+    selectedMonth.value++
+  }
+  resetReportPages()
+}
+
+function inSelectedMonth(iso: string | null | undefined): boolean {
   if (!iso) return false
   const t = new Date(iso).getTime()
-  return !isNaN(t) && t >= currentMonthStart.value && t <= currentMonthEnd.value
+  return !isNaN(t) && t >= selectedMonthStart.value && t <= selectedMonthEnd.value
 }
 
 function formatDateTime(iso: string | null | undefined): string {
@@ -400,6 +438,36 @@ function scoreChangeText(log: ObservationOperation): string {
   }
 }
 
+const professionalItems = ['学历与学术背景', '行业资质与认证', '专业成果与经验'] as const
+const influenceItems = ['社会荣誉与奖项', '职称/管理履历与行业地位'] as const
+const allScoreItems = [...professionalItems, ...influenceItems] as string[]
+
+function adjustContentText(log: ObservationOperation): string {
+  try {
+    const raw = log as ObservationOperation & { beforeState?: string; afterState?: string }
+    const before = JSON.parse(String(raw.beforeState || '{}'))
+    const after = JSON.parse(String(raw.afterState || '{}'))
+    if (after.status === 'eliminated' || raw.operation === '淘汰') return '淘汰'
+    if (raw.operation?.includes('延期') || raw.operation?.includes('延后')) return '延后观察'
+    if (raw.operation === '删除') return '删除专家'
+    const beforeProf = before.subScores?.professional || {}
+    const afterProf = after.subScores?.professional || {}
+    const beforeInfl = before.subScores?.influence || {}
+    const afterInfl = after.subScores?.influence || {}
+    const changes: string[] = []
+    allScoreItems.forEach((it: string) => {
+      const isProf = (professionalItems as readonly string[]).includes(it)
+      const b = Number((isProf ? beforeProf : beforeInfl)[it] ?? 2)
+      const a = Number((isProf ? afterProf : afterInfl)[it] ?? 2)
+      if (b !== a) changes.push(`${it} ${b}★→${a}★`)
+    })
+    if (changes.length) return changes.join('、')
+    return raw.operation || '-'
+  } catch {
+    return (log as any).operation || '-'
+  }
+}
+
 // ===== 活跃专家（与仪表盘保持一致：排除已淘汰且综合评分 ≥ 3） =====
 const activeExperts = computed(() =>
   store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 3)
@@ -415,24 +483,31 @@ const avgProfessional = computed(() => avgScore('professional'))
 const avgInfluence = computed(() => avgScore('influence'))
 const avgOverall = computed(() => avgScore('overall'))
 
-// ===== 专家变动 =====
-const newExperts = computed(() =>
-  store.experts.filter(e => inCurrentMonth(e.createdAt))
-)
-
-const modifiedExperts = computed(() =>
-  store.experts.filter(e => {
-    if (!inCurrentMonth(e.updatedAt)) return false
-    return e.updatedAt !== e.createdAt
-  })
-)
+// ===== 专家变动（新增 / 调整 / 观察 / 淘汰） =====
+type ExpertChangeType = 'new' | 'adjust' | 'observe' | 'eliminate'
 
 const allExpertChanges = computed(() => {
-  const list: { type: 'new' | 'modified'; time: string; expert: Expert }[] = []
-  newExperts.value.forEach(e => list.push({ type: 'new', time: e.createdAt, expert: e }))
-  modifiedExperts.value.forEach(e => list.push({ type: 'modified', time: e.updatedAt, expert: e }))
+  const list: { type: ExpertChangeType; time: string; expert: Expert }[] = []
+  store.experts.forEach(e => {
+    if (inSelectedMonth(e.createdAt)) {
+      list.push({ type: 'new', time: e.createdAt, expert: e })
+    }
+    if (inSelectedMonth(e.updatedAt) && e.updatedAt !== e.createdAt) {
+      let type: ExpertChangeType = 'adjust'
+      if (e.status === 'eliminated') type = 'eliminate'
+      else if (e.status === 'observation') type = 'observe'
+      list.push({ type, time: e.updatedAt, expert: e })
+    }
+  })
   return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
 })
+
+function expertChangeCount(t: ExpertChangeType): number {
+  return allExpertChanges.value.filter(c => c.type === t).length
+}
+function expertChangeLabel(t: ExpertChangeType): string {
+  return { new: '新增', adjust: '调整', observe: '观察', eliminate: '淘汰' }[t]
+}
 
 const expertTotalPages = computed(() => Math.max(1, Math.ceil(allExpertChanges.value.length / PAGE_SIZE)))
 const paginatedExpertChanges = computed(() => {
@@ -441,24 +516,29 @@ const paginatedExpertChanges = computed(() => {
   return allExpertChanges.value.slice(start, start + PAGE_SIZE)
 })
 
-// ===== 合作项目变动 =====
-const newProjects = computed(() =>
-  store.yiliProjects.filter(p => inCurrentMonth(p.createdAt))
-)
-
-const modifiedProjects = computed(() =>
-  store.yiliProjects.filter(p => {
-    if (!inCurrentMonth(p.updatedAt)) return false
-    return p.updatedAt !== p.createdAt
-  })
-)
+// ===== 合作项目变动（新增 / 修改 / 待关联） =====
+type ProjectChangeType = 'new' | 'modified' | 'pending'
 
 const allProjectChanges = computed(() => {
-  const list: { type: 'new' | 'modified'; time: string; project: Project }[] = []
-  newProjects.value.forEach(p => list.push({ type: 'new', time: p.createdAt, project: p }))
-  modifiedProjects.value.forEach(p => list.push({ type: 'modified', time: p.updatedAt, project: p }))
+  const list: { type: ProjectChangeType; time: string; project: Project }[] = []
+  store.yiliProjects.forEach(p => {
+    const unlinked = !p.expertId && !p.pendingExpertName
+    if (inSelectedMonth(p.createdAt)) {
+      list.push({ type: unlinked ? 'pending' : 'new', time: p.createdAt, project: p })
+    }
+    if (inSelectedMonth(p.updatedAt) && p.updatedAt !== p.createdAt) {
+      list.push({ type: 'modified', time: p.updatedAt, project: p })
+    }
+  })
   return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
 })
+
+function projectChangeCount(t: ProjectChangeType): number {
+  return allProjectChanges.value.filter(c => c.type === t).length
+}
+function projectChangeLabel(t: ProjectChangeType): string {
+  return { new: '新增', modified: '修改', pending: '待关联' }[t]
+}
 
 const projectTotalPages = computed(() => Math.max(1, Math.ceil(allProjectChanges.value.length / PAGE_SIZE)))
 const paginatedProjectChanges = computed(() => {
@@ -611,11 +691,27 @@ async function loadUsers() {
 
 async function captureReport(): Promise<HTMLCanvasElement | null> {
   if (!reportExportRef.value) return null
-  return html2canvas(reportExportRef.value, {
-    backgroundColor: '#ffffff',
-    scale: 2,
-    useCORS: true,
-  })
+  const source = reportExportRef.value
+  const clone = source.cloneNode(true) as HTMLElement
+  clone.style.width = source.clientWidth + 'px'
+  clone.style.position = 'fixed'
+  clone.style.left = '-99999px'
+  clone.style.top = '0'
+  clone.style.margin = '0'
+  clone.style.background = '#ffffff'
+  clone.classList.remove('exporting')
+  // 强制展开所有明细（v-show 默认折叠，克隆中显示全量，主界面不跳动）
+  clone.querySelectorAll<HTMLElement>('.detail-body').forEach(el => { el.style.display = 'block' })
+  // 隐藏交互按钮，导出为静态全量报告
+  clone.querySelectorAll<HTMLElement>('.detail-summary .btn').forEach(el => { el.style.display = 'none' })
+  clone.querySelectorAll<HTMLElement>('.month-selector .btn').forEach(el => { el.style.display = 'none' })
+  clone.querySelectorAll<HTMLElement>('.pagination').forEach(el => { el.style.display = 'none' })
+  document.body.appendChild(clone)
+  try {
+    return await html2canvas(clone, { backgroundColor: '#ffffff', scale: 2, useCORS: true })
+  } finally {
+    if (clone.parentNode) clone.parentNode.removeChild(clone)
+  }
 }
 
 function downloadCanvasAsPNG(canvas: HTMLCanvasElement, filename: string) {
@@ -666,24 +762,12 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   const prevExpertPage = expertPage.value
   const prevProjectPage = projectPage.value
   const prevObsLogPage = obsLogPage.value
-  const prevExpertExpanded = expertDetailExpanded.value
-  const prevProjectExpanded = projectDetailExpanded.value
-  const prevObsLogExpanded = obsLogExpanded.value
+  // isExporting 仅用于让分页明细返回全量；明细用 v-show 折叠，主界面布局不变 → 导出过程不跳动
   isExporting.value = true
-  expertDetailExpanded.value = true
-  projectDetailExpanded.value = true
-  obsLogExpanded.value = true
-  expertPage.value = 1
-  projectPage.value = 1
-  obsLogPage.value = 1
   await nextTick()
-  await new Promise(resolve => setTimeout(resolve, 300))
   const canvas = await captureReport()
   await callback(canvas)
   isExporting.value = false
-  expertDetailExpanded.value = prevExpertExpanded
-  projectDetailExpanded.value = prevProjectExpanded
-  obsLogExpanded.value = prevObsLogExpanded
   expertPage.value = prevExpertPage
   projectPage.value = prevProjectPage
   obsLogPage.value = prevObsLogPage
@@ -713,11 +797,23 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   margin-bottom: 16px;
 }
 
-.report-header h2 {
-  margin: 0 0 4px;
-  font-size: 20px;
+.month-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.month-selector .btn-sm {
+  min-width: 64px;
+}
+
+.month-label {
+  font-size: 18px;
   font-weight: 600;
   color: #111827;
+  min-width: 120px;
+  text-align: center;
 }
 
 .report-date {
@@ -965,6 +1061,26 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
 .tag.modified {
   background: #dbeafe;
   color: #1e40af;
+}
+
+.tag.adjust {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.tag.observe {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.tag.eliminate {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.tag.pending {
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .log-type {

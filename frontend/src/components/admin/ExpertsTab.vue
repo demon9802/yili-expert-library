@@ -568,6 +568,23 @@ function uploadImportFile() {
   importExpertsFromFile(pendingImportFile.value)
 }
 
+// 复合领域标签（内部以「/」分隔）不应被进一步拆分；若导入数据已被拆成碎片，
+// 在此合并还原，避免产生「战略规划 / 战略解码 / 战略落地」等错误领域。
+const STRATEGY_FRAGMENTS = ['战略规划', '战略解码', '战略落地']
+const GENERIC_FRAGMENTS = ['通用（领导力', '协同', '执行力', '目标管理）']
+const STRATEGY_TAG = '战略规划/战略解码/战略落地'
+const GENERIC_TAG = '通用（领导力/协同/执行力/目标管理）'
+const COMPOSITE_FRAGMENTS = new Set([...STRATEGY_FRAGMENTS, ...GENERIC_FRAGMENTS])
+
+function normalizeCompositeFields(fields: string[]): string[] {
+  const hasStrategy = fields.some(f => STRATEGY_FRAGMENTS.includes(f))
+  const hasGeneric = fields.some(f => GENERIC_FRAGMENTS.includes(f))
+  const out = fields.filter(f => !COMPOSITE_FRAGMENTS.has(f))
+  if (hasStrategy && !out.includes(STRATEGY_TAG)) out.push(STRATEGY_TAG)
+  if (hasGeneric && !out.includes(GENERIC_TAG)) out.push(GENERIC_TAG)
+  return out
+}
+
 function importExpertsFromFile(file: File) {
   const reader = new FileReader()
   reader.onload = async () => {
@@ -582,8 +599,10 @@ function importExpertsFromFile(file: File) {
         // 空姓名行（如模板的「填写说明」行）直接跳过，不计为失败
         if (!name) continue
         if (store.experts.some(e => e.name === name)) { skipped++; continue }
-        const fields = String(r['适用领域'] || r['fields'] || '')
-          .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
+        const fields = normalizeCompositeFields(
+          String(r['适用领域'] || r['fields'] || '')
+            .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
+        )
         const advantages = String(r['核心优势'] || r['突出优势'] || r['advantages'] || '')
           .split('\n').map((s: string) => s.trim()).filter(Boolean)
         const contactsRaw = String(r['联系方式'] || r['contactInfo'] || '')

@@ -487,7 +487,7 @@ function toggleMobileMode() {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 2px 8px;
+  padding: 1px 6px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -507,34 +507,37 @@ function toggleMobileMode() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 .page-navigation-float :deep(.page-nav-inline-btn) {
-  padding: 0 8px;
-  height: 24px;
-  font-size: 11px;
-  line-height: 24px;
+  padding: 0 6px;
+  height: 18px;
+  font-size: 10px;
+  line-height: 18px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: #ffffff;
   color: var(--primary);
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .page-navigation-float :deep(.page-nav-inline-btn.disabled) {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 24px;
-  height: 24px;
-  padding: 0 3px;
-  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 2px;
+  font-size: 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   background: #ffffff;
   color: var(--text-secondary);
   font-weight: 500;
@@ -550,29 +553,37 @@ function toggleMobileMode() {
   color: #ffffff;
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 11px;
+  height: 18px;
+  font-size: 10px;
+  line-height: 18px;
   color: var(--text-muted);
-  margin-left: 4px;
+  margin-left: 2px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
 }
 @media (max-width: 480px) {
   .page-navigation-float {
-    padding: 2px 6px;
+    padding: 1px 4px;
   }
   .page-navigation-float :deep(.page-navigation-inline) {
     gap: 3px;
   }
   .page-navigation-float :deep(.page-nav-inline-btn),
   .page-navigation-float :deep(.page-nav-inline-num) {
-    height: 22px;
+    height: 18px;
     font-size: 10px;
-    line-height: 22px;
+    line-height: 18px;
   }
   .page-navigation-float :deep(.page-nav-inline-num) {
-    min-width: 22px;
+    min-width: 18px;
   }
   .page-navigation-float :deep(.page-nav-inline-btn) {
-    padding: 0 6px;
+    padding: 0 5px;
+  }
+  .page-navigation-float :deep(.page-nav-inline-info) {
+    height: 18px;
+    line-height: 18px;
   }
 }
 </style>

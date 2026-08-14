@@ -173,7 +173,7 @@
           <tr v-for="log in pagedGlobalLogs" :key="log.id">
             <td>{{ formatDateTime(log.createdAt) }}</td>
             <td>{{ log.expertName }}</td>
-            <td>{{ log.operatorName }}（{{ roleText(log.operatorRole) }}）</td>
+            <td>{{ roleText(log.operatorRole) }}/{{ log.operatorName || '-' }}</td>
             <td>
               <span class="log-type" :class="'type-' + typeClass(log.operation)">{{ log.operation }}</span>
             </td>
@@ -612,11 +612,28 @@ function scoreChangeText(log: OpLog): string {
 }
 function adjustContentText(log: OpLog): string {
   try {
+    const before = JSON.parse(log.beforeState || '{}')
     const after = JSON.parse(log.afterState || '{}')
-    if (after.status === 'eliminated') return '淘汰'
+
+    if (after.status === 'eliminated' || log.operation === '淘汰') return '淘汰'
     if (log.operation?.includes('延期') || log.operation?.includes('延后')) return '延后观察'
-    if (log.operation?.includes('自动')) return '覆盖人工调分'
-    if (log.operation?.includes('调分')) return '覆盖人工调分'
+    if (log.operation === '删除') return '删除专家'
+
+    const beforeProf = before.subScores?.professional || {}
+    const afterProf = after.subScores?.professional || {}
+    const beforeInfl = before.subScores?.influence || {}
+    const afterInfl = after.subScores?.influence || {}
+
+    const changes: string[] = []
+    allItems.forEach(it => {
+      const dim = professionalItems.includes(it as any) ? beforeProf : beforeInfl
+      const dimAfter = professionalItems.includes(it as any) ? afterProf : afterInfl
+      const b = Number(dim[it] ?? 2)
+      const a = Number(dimAfter[it] ?? 2)
+      if (b !== a) changes.push(`${it} ${b}★→${a}★`)
+    })
+
+    if (changes.length) return changes.join('、')
     return log.operation || '-'
   } catch {
     return log.operation || '-'
