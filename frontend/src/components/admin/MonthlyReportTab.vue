@@ -19,20 +19,94 @@
         统计范围：全量库内资源（含未在前台展示的观察库专家、已淘汰专家，以及不可见 / 未关联专家的合作项目）。
       </p>
 
-      <!-- 月度概览 -->
-      <div class="overview-cards">
-        <div class="overview-card">
-          <div class="overview-value">{{ newExperts.length }}</div>
-          <div class="overview-label">新增</div>
+      <!-- ① 本月专家变动 -->
+      <h4 class="report-section-title">① 本月专家变动</h4>
+      <div class="detail-section">
+        <div class="detail-summary">
+          <span>本月新增 <strong>{{ newExperts.length }}</strong> 位专家，修改 <strong>{{ modifiedExperts.length }}</strong> 位专家。</span>
+          <button class="btn btn-sm" @click="expertDetailExpanded = !expertDetailExpanded">
+            {{ expertDetailExpanded ? '收起明细' : '展开明细' }}
+          </button>
         </div>
-        <div class="overview-card">
-          <div class="overview-value">{{ modifiedExperts.length }}</div>
-          <div class="overview-label">修改</div>
+        <div v-if="expertDetailExpanded || isExporting" class="detail-body">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>专家姓名</th>
+                <th>操作类型</th>
+                <th>时间</th>
+                <th>状态</th>
+                <th>综合评分</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedExpertChanges" :key="item.expert.id + '-' + item.type">
+                <td>{{ item.expert.name }}</td>
+                <td>
+                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                </td>
+                <td>{{ formatDateTime(item.time) }}</td>
+                <td>{{ statusLabel(item.expert.status) }}</td>
+                <td>{{ item.expert.scores?.overall?.toFixed(1) ?? '-' }}</td>
+              </tr>
+              <tr v-if="allExpertChanges.length === 0">
+                <td colspan="5" class="empty-cell">本月暂无专家变动</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!isExporting && expertTotalPages > 1" class="pagination">
+            <button class="btn btn-sm" :disabled="expertPage === 1" @click="expertPage--">上一页</button>
+            <span>第 {{ expertPage }} / {{ expertTotalPages }} 页</span>
+            <button class="btn btn-sm" :disabled="expertPage === expertTotalPages" @click="expertPage++">下一页</button>
+          </div>
         </div>
       </div>
 
-      <!-- ① 当前仪表盘快照 -->
-      <h4 class="report-section-title">① 当前仪表盘快照（{{ todayText }}）</h4>
+      <!-- ② 本月合作项目变动 -->
+      <h4 class="report-section-title">② 本月合作项目变动</h4>
+      <div class="detail-section">
+        <div class="detail-summary">
+          <span>本月新增 <strong>{{ newProjects.length }}</strong> 个项目，修改 <strong>{{ modifiedProjects.length }}</strong> 个项目。</span>
+          <button class="btn btn-sm" @click="projectDetailExpanded = !projectDetailExpanded">
+            {{ projectDetailExpanded ? '收起明细' : '展开明细' }}
+          </button>
+        </div>
+        <div v-if="projectDetailExpanded || isExporting" class="detail-body">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>项目名称</th>
+                <th>操作类型</th>
+                <th>时间</th>
+                <th>关联专家</th>
+                <th>年份</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedProjectChanges" :key="item.project.id + '-' + item.type">
+                <td>{{ item.project.title }}</td>
+                <td>
+                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                </td>
+                <td>{{ formatDateTime(item.time) }}</td>
+                <td>{{ relatedExpertName(item.project) }}</td>
+                <td>{{ item.project.year }}</td>
+              </tr>
+              <tr v-if="allProjectChanges.length === 0">
+                <td colspan="5" class="empty-cell">本月暂无合作项目变动</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!isExporting && projectTotalPages > 1" class="pagination">
+            <button class="btn btn-sm" :disabled="projectPage === 1" @click="projectPage--">上一页</button>
+            <span>第 {{ projectPage }} / {{ projectTotalPages }} 页</span>
+            <button class="btn btn-sm" :disabled="projectPage === projectTotalPages" @click="projectPage++">下一页</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ 当前仪表盘快照 -->
+      <h4 class="report-section-title">③ 当前仪表盘快照（{{ todayText }}）</h4>
       <div class="dashboard-grid">
         <div class="dashboard-card full">
           <h4>领域分布情况</h4>
@@ -98,8 +172,8 @@
         </div>
       </div>
 
-      <!-- 访问统计 -->
-      <h4 class="report-section-title">② 访问统计</h4>
+      <!-- ④ 系统使用情况 -->
+      <h4 class="report-section-title">④ 系统使用情况</h4>
       <div class="stats-grid sm">
         <div class="stat-card">
           <span>总访问量</span>
@@ -129,90 +203,65 @@
         </tbody>
       </table>
 
-      <!-- 专家变动 -->
-      <h4 class="report-section-title">③ 专家变动</h4>
+      <!-- ⑤ 观察库操作明细 -->
+      <h4 class="report-section-title">⑤ 观察库操作明细</h4>
       <div class="detail-section">
         <div class="detail-summary">
-          <span>本月新增 <strong>{{ newExperts.length }}</strong> 位专家，修改 <strong>{{ modifiedExperts.length }}</strong> 位专家。</span>
-          <button class="btn btn-sm" @click="expertDetailExpanded = !expertDetailExpanded">
-            {{ expertDetailExpanded ? '收起明细' : '展开明细' }}
+          <span>共 <strong>{{ allObsLogs.length }}</strong> 条观察库操作记录。</span>
+          <button class="btn btn-sm" @click="obsLogExpanded = !obsLogExpanded">
+            {{ obsLogExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
-        <div v-if="expertDetailExpanded || isExporting" class="detail-body">
-          <table class="admin-table">
+        <div v-if="obsLogExpanded || isExporting" class="detail-body">
+          <table class="admin-table obs-log-table">
             <thead>
               <tr>
-                <th>专家姓名</th>
-                <th>操作类型</th>
                 <th>时间</th>
-                <th>状态</th>
-                <th>综合评分</th>
+                <th>专家</th>
+                <th>操作者</th>
+                <th>类型</th>
+                <th>综合分变化</th>
+                <th>操作意见</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in paginatedExpertChanges" :key="item.expert.id + '-' + item.type">
-                <td>{{ item.expert.name }}</td>
+              <tr v-for="log in paginatedObsLogs" :key="log.id">
+                <td>{{ formatDateTime(log.createdAt) }}</td>
+                <td>{{ log.expertName }}</td>
+                <td>{{ log.operatorName }}（{{ roleText(log.operatorRole) }}）</td>
                 <td>
-                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                  <span class="log-type" :class="'type-' + typeClass(log.operation)">{{ log.operation }}</span>
                 </td>
-                <td>{{ formatDateTime(item.time) }}</td>
-                <td>{{ statusLabel(item.expert.status) }}</td>
-                <td>{{ item.expert.scores?.overall?.toFixed(1) ?? '-' }}</td>
+                <td>{{ scoreChangeText(log) }}</td>
+                <td>{{ log.note || '-' }}</td>
               </tr>
-              <tr v-if="allExpertChanges.length === 0">
-                <td colspan="5" class="empty-cell">本月暂无专家变动</td>
+              <tr v-if="paginatedObsLogs.length === 0">
+                <td colspan="6" class="empty-cell">暂无操作记录</td>
               </tr>
             </tbody>
           </table>
-          <div v-if="!isExporting && expertTotalPages > 1" class="pagination">
-            <button class="btn btn-sm" :disabled="expertPage === 1" @click="expertPage--">上一页</button>
-            <span>第 {{ expertPage }} / {{ expertTotalPages }} 页</span>
-            <button class="btn btn-sm" :disabled="expertPage === expertTotalPages" @click="expertPage++">下一页</button>
+          <div v-if="!isExporting && obsLogTotalPages > 1" class="pagination">
+            <button class="btn btn-sm" :disabled="obsLogPage === 1" @click="obsLogPage--">上一页</button>
+            <span>第 {{ obsLogPage }} / {{ obsLogTotalPages }} 页</span>
+            <button class="btn btn-sm" :disabled="obsLogPage === obsLogTotalPages" @click="obsLogPage++">下一页</button>
           </div>
         </div>
       </div>
 
-      <!-- 合作项目 -->
-      <h4 class="report-section-title">④ 合作项目</h4>
-      <div class="detail-section">
-        <div class="detail-summary">
-          <span>本月新增 <strong>{{ newProjects.length }}</strong> 个项目，修改 <strong>{{ modifiedProjects.length }}</strong> 个项目。</span>
-          <button class="btn btn-sm" @click="projectDetailExpanded = !projectDetailExpanded">
-            {{ projectDetailExpanded ? '收起明细' : '展开明细' }}
-          </button>
-        </div>
-        <div v-if="projectDetailExpanded || isExporting" class="detail-body">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>项目名称</th>
-                <th>操作类型</th>
-                <th>时间</th>
-                <th>关联专家</th>
-                <th>年份</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in paginatedProjectChanges" :key="item.project.id + '-' + item.type">
-                <td>{{ item.project.title }}</td>
-                <td>
-                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
-                </td>
-                <td>{{ formatDateTime(item.time) }}</td>
-                <td>{{ relatedExpertName(item.project) }}</td>
-                <td>{{ item.project.year }}</td>
-              </tr>
-              <tr v-if="allProjectChanges.length === 0">
-                <td colspan="5" class="empty-cell">本月暂无合作项目变动</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="!isExporting && projectTotalPages > 1" class="pagination">
-            <button class="btn btn-sm" :disabled="projectPage === 1" @click="projectPage--">上一页</button>
-            <span>第 {{ projectPage }} / {{ projectTotalPages }} 页</span>
-            <button class="btn btn-sm" :disabled="projectPage === projectTotalPages" @click="projectPage++">下一页</button>
+      <!-- ⑥ 系统更新日志概要 -->
+      <h4 class="report-section-title">⑥ 系统更新日志概要</h4>
+      <div class="changelog-section">
+        <div v-for="entry in changelog" :key="entry.version" class="changelog-item">
+          <div class="changelog-head">
+            <span class="changelog-version">v{{ entry.version }}</span>
+            <span class="changelog-date">{{ entry.date }}</span>
+            <span class="changelog-title">{{ entry.title }}</span>
           </div>
+          <ul class="changelog-list">
+            <li v-for="(c, i) in entry.changes" :key="i">{{ c }}</li>
+          </ul>
         </div>
+        <div v-if="changelog.length === 0" class="empty-cell">暂无系统更新日志</div>
       </div>
 
       <p v-if="loading" class="loading-text">加载中...</p>
@@ -221,13 +270,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, nextTick } from 'vue'
+import { computed, onMounted, ref, nextTick, watch } from 'vue'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { pageViewApi } from '@/api/pageView'
+import { observationApi } from '@/api/observation'
 import { useAppStore } from '@/store/appStore'
+import { getAllChanges } from '@/utils/changelog'
 import FieldChartInline from '@/components/FieldChartInline.vue'
-import type { Expert, Project } from '@/types'
+import type { Expert, Project, ObservationOperation } from '@/types'
 
 interface MonthlyStats {
   totalExperts?: number
@@ -254,8 +305,10 @@ const isExporting = ref(false)
 
 const expertDetailExpanded = ref(false)
 const projectDetailExpanded = ref(false)
+const obsLogExpanded = ref(false)
 const expertPage = ref(1)
 const projectPage = ref(1)
+const obsLogPage = ref(1)
 const PAGE_SIZE = 5
 
 const monthlyRows = computed(() => Array.isArray(stats.value.rows) ? stats.value.rows : [])
@@ -306,6 +359,34 @@ function relatedExpertName(project: Project): string {
     if (expert) return expert.name
   }
   return project.pendingExpertName || '未关联'
+}
+
+function roleText(role?: string): string {
+  if (role === 'master') return '主管理员'
+  if (role === 'sub') return '子管理员'
+  return role || '未知'
+}
+
+function typeClass(op?: string): string {
+  if (op?.includes('淘汰')) return 'eliminated'
+  if (op?.includes('延期') || op?.includes('延后')) return 'extended'
+  if (op?.includes('评分')) return 'score'
+  if (op?.includes('删除')) return 'delete'
+  return 'other'
+}
+
+function scoreChangeText(log: ObservationOperation): string {
+  try {
+    const raw = log as ObservationOperation & { beforeState?: string; afterState?: string }
+    const before = JSON.parse(String(raw.beforeState || '{}'))
+    const after = JSON.parse(String(raw.afterState || '{}'))
+    const b = before.scores?.overall
+    const a = after.scores?.overall
+    if (b == null || a == null) return '-'
+    return `${Number(b).toFixed(1)} → ${Number(a).toFixed(1)}`
+  } catch {
+    return '-'
+  }
 }
 
 // ===== 活跃专家（与仪表盘保持一致：排除已淘汰且综合评分 ≥ 3） =====
@@ -375,6 +456,30 @@ const paginatedProjectChanges = computed(() => {
   return allProjectChanges.value.slice(start, start + PAGE_SIZE)
 })
 
+// ===== 观察库操作明细 =====
+const allObsLogs = ref<ObservationOperation[]>([])
+
+async function loadObsLogs() {
+  try {
+    const all = await observationApi.findByExpertId()
+    allObsLogs.value = (all || []).sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+  } catch {
+    allObsLogs.value = []
+  }
+}
+
+const obsLogTotalPages = computed(() => Math.max(1, Math.ceil(allObsLogs.value.length / PAGE_SIZE)))
+const paginatedObsLogs = computed(() => {
+  if (isExporting.value) return allObsLogs.value
+  const start = (obsLogPage.value - 1) * PAGE_SIZE
+  return allObsLogs.value.slice(start, start + PAGE_SIZE)
+})
+
+// ===== 系统更新日志概要 =====
+const changelog = computed(() => getAllChanges())
+
 // ===== 分值分布（与后台仪表盘一致） =====
 const scoreRanges = [
   { range: '4.5-5.0分', min: 4.5, max: 5.0, color: '#22c55e' },
@@ -413,8 +518,15 @@ function updateWidth() {
 
 onMounted(() => {
   loadStats()
+  loadObsLogs()
   updateWidth()
   window.addEventListener('resize', updateWidth)
+})
+
+watch([allExpertChanges, allProjectChanges, allObsLogs], () => {
+  expertPage.value = 1
+  projectPage.value = 1
+  obsLogPage.value = 1
 })
 
 const distChartWidth = computed(() => Math.max(containerWidth.value, 360))
@@ -527,13 +639,17 @@ async function exportPDF() {
 async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise<void>) {
   const prevExpertPage = expertPage.value
   const prevProjectPage = projectPage.value
+  const prevObsLogPage = obsLogPage.value
   const prevExpertExpanded = expertDetailExpanded.value
   const prevProjectExpanded = projectDetailExpanded.value
+  const prevObsLogExpanded = obsLogExpanded.value
   isExporting.value = true
   expertDetailExpanded.value = true
   projectDetailExpanded.value = true
+  obsLogExpanded.value = true
   expertPage.value = 1
   projectPage.value = 1
+  obsLogPage.value = 1
   await nextTick()
   await new Promise(resolve => setTimeout(resolve, 300))
   const canvas = await captureReport()
@@ -541,8 +657,10 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   isExporting.value = false
   expertDetailExpanded.value = prevExpertExpanded
   projectDetailExpanded.value = prevProjectExpanded
+  obsLogExpanded.value = prevObsLogExpanded
   expertPage.value = prevExpertPage
   projectPage.value = prevProjectPage
+  obsLogPage.value = prevObsLogPage
 }
 </script>
 
@@ -587,35 +705,6 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   color: #6b7280;
   margin: 0 0 16px;
   line-height: 1.6;
-}
-
-.overview-cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-  max-width: 320px;
-}
-
-.overview-card {
-  padding: 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  text-align: center;
-}
-
-.overview-value {
-  font-size: 36px;
-  font-weight: 700;
-  color: #111827;
-  line-height: 1;
-}
-
-.overview-label {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #6b7280;
 }
 
 .report-section-title {
@@ -749,6 +838,12 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   color: #374151;
 }
 
+.admin-table.obs-log-table th,
+.admin-table.obs-log-table td {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
 .empty-cell {
   text-align: center;
   color: #9ca3af;
@@ -796,6 +891,72 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
 .tag.modified {
   background: #dbeafe;
   color: #1e40af;
+}
+
+.log-type {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.log-type.type-eliminated { background: #fee2e2; color: #991b1b; }
+.log-type.type-extended { background: #dbeafe; color: #1d4ed8; }
+.log-type.type-score { background: #dcfce7; color: #15803d; }
+.log-type.type-delete { background: #f3e8ff; color: #7c3aed; }
+.log-type.type-other { background: #f1f5f9; color: #475569; }
+
+.changelog-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.changelog-item {
+  padding: 10px 0;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.changelog-item:last-child {
+  border-bottom: none;
+}
+
+.changelog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.changelog-version {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+  background: #eff6ff;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.changelog-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.changelog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.changelog-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.9;
 }
 
 .pagination {
