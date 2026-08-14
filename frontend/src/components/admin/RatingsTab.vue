@@ -22,12 +22,12 @@
         <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
 
-      <div class="rule-summary">
-        <div class="rule-line prof">专业度：①②③</div>
-        <div class="rule-line infl">影响力：①②</div>
+      <div class="rule-summary plain">
+        <div class="rule-line prof">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
+        <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称、管理履历与行业地位</div>
       </div>
 
-      <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2.5★ 计，避免粗糙模型批量误判。</p>
+      <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计，避免粗糙模型批量误判。</p>
 
       <div class="toggle-row auto-row">
         <label class="inline-check">
@@ -132,7 +132,7 @@
       <div v-else class="warn-banner">
         <span class="warn-icon">⚠</span>
         <div class="warn-text">
-          <strong>共 {{ lowExperts.length }} 位专家综合评分低于 3.5★</strong>
+          <strong>共 {{ lowExperts.length }} 位专家综合评分低于 3★</strong>
           <span>已自动同步至观察库，可前往查看和处理。</span>
         </div>
         <button class="btn btn-warn btn-sm" type="button" @click="goObservation">前往观察库</button>
@@ -451,9 +451,10 @@ const vClickOutside = {
 .doc-link:hover { background: #eff6ff; }
 
 .rule-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.rule-summary.plain .rule-line { background: none; border: none; padding: 2px 0; }
 .rule-line { font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); }
-.rule-line.prof { background: #eff6ff; color: #1e40af; border-color: #dbeafe; }
-.rule-line.infl { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.rule-summary.plain .rule-line.prof { color: #1e40af; }
+.rule-summary.plain .rule-line.infl { color: #b45309; }
 
 .missing-tip { margin: 0 0 12px; padding: 8px 10px; border-radius: 6px; background: #fefce8; color: #854d0e; font-size: 12px; }
 .auto-row { margin-top: 4px; }

@@ -95,11 +95,11 @@ export const useAppStore = defineStore('app', () => {
     // 基础过滤：排除已淘汰专家（V5 getFilteredExperts 逻辑）
     let result = experts.value.filter(e => e.status !== 'eliminated')
 
-    // 评分筛选：基础规则排除 <3★（V5.9.5 观察库阈值），再通过 min/max 区间做前端自定义筛选
+    // 评分筛选：基础规则排除 <3★（观察库阈值，<3★ 专家不展示），再通过 min/max 区间做前端自定义筛选
     result = result.filter(e => {
       const overall = e.scores?.overall
       if (overall === null || overall === undefined) return false
-      if (overall < 3) return false
+      if (overall < OBSERVATION_THRESHOLD) return false
       if (scoreFilter.value.min != null && overall < scoreFilter.value.min) return false
       if (scoreFilter.value.max != null && overall > scoreFilter.value.max) return false
       return true
