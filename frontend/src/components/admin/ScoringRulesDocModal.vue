@@ -7,10 +7,10 @@
       </div>
       <div class="doc-body">
         <h4>一、评分结构与计算</h4>
-        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项，各占 20%。综合评分 = 专业度 × 60% + 影响力 × 40%。</p>
+        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项，各占 20%。</p>
         <div class="rule-summary plain">
-          <div class="rule-line prof">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
-          <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
+          <div class="rule-line">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
+          <div class="rule-line">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
         </div>
         <h4>二、评分规则</h4>
         <table class="doc-table matrix">
@@ -146,9 +146,7 @@ const emit = defineEmits<{ close: [] }>()
 .doc-body h4:first-child { margin-top: 0; }
 .rule-summary { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .rule-summary.plain .rule-line { background: none; border: none; padding: 2px 0; }
-.rule-line { font-size: 15px; font-weight: 600; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); }
-.rule-summary.plain .rule-line.prof { color: #1e40af; }
-.rule-summary.plain .rule-line.infl { color: #b45309; }
+.rule-line { font-size: 14px; font-weight: 400; color: var(--text); padding: 2px 0; }
 .dim-lead { margin: 0 0 12px; color: #64748b; }
 .formula { margin: 12px 0 0; padding: 10px 14px; background: #f8fafc; border-radius: 6px; color: #475569; }
 .missing { margin: 12px 0 0; padding: 8px 12px; background: #fefce8; border-radius: 6px; color: #854d0e; }
@@ -169,15 +167,8 @@ const emit = defineEmits<{ close: [] }>()
   font-weight: 600;
   color: #475569;
 }
-.doc-table .dim {
-  font-weight: 700;
-  color: #1d4ed8;
-  background: #eff6ff;
-  text-align: center;
-  vertical-align: middle;
-}
 .doc-table .item {
-  font-weight: 600;
+  font-weight: 400;
   white-space: nowrap;
 }
 .doc-table.matrix { min-width: 800px; }

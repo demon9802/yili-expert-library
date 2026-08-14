@@ -63,7 +63,7 @@ export function daysBetweenDates(a: string | null | undefined, b: string | null 
   return Math.round((db.getTime() - da.getTime()) / 86400000)
 }
 
-// 观察截止日：已存则用之，否则按入库日期 + 6 个月推算
+// 观察截止日：已存则用之，否则按入库日期 + 18 个月推算
 export function computeObservationDeadline(
   observationDate: string | null | undefined,
   scores: any
@@ -71,7 +71,7 @@ export function computeObservationDeadline(
   const existing = scores && scores.observationDeadline
   if (existing) return String(existing)
   const entry = observationDate || formatDateYMD(new Date())
-  return addMonthsToDateYMD(entry, 6)
+  return addMonthsToDateYMD(entry, 18)
 }
 
 export function debounce<T extends (...args: any[]) => any>(

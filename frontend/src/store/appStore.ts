@@ -81,13 +81,16 @@ export const useAppStore = defineStore('app', () => {
   // 数据更新时间（系统设置 → 数据更新时间）
   const updateTime = ref<string>('')
 
+  // 手机端适配开关（系统设置 → 手机端视图）
+  const mobileAdaptation = ref<boolean>(true)
+
   // 配色方案预设（运行时改写 --primary / --primary-light / --primary-dark）
   const COLOR_SCHEMES: Record<string, { name: string; primary: string; light: string; dark: string }> = {
     default: { name: '默认蓝', primary: '#1a56db', light: '#e8f0fe', dark: '#1e40af' },
-    teal: { name: '青绿', primary: '#0d9488', light: '#ccfbf1', dark: '#0f766e' },
-    purple: { name: '紫', primary: '#7c3aed', light: '#ede9fe', dark: '#6d28d9' },
-    rose: { name: '玫红', primary: '#e11d48', light: '#ffe4e6', dark: '#be123c' },
-    amber: { name: '琥珀', primary: '#d97706', light: '#fef3c7', dark: '#b45309' },
+    teal: { name: '翡翠绿', primary: '#0d9488', light: '#ccfbf1', dark: '#0f766e' },
+    purple: { name: '深邃紫', primary: '#7c3aed', light: '#ede9fe', dark: '#6d28d9' },
+    amber: { name: '琥珀金', primary: '#d97706', light: '#fef3c7', dark: '#b45309' },
+    dark: { name: '暗夜黑', primary: '#334155', light: '#f1f5f9', dark: '#0f172a' },
   }
 
   // ===== Getters =====
@@ -251,6 +254,14 @@ export const useAppStore = defineStore('app', () => {
     } catch {
       /* 忽略 */
     }
+
+    // 加载手机端适配开关（系统设置）
+    try {
+      const v = await settingApi.get('mobileAdaptation')
+      if (v != null) mobileAdaptation.value = v !== 'false'
+    } catch {
+      /* 忽略 */
+    }
   }
 
   async function setShowScores(v: boolean) {
@@ -320,6 +331,15 @@ export const useAppStore = defineStore('app', () => {
     updateTime.value = now
     try {
       await settingApi.save('updateTime', now)
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  async function setMobileAdaptation(enabled: boolean) {
+    mobileAdaptation.value = enabled
+    try {
+      await settingApi.save('mobileAdaptation', enabled ? 'true' : 'false')
     } catch {
       /* 忽略 */
     }
@@ -461,7 +481,7 @@ export const useAppStore = defineStore('app', () => {
     if (enteringObservation) {
       const entry = formatDateYMD(new Date())
       payload.observationDate = entry
-      payload.scores = { ...((payload.scores as any) || {}), observationDeadline: addMonthsToDateYMD(entry, 6) }
+      payload.scores = { ...((payload.scores as any) || {}), observationDeadline: addMonthsToDateYMD(entry, 18) }
     }
   }
 
@@ -476,10 +496,11 @@ export const useAppStore = defineStore('app', () => {
         professional: result.professional,
         influence: result.influence,
         overall: result.overall,
-        subScores: {
-          professional: result.professionalItems,
-          influence: result.influenceItems,
-        },
+        // observationDeadline 继续保留在 scores JSON 中（避免改表）
+      },
+      subScores: {
+        professional: result.professionalItems,
+        influence: result.influenceItems,
       },
     }
     applyStatusPayload(payload, result.overall, experts.value[idx].status, experts.value[idx].observationStatus)
@@ -499,10 +520,10 @@ export const useAppStore = defineStore('app', () => {
           professional: result.professional,
           influence: result.influence,
           overall: result.overall,
-          subScores: {
-            professional: result.professionalItems,
-            influence: result.influenceItems,
-          },
+        },
+        subScores: {
+          professional: result.professionalItems,
+          influence: result.influenceItems,
         },
       }
       applyStatusPayload(payload, result.overall, e.status, e.observationStatus)
@@ -671,7 +692,7 @@ export const useAppStore = defineStore('app', () => {
     favoritesFilter, cooperationFilter, searchQuery, adminSearchQuery,
     adminTab, adminSubTab, editingExpert, fieldsCollapsed,
     currentPage, PAGE_SIZE, searchHistory, loading, showScores, sortOptions,
-    platformTitle, colorScheme, appDescription, updateTime, COLOR_SCHEMES,
+    platformTitle, colorScheme, appDescription, updateTime, mobileAdaptation, COLOR_SCHEMES,
     // Getters
     filteredExperts, totalPages, paginatedExperts, isMaster, isSubAdmin,
     // Actions
@@ -679,7 +700,7 @@ export const useAppStore = defineStore('app', () => {
     saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts, recordObservationOperation,
     saveProject, deleteProject,
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
-    setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, applyColorScheme,
+    setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, setMobileAdaptation, applyColorScheme,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
     toggleFieldFilter, clearFilters, setMode, setAdminTab, persistLocal,
   }

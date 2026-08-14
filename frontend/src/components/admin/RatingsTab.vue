@@ -23,8 +23,8 @@
       </div>
 
       <div class="rule-summary plain">
-        <div class="rule-line prof">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
-        <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
+        <div class="rule-line">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
+        <div class="rule-line">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
       </div>
 
       <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计，避免粗糙模型批量误判。</p>
@@ -57,8 +57,8 @@
               <th>姓名</th>
               <th>专业度</th>
               <th>影响力</th>
-              <th v-for="it in professionalItems" :key="it" class="sub-head prof">{{ it }}</th>
-              <th v-for="it in influenceItems" :key="it" class="sub-head infl">{{ it }}</th>
+              <th v-for="it in professionalItems" :key="it" class="sub-head">{{ it }}</th>
+              <th v-for="it in influenceItems" :key="it" class="sub-head">{{ it }}</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -233,8 +233,21 @@ function subsFor(e: Expert): FiveItemScores {
 }
 
 function computeFromSubs(profMap: Record<string, number>, inflMap: Record<string, number>): Scores {
-  const professional = clampScore(avg(professionalItems.map(it => Number(profMap[it] ?? 2))))
-  const influence = clampScore(avg(influenceItems.map(it => Number(inflMap[it] ?? 2))))
+  const profWeights: Record<string, number> = {
+    学历与学术背景: 0.35,
+    行业资质与认证: 0.30,
+    专业成果与经验: 0.35,
+  }
+  const inflWeights: Record<string, number> = {
+    社会荣誉与奖项: 0.35,
+    '职称/管理履历与行业地位': 0.65,
+  }
+  const professional = clampScore(
+    professionalItems.reduce((s, it) => s + Number(profMap[it] ?? 2) * profWeights[it], 0)
+  )
+  const influence = clampScore(
+    influenceItems.reduce((s, it) => s + Number(inflMap[it] ?? 2) * inflWeights[it], 0)
+  )
   const overall = clampScore(professional * 0.6 + influence * 0.4)
   return { professional, influence, overall }
 }
@@ -456,9 +469,7 @@ const vClickOutside = {
 
 .rule-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .rule-summary.plain .rule-line { background: none; border: none; padding: 2px 0; }
-.rule-line { font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); }
-.rule-summary.plain .rule-line.prof { color: #1e40af; }
-.rule-summary.plain .rule-line.infl { color: #b45309; }
+.rule-line { font-size: 14px; font-weight: 400; color: var(--text); padding: 2px 0; }
 
 .missing-tip { margin: 0 0 12px; padding: 8px 10px; border-radius: 6px; background: #fefce8; color: #854d0e; font-size: 12px; }
 .auto-row { margin-top: 4px; }
@@ -473,8 +484,6 @@ const vClickOutside = {
 .data-table th, .data-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .data-table th { background: var(--surface); font-weight: 600; color: var(--text-secondary); font-size: 12px; }
 .data-table tr:hover { background: #f8fafc; }
-.sub-head.prof { color: #1d4ed8; }
-.sub-head.infl { color: #b45309; }
 .cell-name { font-weight: 600; text-align: left; }
 .score-cell { font-weight: 700; }
 .prof-score { color: #3B82F6; }
