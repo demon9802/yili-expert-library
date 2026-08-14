@@ -19,7 +19,7 @@
 
     <!-- 专家卡片 -->
     <div
-      v-for="expert in obsExperts"
+      v-for="expert in pagedObsExperts"
       :key="expert.id"
       class="obs-card"
       :class="{ eliminated: expert.status === 'eliminated' }"
@@ -135,6 +135,13 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- 专家列表分页 -->
+    <div v-if="obsExpertTotalPages > 1" class="log-pagination">
+      <button class="page-btn" :disabled="obsExpertPage === 1" @click="obsExpertPage--">上一页</button>
+      <span class="page-info">{{ obsExpertPage }} / {{ obsExpertTotalPages }}</span>
+      <button class="page-btn" :disabled="obsExpertPage === obsExpertTotalPages" @click="obsExpertPage++">下一页</button>
     </div>
 
     <!-- 底部：观察库操作记录 -->
@@ -548,8 +555,17 @@ function allVisibleLogsForExpertIds(ids: number[]): OpLog[] {
 }
 const allVisibleLogs = computed(() => allVisibleLogsForExpertIds(obsExperts.value.map(e => e.id)))
 
+const obsExpertPage = ref(1)
+const obsExpertPageSize = 5
+const pagedObsExperts = computed(() => {
+  const start = (obsExpertPage.value - 1) * obsExpertPageSize
+  return obsExperts.value.slice(start, start + obsExpertPageSize)
+})
+const obsExpertTotalPages = computed(() => Math.max(1, Math.ceil(obsExperts.value.length / obsExpertPageSize)))
+watch(obsExperts, () => { obsExpertPage.value = 1 })
+
 const globalLogPage = ref(1)
-const globalLogPageSize = 10
+const globalLogPageSize = 5
 const pagedGlobalLogs = computed(() => {
   const start = (globalLogPage.value - 1) * globalLogPageSize
   return allVisibleLogs.value.slice(start, start + globalLogPageSize)
