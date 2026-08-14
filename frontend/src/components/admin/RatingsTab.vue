@@ -3,7 +3,7 @@
     <div class="tab-header"><h3>评分管理</h3></div>
 
     <!-- ① 前端展示控制 -->
-    <div class="config-card">
+    <div v-if="store.isMaster" class="config-card">
       <h4>① 前端展示控制</h4>
       <div class="toggle-row">
         <span>在前端展示评分信息（专家卡片 &amp; 详情页）：</span>
@@ -19,7 +19,7 @@
     <div class="config-card">
       <div class="section-title-row">
         <h4>② 评分配置（规则及文档）</h4>
-        <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
+        <button v-if="store.isMaster" class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
 
       <div class="rule-summary plain">
@@ -99,11 +99,12 @@
       <p class="hint adjust-hint">直接修改表格中 5 个评分项的整数分值（1-5，最高 5★）；专业度、影响力、综合得分由系统自动计算，不可直接编辑。</p>
       <div class="quick-row">
         <input v-model="searchQuery" type="search" placeholder="搜索专家姓名..." class="search-input" />
-        <button class="btn btn-secondary" type="button" :disabled="batchRunning" @click="runBatchScoring">
+        <button v-if="store.isMaster" class="btn btn-secondary" type="button" :disabled="batchRunning" @click="runBatchScoring">
           {{ batchRunning ? '重置中...' : '整体重置为自动评分' }}
         </button>
       </div>
-      <p v-if="batchMessage" class="batch-message" :class="{ error: !batchSuccess }">{{ batchMessage }}</p>
+      <p v-if="store.isMaster && batchMessage" class="batch-message" :class="{ error: !batchSuccess }">{{ batchMessage }}</p>
+      <p v-if="store.isSubAdmin" class="hint view-only-hint">子管理员仅可查看评分，不可编辑评分项或调整展示开关。</p>
 
       <div class="table-scroll-wrapper">
         <table class="data-table">
@@ -130,6 +131,7 @@
                   max="5"
                   step="1"
                   :value="subsFor(e).professional[it]"
+                  :disabled="store.isSubAdmin"
                   @change="onSubChange(e, 'professional', it, $event)"
                 />
               </td>
@@ -141,6 +143,7 @@
                   max="5"
                   step="1"
                   :value="subsFor(e).influence[it]"
+                  :disabled="store.isSubAdmin"
                   @change="onSubChange(e, 'influence', it, $event)"
                 />
               </td>
@@ -553,6 +556,19 @@ const vClickOutside = {
 .sub-input { width: 52px; padding: 3px 4px; border: 1px solid #bfdbfe; border-radius: 4px; font-size: 12px; text-align: center; }
 .sub-input:focus { outline: none; border-color: var(--primary); }
 .sub-input.infl { border-color: #fde68a; }
+.sub-input:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+.view-only-hint {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
 .actions { position: relative; }
 
 .action-dropdown { position: relative; display: inline-block; }

@@ -4,7 +4,7 @@
       <h2>仪表盘管理</h2>
     </div>
 
-    <section class="dashboard-section">
+    <section v-if="store.isMaster" class="dashboard-section">
       <h4>展示模块设置</h4>
       <div class="module-settings">
         <label

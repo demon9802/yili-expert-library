@@ -505,13 +505,25 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteExpert(id: number) {
+    const e = experts.value.find(x => x.id === id)
+    if (e) {
+      await recordObservationOperation({
+        expertId: e.id,
+        expertName: e.name,
+        operation: '删除',
+        before: { status: e.status, observationStatus: e.observationStatus, scores: e.scores },
+        after: { deleted: true },
+        note: '永久删除专家',
+        tags: ['delete'],
+      })
+    }
     if (testMode.value) {
-      experts.value = experts.value.filter(e => e.id !== id)
+      experts.value = experts.value.filter(x => x.id !== id)
       persistTest()
       return
     }
     await expertApi.delete(id)
-    experts.value = experts.value.filter(e => e.id !== id)
+    experts.value = experts.value.filter(x => x.id !== id)
   }
 
   // ===== 观察库操作记录 =====

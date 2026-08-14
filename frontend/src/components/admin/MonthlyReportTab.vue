@@ -27,11 +27,12 @@
       <h4 class="report-section-title">① 本月专家变动</h4>
       <div class="detail-section">
         <div class="detail-summary">
-          <span>本月专家变动：新增 <strong>{{ expertChangeCount('new') }}</strong> 位、调整 <strong>{{ expertChangeCount('adjust') }}</strong> 位、观察 <strong>{{ expertChangeCount('observe') }}</strong> 位、淘汰 <strong>{{ expertChangeCount('eliminate') }}</strong> 位。</span>
+          <span>本月专家变动：新增 <strong>{{ expertChangeCount('new') }}</strong> 位、调整 <strong>{{ expertChangeCount('adjust') }}</strong> 位、观察 <strong>{{ expertChangeCount('observe') }}</strong> 位、淘汰 <strong>{{ expertChangeCount('eliminate') }}</strong> 位、删除 <strong>{{ expertChangeCount('delete') }}</strong> 位。</span>
           <button class="btn btn-sm" @click="expertDetailExpanded = !expertDetailExpanded">
             {{ expertDetailExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
+        <p class="summary-subline">当前已录入专家 <strong>{{ store.experts.length }}</strong> 位，观察中 <strong>{{ observingExpertCount }}</strong> 位。</p>
         <div v-show="expertDetailExpanded" class="detail-body">
           <table class="admin-table">
             <thead>
@@ -70,11 +71,12 @@
       <h4 class="report-section-title">② 本月合作项目变动</h4>
       <div class="detail-section">
         <div class="detail-summary">
-          <span>本月合作项目变动：新增 <strong>{{ projectChangeCount('new') }}</strong> 个、修改 <strong>{{ projectChangeCount('modified') }}</strong> 个、待关联 <strong>{{ projectChangeCount('pending') }}</strong> 个。</span>
+          <span>本月合作项目变动：新增 <strong>{{ projectChangeCount('new') }}</strong> 个、修改 <strong>{{ projectChangeCount('modified') }}</strong> 个、删除 <strong>{{ projectChangeCount('delete') }}</strong> 个。</span>
           <button class="btn btn-sm" @click="projectDetailExpanded = !projectDetailExpanded">
             {{ projectDetailExpanded ? '收起明细' : '展开明细' }}
           </button>
         </div>
+        <p class="summary-subline">当前已录入合作项目 <strong>{{ store.yiliProjects.length }}</strong> 个，已关联 <strong>{{ linkedProjectCount }}</strong> 个，待关联 <strong>{{ pendingProjectCount }}</strong> 个。</p>
         <div v-show="projectDetailExpanded" class="detail-body">
           <table class="admin-table">
             <thead>
@@ -160,17 +162,14 @@
             <div class="score-numeric-item">
               <div class="label">专业度</div>
               <div class="value blue">{{ avgProfessional }}</div>
-              <div class="sub">满分 10 分</div>
             </div>
             <div class="score-numeric-item">
               <div class="label">影响力</div>
               <div class="value amber">{{ avgInfluence }}</div>
-              <div class="sub">满分 10 分</div>
             </div>
             <div class="score-numeric-item">
               <div class="label">综合评分</div>
               <div class="value green">{{ avgOverall }}</div>
-              <div class="sub">加权平均</div>
             </div>
           </div>
         </div>
@@ -397,7 +396,8 @@ function statusLabel(status: string | null | undefined): string {
   const map: Record<string, string> = {
     active: '在库',
     observation: '观察库',
-    eliminated: '已淘汰'
+    eliminated: '已淘汰',
+    deleted: '已删除'
   }
   return map[status] || status
 }
@@ -483,8 +483,12 @@ const avgProfessional = computed(() => avgScore('professional'))
 const avgInfluence = computed(() => avgScore('influence'))
 const avgOverall = computed(() => avgScore('overall'))
 
-// ===== 专家变动（新增 / 调整 / 观察 / 淘汰） =====
-type ExpertChangeType = 'new' | 'adjust' | 'observe' | 'eliminate'
+// ===== 专家变动（新增 / 调整 / 观察 / 淘汰 / 删除） =====
+type ExpertChangeType = 'new' | 'adjust' | 'observe' | 'eliminate' | 'delete'
+
+const observingExpertCount = computed(
+  () => store.experts.filter(e => e.status === 'observation' || !!e.observationStatus).length
+)
 
 const allExpertChanges = computed(() => {
   const list: { type: ExpertChangeType; time: string; expert: Expert }[] = []
@@ -499,6 +503,31 @@ const allExpertChanges = computed(() => {
       list.push({ type, time: e.updatedAt, expert: e })
     }
   })
+  // 硬删除的专家从 store 消失，需从观察库操作记录中补充「删除」类型
+  allObsLogs.value.forEach(log => {
+    if (log.operation === '删除' && inSelectedMonth(log.createdAt)) {
+      try {
+        const raw = log as any
+        const before = JSON.parse(String(raw.beforeState || '{}'))
+        list.push({
+          type: 'delete',
+          time: log.createdAt,
+          expert: {
+            id: log.expertId,
+            name: log.expertName,
+            status: 'deleted',
+            scores: before.scores,
+          } as Expert,
+        })
+      } catch {
+        list.push({
+          type: 'delete',
+          time: log.createdAt,
+          expert: { id: log.expertId, name: log.expertName, status: 'deleted' } as Expert,
+        })
+      }
+    }
+  })
   return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
 })
 
@@ -506,7 +535,7 @@ function expertChangeCount(t: ExpertChangeType): number {
   return allExpertChanges.value.filter(c => c.type === t).length
 }
 function expertChangeLabel(t: ExpertChangeType): string {
-  return { new: '新增', adjust: '调整', observe: '观察', eliminate: '淘汰' }[t]
+  return { new: '新增', adjust: '调整', observe: '观察', eliminate: '淘汰', delete: '删除' }[t]
 }
 
 const expertTotalPages = computed(() => Math.max(1, Math.ceil(allExpertChanges.value.length / PAGE_SIZE)))
@@ -516,15 +545,21 @@ const paginatedExpertChanges = computed(() => {
   return allExpertChanges.value.slice(start, start + PAGE_SIZE)
 })
 
-// ===== 合作项目变动（新增 / 修改 / 待关联） =====
-type ProjectChangeType = 'new' | 'modified' | 'pending'
+const linkedProjectCount = computed(
+  () => store.yiliProjects.filter(p => !!p.expertId || !!p.pendingExpertName).length
+)
+const pendingProjectCount = computed(
+  () => store.yiliProjects.filter(p => !p.expertId && !p.pendingExpertName).length
+)
+
+// ===== 合作项目变动（新增 / 修改 / 删除） =====
+type ProjectChangeType = 'new' | 'modified' | 'delete'
 
 const allProjectChanges = computed(() => {
   const list: { type: ProjectChangeType; time: string; project: Project }[] = []
   store.yiliProjects.forEach(p => {
-    const unlinked = !p.expertId && !p.pendingExpertName
     if (inSelectedMonth(p.createdAt)) {
-      list.push({ type: unlinked ? 'pending' : 'new', time: p.createdAt, project: p })
+      list.push({ type: 'new', time: p.createdAt, project: p })
     }
     if (inSelectedMonth(p.updatedAt) && p.updatedAt !== p.createdAt) {
       list.push({ type: 'modified', time: p.updatedAt, project: p })
@@ -537,7 +572,7 @@ function projectChangeCount(t: ProjectChangeType): number {
   return allProjectChanges.value.filter(c => c.type === t).length
 }
 function projectChangeLabel(t: ProjectChangeType): string {
-  return { new: '新增', modified: '修改', pending: '待关联' }[t]
+  return { new: '新增', modified: '修改', delete: '删除' }[t]
 }
 
 const projectTotalPages = computed(() => Math.max(1, Math.ceil(allProjectChanges.value.length / PAGE_SIZE)))
@@ -1041,6 +1076,17 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   color: #111827;
 }
 
+.summary-subline {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.summary-subline strong {
+  color: #111827;
+  font-weight: 600;
+}
+
 .detail-body {
   margin-top: 12px;
 }
@@ -1076,6 +1122,11 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
 .tag.eliminate {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.tag.delete {
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .tag.pending {
