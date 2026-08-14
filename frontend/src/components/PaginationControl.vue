@@ -5,7 +5,7 @@
       :class="{ disabled: currentPage === 1 }"
       @click="gotoPage(currentPage - 1)"
     >
-      ‹ 上页
+      上一页
     </button>
 
     <template v-if="totalPages > 1">
@@ -44,7 +44,7 @@
       :class="{ disabled: currentPage === totalPages }"
       @click="gotoPage(currentPage + 1)"
     >
-      下页 ›
+      下一页
     </button>
 
     <span class="page-nav-inline-info">{{ currentPage }} / {{ totalPages }} 页</span>

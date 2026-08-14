@@ -473,7 +473,7 @@ function toggleMobileMode() {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 6px 12px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -497,10 +497,10 @@ function toggleMobileMode() {
   flex-wrap: wrap;
 }
 .page-navigation-float :deep(.page-nav-inline-btn) {
-  padding: 0 10px;
-  height: 28px;
-  font-size: 12px;
-  line-height: 28px;
+  padding: 0 8px;
+  height: 24px;
+  font-size: 11px;
+  line-height: 24px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #ffffff;
@@ -515,10 +515,10 @@ function toggleMobileMode() {
   cursor: not-allowed;
 }
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 4px;
-  font-size: 12px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 3px;
+  font-size: 11px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: #ffffff;
@@ -536,26 +536,29 @@ function toggleMobileMode() {
   color: #ffffff;
 }
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-left: 4px;
   white-space: nowrap;
 }
 @media (max-width: 480px) {
   .page-navigation-float {
-    padding: 5px 8px;
+    padding: 3px 6px;
   }
   .page-navigation-float :deep(.page-navigation-inline) {
-    gap: 4px;
+    gap: 3px;
   }
   .page-navigation-float :deep(.page-nav-inline-btn),
   .page-navigation-float :deep(.page-nav-inline-num) {
-    height: 26px;
-    font-size: 11px;
-    line-height: 26px;
+    height: 22px;
+    font-size: 10px;
+    line-height: 22px;
   }
   .page-navigation-float :deep(.page-nav-inline-num) {
-    min-width: 26px;
+    min-width: 22px;
+  }
+  .page-navigation-float :deep(.page-nav-inline-btn) {
+    padding: 0 6px;
   }
 }
 </style>
