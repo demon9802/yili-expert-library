@@ -57,11 +57,93 @@ public class ExpertServiceImpl implements ExpertService {
 
     @Override
     public ExpertDTO update(Long id, ExpertDTO dto) {
-        ExpertEntity entity = dtoToEntity(dto);
-        entity.setId(id);
-        entity.setUpdatedAt(LocalDateTime.now());
-        expertMapper.updateById(entity);
+        ExpertEntity existing = expertMapper.selectById(id);
+        if (existing == null) {
+            // 记录不存在时按原语义整行写入（create 路径的兜底）
+            ExpertEntity entity = dtoToEntity(dto);
+            entity.setId(id);
+            entity.setUpdatedAt(LocalDateTime.now());
+            expertMapper.updateById(entity);
+            return entityToDTO(expertMapper.selectById(id));
+        }
+        // 合并更新：仅用 DTO 提供的非空字段覆盖现有记录，保留未传字段原值，
+        // 避免“重置为自动评分 / 批量调分”等只传 scores+status 的局部更新把
+        // education / qualifications / rating_reference 等基础字段覆盖为空字符串。
+        mergeDtoIntoEntity(dto, existing);
+        existing.setUpdatedAt(LocalDateTime.now());
+        expertMapper.updateById(existing);
         return entityToDTO(expertMapper.selectById(id));
+    }
+
+    /**
+     * 将 DTO 中的非空字段合并进已有 Entity。
+     * 基础文本字段（education/qualifications/rating_reference 等）仅当 DTO 显式提供时才覆盖，
+     * 否则保留 DB 现有值。scores 在现有 JSON 基础上用 DTO 值覆盖合并。
+     * observation_status 按 status 语义处理：退出观察(status=active)→清空；
+     * 淘汰(status=eliminated)→置为 eliminated；进入/留在观察(status=observation)→
+     * 仅当 DTO 显式给出时才覆盖（批量重置未传时保留已有的 manual/evaluating/extended）。
+     */
+    @SuppressWarnings("unchecked")
+    private void mergeDtoIntoEntity(ExpertDTO dto, ExpertEntity e) {
+        if (dto.getName() != null) e.setName(dto.getName());
+        if (dto.getFields() != null) e.setFields(dto.getFields());
+        if (dto.getAdvantages() != null) e.setAdvantages(dto.getAdvantages());
+        if (dto.getEducation() != null) e.setEducation(dto.getEducation());
+        if (dto.getQualifications() != null) e.setQualifications(dto.getQualifications());
+        if (dto.getCourses() != null) e.setCourses(dto.getCourses());
+        if (dto.getContactPerson() != null) e.setContactPerson(dto.getContactPerson());
+        if (dto.getContactInfo() != null) e.setContactInfo(dto.getContactInfo());
+        if (dto.getContactType() != null) e.setContactType(dto.getContactType());
+        if (dto.getReferrer() != null) e.setReferrer(dto.getReferrer());
+        if (dto.getIsSupplier() != null) e.setIsSupplier(dto.getIsSupplier());
+        if (dto.getQualDisplay() != null) e.setQualDisplay(dto.getQualDisplay());
+        if (dto.getAdvDisplay() != null) e.setAdvDisplay(dto.getAdvDisplay());
+        if (dto.getRatingReference() != null) e.setRatingReference(dto.getRatingReference());
+
+        // scores：在现有 JSON 基础上用 DTO 提供的值覆盖合并
+        try {
+            Map<String, Object> scoresMap = new HashMap<>();
+            if (e.getScores() != null && !e.getScores().isEmpty()) {
+                scoresMap = objectMapper.readValue(e.getScores(), Map.class);
+            }
+            if (dto.getScores() instanceof Map) {
+                scoresMap.putAll((Map<String, Object>) dto.getScores());
+            }
+            if (dto.getSubScores() != null) {
+                scoresMap.put("subScores", dto.getSubScores());
+            }
+            if (!scoresMap.isEmpty()) {
+                e.setScores(objectMapper.writeValueAsString(scoresMap));
+            }
+        } catch (Exception ex) {
+            // ignore
+        }
+
+        if (dto.getStatus() != null) {
+            e.setStatus(dto.getStatus());
+            if ("active".equals(dto.getStatus())) {
+                e.setObservationStatus(null);
+            } else if ("eliminated".equals(dto.getStatus())) {
+                e.setObservationStatus("eliminated");
+            } else if (dto.getObservationStatus() != null) {
+                e.setObservationStatus(dto.getObservationStatus());
+            }
+            // status='observation' 且 DTO 未给 observationStatus：保留现有值
+        } else if (dto.getObservationStatus() != null) {
+            e.setObservationStatus(dto.getObservationStatus());
+        }
+
+        if (dto.getObservationDate() != null) e.setObservationDate(dto.getObservationDate());
+
+        try {
+            if (dto.getContacts() != null && !dto.getContacts().isEmpty()) {
+                e.setContacts(objectMapper.writeValueAsString(dto.getContacts()));
+            }
+        } catch (Exception ex) {
+            // ignore
+        }
+
+        if (dto.getCreatedBy() != null) e.setCreatedBy(dto.getCreatedBy());
     }
 
     @Override

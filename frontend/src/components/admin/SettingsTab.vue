@@ -86,8 +86,27 @@
 
       <!-- 测试环境 -->
       <div class="form-block test-mode-block">
-        <label class="form-label">测试环境</label>
-        <button class="btn btn-warning" @click="enterTestMode">进入测试模式</button>
+        <label class="form-label">测试环境（独立数据空间模拟角色视角）</label>
+        <p class="input-hint">进入后将在独立数据空间模拟主管理员 / 子管理员 / 前端用户三种视角，所有改动仅保存在本地、不影响正式库；退出时自动从生产库还原数据。</p>
+        <div v-if="!store.testMode" class="test-enter">
+          <div class="test-role-select">
+            <button class="scheme-btn" :class="{ active: pendingRole === 'master' }" @click="pendingRole = 'master'">主管理员</button>
+            <button class="scheme-btn" :class="{ active: pendingRole === 'sub' }" @click="pendingRole = 'sub'">子管理员</button>
+            <button class="scheme-btn" :class="{ active: pendingRole === 'user' }" @click="pendingRole = 'user'">前端用户</button>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-warning" :disabled="saving" @click="enterTestMode">进入测试模式（{{ pendingRoleLabel }}）</button>
+          </div>
+        </div>
+        <div v-else class="test-active">
+          <span class="test-active-badge">测试模式进行中 · 当前视角：{{ roleLabel }}</span>
+          <div class="form-actions">
+            <button class="btn" @click="store.switchTestRole('master')">主管理员</button>
+            <button class="btn" @click="store.switchTestRole('sub')">子管理员</button>
+            <button class="btn" @click="store.switchTestRole('user')">前端用户</button>
+            <button class="btn danger" :disabled="saving" @click="exitTestMode">退出测试模式</button>
+          </div>
+        </div>
       </div>
 
       <!-- 部署信息 -->
@@ -178,6 +197,15 @@ const mobileAdaptationInput = ref(store.mobileAdaptation)
 const saving = ref(false)
 const message = ref('')
 
+// 测试模式：进入前选择的角色
+const pendingRole = ref<'master' | 'sub' | 'user'>('master')
+const pendingRoleLabel = computed(() =>
+  pendingRole.value === 'master' ? '主管理员' : pendingRole.value === 'sub' ? '子管理员' : '前端用户'
+)
+const roleLabel = computed(() =>
+  store.testRole === 'master' ? '主管理员' : store.testRole === 'sub' ? '子管理员' : '前端用户'
+)
+
 const schemes = computed(() => store.COLOR_SCHEMES)
 
 const defaultSortOptions = [
@@ -266,8 +294,24 @@ async function refreshTime() {
   message.value = '更新时间已刷新'
 }
 
-function enterTestMode() {
-  alert('测试模式功能正在开发中，将在独立数据空间中模拟不同角色视角。')
+async function enterTestMode() {
+  saving.value = true
+  try {
+    await store.enterTestMode(pendingRole.value)
+    message.value = '已进入测试模式：' + pendingRoleLabel.value + ' 视角（独立数据空间）'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function exitTestMode() {
+  saving.value = true
+  try {
+    await store.exitTestMode()
+    message.value = '已退出测试模式，正式数据已还原'
+  } finally {
+    saving.value = false
+  }
 }
 
 function clearCache() {
@@ -470,6 +514,42 @@ function clearCache() {
 
 .test-mode-block .form-label {
   margin-bottom: 0;
+}
+
+.test-enter {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.test-role-select {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.test-role-select .scheme-btn {
+  flex-direction: row;
+  gap: 0;
+  padding: 6px 16px;
+}
+
+.test-active {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.test-active-badge {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #b45309;
+  border: 1px solid #fdba74;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .time-row {

@@ -43,7 +43,7 @@ router.beforeEach(async (to, _from, next) => {
     await store.checkAuthState()
   }
 
-  if (to.meta?.requiresAdmin && !store.isAdmin) {
+  if (to.meta?.requiresAdmin && !store.isAdmin && !store.testMode) {
     next('/')
     return
   }

@@ -21,11 +21,17 @@ const STORAGE_KEY = 'yili_expert_db'
 const SEARCH_HISTORY_KEY = 'yili_search_history'
 const MAX_SEARCH_HISTORY = 5
 
+// 测试模式：独立数据空间（本地快照），用于模拟不同角色视角，不影响正式数据
+const TEST_MODE_KEY = 'yili_test_mode'
+const TEST_ROLE_KEY = 'yili_test_role'
+const TEST_DB_KEY = 'yili_test_db'
+
 export const useAppStore = defineStore('app', () => {
   // ===== State =====
   const mode = ref<AppMode>('frontend')
   const currentUser = ref<User | null>(null)
-  const isAdmin = ref(false)
+  // authIsAdmin 仅反映真实登录态；对外暴露的 isAdmin 在测试模式下会按测试角色覆盖
+  const authIsAdmin = ref(false)
 
   const experts = ref<Expert[]>([])
   const fields = ref<Field[]>([])
@@ -83,6 +89,13 @@ export const useAppStore = defineStore('app', () => {
 
   // 手机端适配开关（系统设置 → 手机端视图）
   const mobileAdaptation = ref<boolean>(true)
+
+  // 测试模式（独立数据空间模拟不同角色视角）
+  // 初始值从 localStorage 恢复，避免刷新后丢失测试态
+  const testMode = ref<boolean>(lsGet(TEST_MODE_KEY) === true)
+  const testRole = ref<'master' | 'sub' | 'user'>(
+    (lsGet(TEST_ROLE_KEY) as 'master' | 'sub' | 'user') || 'master'
+  )
 
   // 配色方案预设（运行时改写 --primary / --primary-light / --primary-dark）
   const COLOR_SCHEMES: Record<string, { name: string; primary: string; light: string; dark: string }> = {
@@ -266,6 +279,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function setShowScores(v: boolean) {
     showScores.value = v
+    if (testMode.value) return
     try {
       await settingApi.save('showScores', v ? 'true' : 'false')
     } catch {
@@ -275,6 +289,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function saveSortOptions(options: { id: string; name: string }[]) {
     sortOptions.value = options
+    if (testMode.value) return
     try {
       await settingApi.save('sortOptions', JSON.stringify(options))
     } catch {
@@ -300,6 +315,7 @@ export const useAppStore = defineStore('app', () => {
     if (!t) return
     platformTitle.value = t
     updateDocumentTitle()
+    if (testMode.value) return
     try {
       await settingApi.save('mainTitle', t)
     } catch {
@@ -310,6 +326,7 @@ export const useAppStore = defineStore('app', () => {
   async function setColorScheme(key: string) {
     colorScheme.value = key
     applyColorScheme(key)
+    if (testMode.value) return
     try {
       await settingApi.save('colorScheme', key)
     } catch {
@@ -319,6 +336,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function setAppDescription(desc: string) {
     appDescription.value = desc
+    if (testMode.value) return
     try {
       await settingApi.save('description', desc)
     } catch {
@@ -329,6 +347,7 @@ export const useAppStore = defineStore('app', () => {
   async function refreshUpdateTime() {
     const now = new Date().toISOString()
     updateTime.value = now
+    if (testMode.value) return
     try {
       await settingApi.save('updateTime', now)
     } catch {
@@ -338,6 +357,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function setMobileAdaptation(enabled: boolean) {
     mobileAdaptation.value = enabled
+    if (testMode.value) return
     try {
       await settingApi.save('mobileAdaptation', enabled ? 'true' : 'false')
     } catch {
@@ -345,11 +365,55 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  // ===== 测试模式（独立数据空间，模拟 master/sub/user 三种角色视角）=====
+  // 设计：进入时把当前生产数据快照到独立 localStorage 空间；测试态内的所有写操作
+  // 仅作用于本地响应式数据 + 该独立空间，绝不调用后端，从而不会污染正式库。
+  // 退出时重新从生产库加载，丢弃测试态的任何本地修改。
+
+  function persistTest() {
+    lsSet(TEST_DB_KEY, {
+      experts: experts.value,
+      fields: fields.value,
+      yiliProjects: yiliProjects.value,
+      favorites: favorites.value,
+    })
+  }
+
+  async function enterTestMode(role: 'master' | 'sub' | 'user' = 'master') {
+    // 先快照当前生产数据（深拷贝，避免后续本地修改影响快照本身）
+    const snapshot = {
+      experts: JSON.parse(JSON.stringify(experts.value)),
+      fields: JSON.parse(JSON.stringify(fields.value)),
+      yiliProjects: JSON.parse(JSON.stringify(yiliProjects.value)),
+      favorites: JSON.parse(JSON.stringify(favorites.value)),
+    }
+    lsSet(TEST_DB_KEY, snapshot)
+    testRole.value = role
+    testMode.value = true
+    lsSet(TEST_MODE_KEY, true)
+    lsSet(TEST_ROLE_KEY, role)
+  }
+
+  async function exitTestMode() {
+    testMode.value = false
+    testRole.value = 'master'
+    lsRemove(TEST_MODE_KEY)
+    lsRemove(TEST_ROLE_KEY)
+    lsRemove(TEST_DB_KEY)
+    // 重新从生产库加载，丢弃测试态的任何本地修改，保证正式数据纯净
+    await loadAppData()
+  }
+
+  function switchTestRole(role: 'master' | 'sub' | 'user') {
+    testRole.value = role
+    lsSet(TEST_ROLE_KEY, role)
+  }
+
   async function checkAuthState() {
     const token = getToken()
     if (!token) {
       currentUser.value = null
-      isAdmin.value = false
+      authIsAdmin.value = false
       return
     }
     try {
@@ -358,14 +422,14 @@ export const useAppStore = defineStore('app', () => {
       const cached = lsGet('yili_current_user')
       if (cached) {
         currentUser.value = cached
-        isAdmin.value = !!cached.isAdmin
+        authIsAdmin.value = !!cached.isAdmin
       }
     } catch {
       // token 无效
       removeToken()
       lsRemove('yili_current_user')
       currentUser.value = null
-      isAdmin.value = false
+      authIsAdmin.value = false
     }
   }
 
@@ -373,19 +437,32 @@ export const useAppStore = defineStore('app', () => {
     const result = await authApi.login(email, password)
     setToken(result.token)
     currentUser.value = result.user
-    isAdmin.value = result.user.isAdmin || false
+    authIsAdmin.value = result.user.isAdmin || false
     lsSet('yili_current_user', result.user)
     return result
   }
 
-  const isMaster = computed(() => isAdmin.value && currentUser.value?.role === 'master')
-  const isSubAdmin = computed(() => isAdmin.value && currentUser.value?.role === 'sub')
+  // 对外暴露的 isAdmin：真实登录态优先；测试模式下按测试角色覆盖（user=无后台权限）
+  const isAdmin = computed(() => {
+    if (testMode.value) return testRole.value !== 'user'
+    return authIsAdmin.value
+  })
+
+  // 角色判定：测试模式下完全由 testRole 决定，用于模拟 master/sub/user 三种视角
+  const isMaster = computed(() => {
+    if (testMode.value) return testRole.value === 'master'
+    return authIsAdmin.value && currentUser.value?.role === 'master'
+  })
+  const isSubAdmin = computed(() => {
+    if (testMode.value) return testRole.value === 'sub'
+    return authIsAdmin.value && currentUser.value?.role === 'sub'
+  })
 
   async function signUp(email: string, password: string) {
     const result = await authApi.signUp(email, password)
     setToken(result.token)
     currentUser.value = result.user
-    isAdmin.value = false
+    authIsAdmin.value = false
     lsSet('yili_current_user', result.user)
     return result
   }
@@ -395,12 +472,26 @@ export const useAppStore = defineStore('app', () => {
     removeToken()
     lsRemove('yili_current_user')
     currentUser.value = null
-    isAdmin.value = false
+    authIsAdmin.value = false
     mode.value = 'frontend'
   }
 
   // ===== 专家 CRUD =====
   async function saveExpert(expert: Partial<Expert>) {
+    if (testMode.value) {
+      // 测试模式：仅本地变更，写入独立数据空间，不触碰生产库
+      if (expert.id) {
+        const idx = experts.value.findIndex(e => e.id === expert.id)
+        if (idx >= 0) experts.value[idx] = { ...experts.value[idx], ...expert } as Expert
+        persistTest()
+        return experts.value[idx]
+      } else {
+        const created = { ...expert, id: Date.now() } as Expert
+        experts.value.push(created)
+        persistTest()
+        return created
+      }
+    }
     if (expert.id) {
       const updated = await expertApi.update(expert.id, expert)
       const idx = experts.value.findIndex(e => e.id === expert.id)
@@ -414,6 +505,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteExpert(id: number) {
+    if (testMode.value) {
+      experts.value = experts.value.filter(e => e.id !== id)
+      persistTest()
+      return
+    }
     await expertApi.delete(id)
     experts.value = experts.value.filter(e => e.id !== id)
   }
@@ -487,6 +583,25 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 自动评分 =====
   async function autoScoreExpertById(id: number) {
+    if (testMode.value) {
+      const idx = experts.value.findIndex(e => e.id === id)
+      if (idx < 0) return null
+      const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
+      const merged = {
+        ...experts.value[idx],
+        scores: {
+          ...(experts.value[idx].scores || {}),
+          professional: result.professional,
+          influence: result.influence,
+          overall: result.overall,
+        },
+        subScores: { professional: result.professionalItems, influence: result.influenceItems },
+      }
+      applyStatusPayload(merged as Partial<Expert>, result.overall, experts.value[idx].status, experts.value[idx].observationStatus)
+      experts.value[idx] = merged as Expert
+      persistTest()
+      return result
+    }
     const idx = experts.value.findIndex(e => e.id === id)
     if (idx < 0) return null
     const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
@@ -510,6 +625,24 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function autoScoreAllExperts(): Promise<number> {
+    if (testMode.value) {
+      let count = 0
+      for (const e of experts.value) {
+        if (e.status === 'eliminated') continue
+        const result = autoScoreExpert(e, yiliProjects.value)
+        e.scores = {
+          ...(e.scores || {}),
+          professional: result.professional,
+          influence: result.influence,
+          overall: result.overall,
+        }
+        e.subScores = { professional: result.professionalItems, influence: result.influenceItems }
+        applyStatusPayload(e as Partial<Expert>, result.overall, e.status, e.observationStatus)
+        count += 1
+      }
+      persistTest()
+      return count
+    }
     let count = 0
     for (const e of experts.value) {
       if (e.status === 'eliminated') continue
@@ -537,6 +670,17 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 项目 CRUD =====
   async function saveProject(project: Partial<Project>) {
+    if (testMode.value) {
+      if (project.id) {
+        const idx = yiliProjects.value.findIndex(p => p.id === project.id)
+        if (idx >= 0) yiliProjects.value[idx] = { ...yiliProjects.value[idx], ...project } as Project
+      } else {
+        const created = { ...project, id: Date.now() } as Project
+        yiliProjects.value.push(created)
+      }
+      persistTest()
+      return
+    }
     if (project.id) {
       const updated = await projectApi.update(project.id, project)
       const idx = yiliProjects.value.findIndex(p => p.id === project.id)
@@ -550,6 +694,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteProject(id: number) {
+    if (testMode.value) {
+      yiliProjects.value = yiliProjects.value.filter(p => p.id !== id)
+      persistTest()
+      return
+    }
     await projectApi.delete(id)
     yiliProjects.value = yiliProjects.value.filter(p => p.id !== id)
   }
@@ -557,6 +706,24 @@ export const useAppStore = defineStore('app', () => {
   // ===== 领域 CRUD =====
   // field 可携带 _oldName 表示改名（对齐 V5：改名级联专家、删除清理专家引用）
   async function saveField(field: Partial<Field> & { _oldName?: string }) {
+    if (testMode.value) {
+      const oldName = field._oldName
+      const keyName = oldName ?? field.name!
+      if (field.id) {
+        const idx = fields.value.findIndex(f => f.name === keyName)
+        if (idx >= 0) fields.value[idx] = { ...fields.value[idx], ...field } as Field
+      } else {
+        fields.value.push(field as Field)
+      }
+      if (oldName && field.name && oldName !== field.name) {
+        experts.value = experts.value.map(e => ({
+          ...e,
+          fields: (e.fields || []).map(f => (f === oldName ? field.name! : f)),
+        }))
+      }
+      persistTest()
+      return
+    }
     const oldName = field._oldName
     const keyName = oldName ?? field.name!
     if (field.id) {
@@ -577,6 +744,15 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteField(name: string) {
+    if (testMode.value) {
+      fields.value = fields.value.filter(f => f.name !== name)
+      experts.value = experts.value.map(e => ({
+        ...e,
+        fields: (e.fields || []).filter(f => f !== name),
+      }))
+      persistTest()
+      return
+    }
     await fieldApi.delete(name)
     fields.value = fields.value.filter(f => f.name !== name)
     // 同步清理本地专家身上的领域引用（后端已级联 DB）
@@ -588,6 +764,13 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 收藏 =====
   async function toggleFavorite(expertId: number) {
+    if (testMode.value) {
+      const isFav = favorites.value.includes(expertId)
+      if (isFav) favorites.value = favorites.value.filter(id => id !== expertId)
+      else favorites.value.push(expertId)
+      persistTest()
+      return
+    }
     const isFav = favorites.value.includes(expertId)
     if (isFav) {
       favorites.value = favorites.value.filter(id => id !== expertId)
@@ -693,6 +876,8 @@ export const useAppStore = defineStore('app', () => {
     adminTab, adminSubTab, editingExpert, fieldsCollapsed,
     currentPage, PAGE_SIZE, searchHistory, loading, showScores, sortOptions,
     platformTitle, colorScheme, appDescription, updateTime, mobileAdaptation, COLOR_SCHEMES,
+    // 测试模式
+    testMode, testRole,
     // Getters
     filteredExperts, totalPages, paginatedExperts, isMaster, isSubAdmin,
     // Actions
@@ -703,5 +888,6 @@ export const useAppStore = defineStore('app', () => {
     setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, setMobileAdaptation, applyColorScheme,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
     toggleFieldFilter, clearFilters, setMode, setAdminTab, persistLocal,
+    enterTestMode, exitTestMode, switchTestRole,
   }
 })

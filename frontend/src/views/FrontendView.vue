@@ -21,14 +21,14 @@
             {{ isMobile ? '💻 桌面版' : '📱 手机版' }}
           </button>
           <button
-            v-if="!store.currentUser || !store.isAdmin"
+            v-if="(!store.currentUser || !store.isAdmin) && !(store.testMode && store.testRole !== 'user')"
             class="btn btn-sm"
             style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
             @click="goAdminLogin"
           >
             管理后台
           </button>
-          <template v-if="store.currentUser && store.isAdmin">
+          <template v-if="(store.currentUser && store.isAdmin) || (store.testMode && store.testRole !== 'user')">
             <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="goAdmin">
               管理后台
             </button>
@@ -487,7 +487,7 @@ function toggleMobileMode() {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -557,7 +557,7 @@ function toggleMobileMode() {
 }
 @media (max-width: 480px) {
   .page-navigation-float {
-    padding: 3px 6px;
+    padding: 2px 6px;
   }
   .page-navigation-float :deep(.page-navigation-inline) {
     gap: 3px;

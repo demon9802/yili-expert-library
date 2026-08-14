@@ -71,32 +71,38 @@
       <div class="score-edit-section">
         <div class="edit-hint">评分项（可连续修改多项，完成后点“确认调分”并填写意见）</div>
         <div class="score-rows">
-          <div v-for="it in professionalItems" :key="'p-' + it" class="score-row">
-            <span class="row-label">{{ it }}</span>
-            <div class="row-input">
-              <input
-                type="number"
-                min="1"
-                max="5"
-                step="1"
-                :value="draftScores[expert.id]?.professional[it] ?? subScoreVal(expert, 'professional', it) ?? 2"
-                @change="onScoreChange(expert, 'professional', it, $event)"
-              />
-              <span class="unit">/ 5★</span>
+          <div class="score-group">
+            <div class="score-group-title">专业度</div>
+            <div v-for="it in professionalItems" :key="'p-' + it" class="score-row">
+              <span class="row-label">{{ it }}</span>
+              <div class="row-input">
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="1"
+                  :value="draftScores[expert.id]?.professional[it] ?? subScoreVal(expert, 'professional', it) ?? 2"
+                  @change="onScoreChange(expert, 'professional', it, $event)"
+                />
+                <span class="unit">/ 5★</span>
+              </div>
             </div>
           </div>
-          <div v-for="it in influenceItems" :key="'i-' + it" class="score-row">
-            <span class="row-label">{{ it }}</span>
-            <div class="row-input">
-              <input
-                type="number"
-                min="1"
-                max="5"
-                step="1"
-                :value="draftScores[expert.id]?.influence[it] ?? subScoreVal(expert, 'influence', it) ?? 2"
-                @change="onScoreChange(expert, 'influence', it, $event)"
-              />
-              <span class="unit">/ 5★</span>
+          <div class="score-group">
+            <div class="score-group-title">影响力</div>
+            <div v-for="it in influenceItems" :key="'i-' + it" class="score-row">
+              <span class="row-label">{{ it }}</span>
+              <div class="row-input">
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  step="1"
+                  :value="draftScores[expert.id]?.influence[it] ?? subScoreVal(expert, 'influence', it) ?? 2"
+                  @change="onScoreChange(expert, 'influence', it, $event)"
+                />
+                <span class="unit">/ 5★</span>
+              </div>
             </div>
           </div>
         </div>
@@ -770,7 +776,9 @@ onMounted(() => {
 
 .score-edit-section { margin-bottom: 8px; }
 .edit-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.score-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; margin-bottom: 12px; }
+.score-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-bottom: 12px; }
+.score-group { display: flex; flex-direction: column; gap: 8px; }
+.score-group-title { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 2px; padding-bottom: 4px; border-bottom: 1px dashed var(--border); }
 .score-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .row-label { font-size: 13px; color: var(--text); }
 .row-input { display: flex; align-items: center; gap: 6px; }
