@@ -174,34 +174,43 @@
 
       <!-- ④ 系统使用情况 -->
       <h4 class="report-section-title">④ 系统使用情况</h4>
-      <div class="stats-grid sm">
-        <div class="stat-card">
-          <span>总访问量</span>
-          <strong>{{ pageStats.totalViews ?? 0 }}</strong>
+      <div class="usage-grid">
+        <div class="usage-card">
+          <h5>管理权限分布</h5>
+          <div class="usage-list">
+            <div class="usage-row">
+              <span>主管理员</span>
+              <strong>{{ adminStats.masterCount }}</strong>
+            </div>
+            <div class="usage-row">
+              <span>子管理员</span>
+              <strong>{{ adminStats.subCount }}</strong>
+            </div>
+            <div class="usage-row">
+              <span>专家总数</span>
+              <strong>{{ store.experts.length }}</strong>
+            </div>
+            <div class="usage-row">
+              <span>合作项目总数</span>
+              <strong>{{ store.yiliProjects.length }}</strong>
+            </div>
+          </div>
         </div>
-        <div class="stat-card">
-          <span>本月新增专家</span>
-          <strong>{{ newExperts.length }}</strong>
+        <div class="usage-card">
+          <h5>前端访问情况</h5>
+          <div class="usage-list">
+            <div class="usage-row">
+              <span>本月访问</span>
+              <strong>{{ pageStats.thisMonth ?? 0 }}</strong>
+            </div>
+            <div class="usage-row">
+              <span>累计访问</span>
+              <strong>{{ pageStats.total ?? 0 }}</strong>
+            </div>
+          </div>
+          <p class="usage-note">注：访问计数已同步云端，支持跨设备统计</p>
         </div>
       </div>
-      <table v-if="monthlyRows.length" class="admin-table">
-        <thead>
-          <tr>
-            <th>月份</th>
-            <th>专家总数</th>
-            <th>新增专家</th>
-            <th>访问量</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in monthlyRows" :key="row.month">
-            <td>{{ row.month }}</td>
-            <td>{{ row.totalExperts }}</td>
-            <td>{{ row.newExperts }}</td>
-            <td>{{ row.totalViews }}</td>
-          </tr>
-        </tbody>
-      </table>
 
       <!-- ⑤ 观察库操作明细 -->
       <h4 class="report-section-title">⑤ 观察库操作明细</h4>
@@ -275,10 +284,11 @@ import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { pageViewApi } from '@/api/pageView'
 import { observationApi } from '@/api/observation'
+import { authApi } from '@/api/auth'
 import { useAppStore } from '@/store/appStore'
 import { getAllChanges } from '@/utils/changelog'
 import FieldChartInline from '@/components/FieldChartInline.vue'
-import type { Expert, Project, ObservationOperation } from '@/types'
+import type { Expert, Project, ObservationOperation, UserDTO } from '@/types'
 
 interface MonthlyStats {
   totalExperts?: number
@@ -297,6 +307,7 @@ interface ChangeItem<T> {
 
 const store = useAppStore()
 const stats = ref<MonthlyStats>({})
+const userList = ref<UserDTO[]>([])
 const loading = ref(false)
 const reportExportRef = ref<HTMLElement | null>(null)
 const chartContainer = ref<HTMLElement | null>(null)
@@ -519,6 +530,7 @@ function updateWidth() {
 onMounted(() => {
   loadStats()
   loadObsLogs()
+  loadUsers()
   updateWidth()
   window.addEventListener('resize', updateWidth)
 })
@@ -568,9 +580,15 @@ const scoreDistSlices = computed(() => {
 
 // ===== 访问统计（后端，best-effort） =====
 const pageStats = computed(() => ({
-  totalViews: stats.value.totalViews,
-  newExperts: stats.value.newExperts,
+  total: stats.value.total,
+  thisMonth: stats.value.thisMonth,
 }))
+
+const adminStats = computed(() => {
+  const masterCount = userList.value.filter(u => u.role === 'master' || (u.isAdmin && u.role !== 'sub')).length
+  const subCount = userList.value.filter(u => u.role === 'sub').length
+  return { masterCount, subCount }
+})
 
 async function loadStats() {
   loading.value = true
@@ -580,6 +598,14 @@ async function loadStats() {
     stats.value = {}
   } finally {
     loading.value = false
+  }
+}
+
+async function loadUsers() {
+  try {
+    userList.value = await authApi.fetchUserList()
+  } catch {
+    userList.value = []
   }
 }
 
@@ -787,6 +813,54 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   color: #94a3b8;
 }
 
+.usage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.usage-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 20px;
+  background: #fff;
+}
+
+.usage-card h5 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.usage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usage-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #374151;
+}
+
+.usage-row strong {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.usage-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -963,8 +1037,8 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
   font-size: 13px;
   color: #6b7280;
 }
@@ -990,8 +1064,25 @@ async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise
 
 @media (max-width: 900px) {
   .dashboard-grid,
-  .score-numeric-grid {
+  .score-numeric-grid,
+  .usage-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .usage-card {
+    padding: 12px 14px;
+  }
+  .usage-row {
+    font-size: 12px;
+  }
+  .usage-row strong {
+    font-size: 16px;
+  }
+  .pagination {
+    margin-top: 6px;
+    gap: 6px;
   }
 }
 </style>
