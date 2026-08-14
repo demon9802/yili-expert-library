@@ -12,7 +12,12 @@
           <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="showDashboard">
             📊 数据仪表盘
           </button>
-          <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="toggleMobileMode">
+          <button
+            v-if="store.mobileAdaptation"
+            class="btn btn-sm"
+            style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)"
+            @click="toggleMobileMode"
+          >
             {{ isMobile ? '💻 桌面版' : '📱 手机版' }}
           </button>
           <button
@@ -260,6 +265,15 @@ const router = useRouter()
 const showHistory = ref(false)
 const selectedExpert = ref<Expert | null>(null)
 const isMobile = ref(false)
+
+// 系统设置中的手机端适配开关：关闭后强制退出手机视图
+watch(() => store.mobileAdaptation, enabled => {
+  if (!enabled && isMobile.value) {
+    isMobile.value = false
+    document.body.classList.remove('mobile-mode')
+  }
+}, { immediate: true })
+
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
 const showFloatingNav = ref(false)

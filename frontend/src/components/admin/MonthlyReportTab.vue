@@ -9,60 +9,97 @@
       </div>
     </div>
 
-    <div ref="reportExportRef" class="report-body">
+    <div ref="reportExportRef" class="report-body" :class="{ exporting: isExporting }">
+      <div class="report-header">
+        <h2>月度系统数据报告</h2>
+        <p class="report-date">统计日期：{{ todayText }}</p>
+      </div>
+
       <p class="report-note">
         统计范围：全量库内资源（含未在前台展示的观察库专家、已淘汰专家，以及不可见 / 未关联专家的合作项目）。
       </p>
 
-      <!-- 资源总览 -->
-      <h4 class="report-h4">资源总览</h4>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <span>专家总数（全量）</span>
-          <strong>{{ expertStats.total }}</strong>
+      <!-- 月度概览 -->
+      <div class="overview-cards">
+        <div class="overview-card">
+          <div class="overview-value">{{ newExperts.length }}</div>
+          <div class="overview-label">新增</div>
         </div>
-        <div class="stat-card">
-          <span>前台展示专家</span>
-          <strong class="ok">{{ expertStats.active }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>观察库专家（不展示）</span>
-          <strong class="warn">{{ expertStats.observing }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>已淘汰专家</span>
-          <strong class="danger">{{ expertStats.eliminated }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>合作项目总数（全量）</span>
-          <strong>{{ projectStats.total }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>可见项目</span>
-          <strong class="ok">{{ projectStats.visible }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>不可见项目</span>
-          <strong class="warn">{{ projectStats.invisible }}</strong>
-        </div>
-        <div class="stat-card">
-          <span>未关联专家项目</span>
-          <strong class="warn">{{ projectStats.unlinked }}</strong>
+        <div class="overview-card">
+          <div class="overview-value">{{ modifiedExperts.length }}</div>
+          <div class="overview-label">修改</div>
         </div>
       </div>
 
-      <!-- 评分分布 -->
-      <h4 class="report-h4">专家评分分布（全量）</h4>
-      <div class="dist-row" v-for="b in scoreBuckets" :key="b.label">
-        <span class="dist-label">{{ b.label }}</span>
-        <div class="dist-bar-track">
-          <div class="dist-bar" :style="{ width: barPct(b.count) + '%' }"></div>
+      <!-- ① 当前仪表盘快照 -->
+      <h4 class="report-section-title">① 当前仪表盘快照（{{ todayText }}）</h4>
+      <div class="dashboard-grid">
+        <div class="dashboard-card full">
+          <h4>领域分布情况</h4>
+          <div class="chart-container tall">
+            <FieldChartInline />
+          </div>
         </div>
-        <span class="dist-count">{{ b.count }} 人</span>
+
+        <div class="dashboard-card">
+          <h4>分值分布</h4>
+          <div ref="chartContainer" class="chart-container dist-chart-wrap">
+            <svg class="dist-chart" :viewBox="`0 0 ${distChartWidth} ${distChartHeight}`" role="img" aria-label="分值分布圆环图">
+              <g v-if="scoreDistTotal > 0">
+                <path
+                  v-for="(slice, i) in scoreDistSlices"
+                  :key="i"
+                  :d="slice.path"
+                  :fill="slice.color"
+                  stroke="#ffffff"
+                  stroke-width="2"
+                  opacity="0.9"
+                />
+                <text
+                  v-for="(slice, i) in scoreDistSlices.filter(s => s.percent >= 3)"
+                  :key="'t' + i"
+                  :x="slice.labelX" :y="slice.labelY + 4"
+                  text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff"
+                >{{ slice.percent.toFixed(1) }}%</text>
+              </g>
+              <circle v-else :cx="distCx" :cy="distCy" :r="distR" fill="#e2e8f0" />
+              <circle :cx="distCx" :cy="distCy" :r="innerR" fill="#fff" />
+              <text :x="distCx" :y="distCy - 4" text-anchor="middle" font-size="24" font-weight="600" fill="#1e293b">{{ scoreDistTotal }}</text>
+              <text :x="distCx" :y="distCy + 16" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>
+
+              <g v-for="(item, i) in scoreDistItems" :key="'legend-' + i">
+                <rect :x="legendX" :y="legendY + i * 34" width="12" height="12" rx="3" :fill="item.color" />
+                <text :x="legendX + 18" :y="legendY + i * 34 + 10" font-size="13" font-weight="600" fill="#334155">{{ item.range }}</text>
+                <text :x="legendX + 18" :y="legendY + i * 34 + 26" font-size="12" fill="#64748b">{{ item.count }}人 ({{ item.percent.toFixed(1) }}%)</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <h4>各项评分平均分</h4>
+          <div class="score-numeric-grid">
+            <div class="score-numeric-item">
+              <div class="label">专业度</div>
+              <div class="value blue">{{ avgProfessional }}</div>
+              <div class="sub">满分 10 分</div>
+            </div>
+            <div class="score-numeric-item">
+              <div class="label">影响力</div>
+              <div class="value amber">{{ avgInfluence }}</div>
+              <div class="sub">满分 10 分</div>
+            </div>
+            <div class="score-numeric-item">
+              <div class="label">综合评分</div>
+              <div class="value green">{{ avgOverall }}</div>
+              <div class="sub">加权平均</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 访问统计 -->
-      <h4 class="report-h4">访问统计</h4>
+      <h4 class="report-section-title">② 访问统计</h4>
       <div class="stats-grid sm">
         <div class="stat-card">
           <span>总访问量</span>
@@ -70,7 +107,7 @@
         </div>
         <div class="stat-card">
           <span>本月新增专家</span>
-          <strong>{{ pageStats.newExperts ?? 0 }}</strong>
+          <strong>{{ newExperts.length }}</strong>
         </div>
       </div>
       <table v-if="monthlyRows.length" class="admin-table">
@@ -91,17 +128,106 @@
           </tr>
         </tbody>
       </table>
-      <p v-if="loading">加载中...</p>
+
+      <!-- 专家变动 -->
+      <h4 class="report-section-title">③ 专家变动</h4>
+      <div class="detail-section">
+        <div class="detail-summary">
+          <span>本月新增 <strong>{{ newExperts.length }}</strong> 位专家，修改 <strong>{{ modifiedExperts.length }}</strong> 位专家。</span>
+          <button class="btn btn-sm" @click="expertDetailExpanded = !expertDetailExpanded">
+            {{ expertDetailExpanded ? '收起明细' : '展开明细' }}
+          </button>
+        </div>
+        <div v-if="expertDetailExpanded || isExporting" class="detail-body">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>专家姓名</th>
+                <th>操作类型</th>
+                <th>时间</th>
+                <th>状态</th>
+                <th>综合评分</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedExpertChanges" :key="item.expert.id + '-' + item.type">
+                <td>{{ item.expert.name }}</td>
+                <td>
+                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                </td>
+                <td>{{ formatDateTime(item.time) }}</td>
+                <td>{{ statusLabel(item.expert.status) }}</td>
+                <td>{{ item.expert.scores?.overall?.toFixed(1) ?? '-' }}</td>
+              </tr>
+              <tr v-if="allExpertChanges.length === 0">
+                <td colspan="5" class="empty-cell">本月暂无专家变动</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!isExporting && expertTotalPages > 1" class="pagination">
+            <button class="btn btn-sm" :disabled="expertPage === 1" @click="expertPage--">上一页</button>
+            <span>第 {{ expertPage }} / {{ expertTotalPages }} 页</span>
+            <button class="btn btn-sm" :disabled="expertPage === expertTotalPages" @click="expertPage++">下一页</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 合作项目 -->
+      <h4 class="report-section-title">④ 合作项目</h4>
+      <div class="detail-section">
+        <div class="detail-summary">
+          <span>本月新增 <strong>{{ newProjects.length }}</strong> 个项目，修改 <strong>{{ modifiedProjects.length }}</strong> 个项目。</span>
+          <button class="btn btn-sm" @click="projectDetailExpanded = !projectDetailExpanded">
+            {{ projectDetailExpanded ? '收起明细' : '展开明细' }}
+          </button>
+        </div>
+        <div v-if="projectDetailExpanded || isExporting" class="detail-body">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>项目名称</th>
+                <th>操作类型</th>
+                <th>时间</th>
+                <th>关联专家</th>
+                <th>年份</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in paginatedProjectChanges" :key="item.project.id + '-' + item.type">
+                <td>{{ item.project.title }}</td>
+                <td>
+                  <span class="tag" :class="item.type">{{ item.type === 'new' ? '新增' : '修改' }}</span>
+                </td>
+                <td>{{ formatDateTime(item.time) }}</td>
+                <td>{{ relatedExpertName(item.project) }}</td>
+                <td>{{ item.project.year }}</td>
+              </tr>
+              <tr v-if="allProjectChanges.length === 0">
+                <td colspan="5" class="empty-cell">本月暂无合作项目变动</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!isExporting && projectTotalPages > 1" class="pagination">
+            <button class="btn btn-sm" :disabled="projectPage === 1" @click="projectPage--">上一页</button>
+            <span>第 {{ projectPage }} / {{ projectTotalPages }} 页</span>
+            <button class="btn btn-sm" :disabled="projectPage === projectTotalPages" @click="projectPage++">下一页</button>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="loading" class="loading-text">加载中...</p>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, nextTick } from 'vue'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { pageViewApi } from '@/api/pageView'
 import { useAppStore } from '@/store/appStore'
+import FieldChartInline from '@/components/FieldChartInline.vue'
+import type { Expert, Project } from '@/types'
 
 interface MonthlyStats {
   totalExperts?: number
@@ -112,56 +238,221 @@ interface MonthlyStats {
   [key: string]: any
 }
 
+interface ChangeItem<T> {
+  type: 'new' | 'modified'
+  time: string
+  entity: T
+}
+
 const store = useAppStore()
 const stats = ref<MonthlyStats>({})
 const loading = ref(false)
 const reportExportRef = ref<HTMLElement | null>(null)
+const chartContainer = ref<HTMLElement | null>(null)
+const containerWidth = ref(400)
+const isExporting = ref(false)
+
+const expertDetailExpanded = ref(false)
+const projectDetailExpanded = ref(false)
+const expertPage = ref(1)
+const projectPage = ref(1)
+const PAGE_SIZE = 5
 
 const monthlyRows = computed(() => Array.isArray(stats.value.rows) ? stats.value.rows : [])
 
-// ===== 专家统计（全量库内资源） =====
-const expertStats = computed(() => {
-  const list = store.experts || []
-  const total = list.length
-  const active = list.filter(e => e.status === 'active').length
-  const observing = list.filter(e => e.status === 'observation' || (!!e.observationStatus && e.status !== 'eliminated')).length
-  const eliminated = list.filter(e => e.status === 'eliminated').length
-  return { total, active, observing, eliminated }
+const today = new Date()
+const todayText = computed(() => {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${today.getFullYear()}/${p(today.getMonth() + 1)}/${p(today.getDate())}`
 })
 
-// ===== 项目统计（全量库内资源） =====
-const projectStats = computed(() => {
-  const list = store.yiliProjects || []
-  const total = list.length
-  const visible = list.filter(p => p.visible !== false).length
-  const invisible = list.filter(p => p.visible === false).length
-  const expertIds = new Set((store.experts || []).map(e => e.id))
-  const unlinked = list.filter(p => p.expertId == null || !expertIds.has(p.expertId)).length
-  return { total, visible, invisible, unlinked }
+const currentMonthStart = computed(() => {
+  const d = new Date(today.getFullYear(), today.getMonth(), 1)
+  return d.getTime()
 })
 
-// ===== 评分分布 =====
-const scoreBuckets = computed(() => {
-  const list = store.experts || []
-  const buckets: Record<string, number> = { '1★': 0, '2★': 0, '3★': 0, '4★': 0, '5★': 0 }
-  list.forEach(e => {
-    const o = e.scores?.overall
-    if (o == null || !Number.isFinite(o)) return
-    const star = Math.min(5, Math.max(1, Math.round(o)))
-    buckets[star + '★'] += 1
-  })
-  return [
-    { label: '1★', count: buckets['1★'] },
-    { label: '2★', count: buckets['2★'] },
-    { label: '3★', count: buckets['3★'] },
-    { label: '4★', count: buckets['4★'] },
-    { label: '5★', count: buckets['5★'] },
-  ]
+const currentMonthEnd = computed(() => {
+  const d = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
+  return d.getTime()
 })
-function barPct(count: number): number {
-  const max = Math.max(1, ...scoreBuckets.value.map(b => b.count))
-  return Math.round((count / max) * 100)
+
+function inCurrentMonth(iso: string | null | undefined): boolean {
+  if (!iso) return false
+  const t = new Date(iso).getTime()
+  return !isNaN(t) && t >= currentMonthStart.value && t <= currentMonthEnd.value
 }
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+function statusLabel(status: string | null | undefined): string {
+  if (!status) return '-'
+  const map: Record<string, string> = {
+    active: '在库',
+    observation: '观察库',
+    eliminated: '已淘汰'
+  }
+  return map[status] || status
+}
+
+function relatedExpertName(project: Project): string {
+  if (project.expertId) {
+    const expert = store.experts.find(e => e.id === project.expertId)
+    if (expert) return expert.name
+  }
+  return project.pendingExpertName || '未关联'
+}
+
+// ===== 活跃专家（与仪表盘保持一致：排除已淘汰且综合评分 ≥ 3） =====
+const activeExperts = computed(() =>
+  store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) >= 3)
+)
+
+function avgScore(key: 'professional' | 'influence' | 'overall'): string {
+  const list = activeExperts.value.filter(e => e.scores?.[key] != null)
+  if (!list.length) return '0.0'
+  return (list.reduce((sum, e) => sum + (e.scores?.[key] || 0), 0) / list.length).toFixed(1)
+}
+
+const avgProfessional = computed(() => avgScore('professional'))
+const avgInfluence = computed(() => avgScore('influence'))
+const avgOverall = computed(() => avgScore('overall'))
+
+// ===== 专家变动 =====
+const newExperts = computed(() =>
+  store.experts.filter(e => inCurrentMonth(e.createdAt))
+)
+
+const modifiedExperts = computed(() =>
+  store.experts.filter(e => {
+    if (!inCurrentMonth(e.updatedAt)) return false
+    return e.updatedAt !== e.createdAt
+  })
+)
+
+const allExpertChanges = computed(() => {
+  const list: { type: 'new' | 'modified'; time: string; expert: Expert }[] = []
+  newExperts.value.forEach(e => list.push({ type: 'new', time: e.createdAt, expert: e }))
+  modifiedExperts.value.forEach(e => list.push({ type: 'modified', time: e.updatedAt, expert: e }))
+  return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+})
+
+const expertTotalPages = computed(() => Math.max(1, Math.ceil(allExpertChanges.value.length / PAGE_SIZE)))
+const paginatedExpertChanges = computed(() => {
+  if (isExporting.value) return allExpertChanges.value
+  const start = (expertPage.value - 1) * PAGE_SIZE
+  return allExpertChanges.value.slice(start, start + PAGE_SIZE)
+})
+
+// ===== 合作项目变动 =====
+const newProjects = computed(() =>
+  store.yiliProjects.filter(p => inCurrentMonth(p.createdAt))
+)
+
+const modifiedProjects = computed(() =>
+  store.yiliProjects.filter(p => {
+    if (!inCurrentMonth(p.updatedAt)) return false
+    return p.updatedAt !== p.createdAt
+  })
+)
+
+const allProjectChanges = computed(() => {
+  const list: { type: 'new' | 'modified'; time: string; project: Project }[] = []
+  newProjects.value.forEach(p => list.push({ type: 'new', time: p.createdAt, project: p }))
+  modifiedProjects.value.forEach(p => list.push({ type: 'modified', time: p.updatedAt, project: p }))
+  return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+})
+
+const projectTotalPages = computed(() => Math.max(1, Math.ceil(allProjectChanges.value.length / PAGE_SIZE)))
+const paginatedProjectChanges = computed(() => {
+  if (isExporting.value) return allProjectChanges.value
+  const start = (projectPage.value - 1) * PAGE_SIZE
+  return allProjectChanges.value.slice(start, start + PAGE_SIZE)
+})
+
+// ===== 分值分布（与后台仪表盘一致） =====
+const scoreRanges = [
+  { range: '4.5-5.0分', min: 4.5, max: 5.0, color: '#22c55e' },
+  { range: '4.0-4.5分（不含4.5）', min: 4.0, max: 4.5, color: '#86efac' },
+  { range: '3.5-4.0分（不含4.0）', min: 3.5, max: 4.0, color: '#f59e0b' },
+  { range: '3.0-3.5分（不含3.5）', min: 3.0, max: 3.5, color: '#f97316' },
+]
+
+const scoreDistItems = computed(() => {
+  const items = scoreRanges.map(r => ({ ...r, count: 0, percent: 0 }))
+  activeExperts.value.forEach(expert => {
+    const score = expert.scores?.overall
+    if (score == null) return
+    for (const item of items) {
+      const inRange = item.max === 5.0
+        ? score >= item.min && score <= item.max
+        : score >= item.min && score < item.max
+      if (inRange) {
+        item.count++
+        break
+      }
+    }
+  })
+  const total = activeExperts.value.length
+  items.forEach(item => {
+    item.percent = total > 0 ? (item.count / total) * 100 : 0
+  })
+  return items
+})
+
+const scoreDistTotal = computed(() => activeExperts.value.length)
+
+function updateWidth() {
+  containerWidth.value = chartContainer.value?.clientWidth || 400
+}
+
+onMounted(() => {
+  loadStats()
+  updateWidth()
+  window.addEventListener('resize', updateWidth)
+})
+
+const distChartWidth = computed(() => Math.max(containerWidth.value, 360))
+const distChartHeight = computed(() => distChartWidth.value < 520 ? 360 : 260)
+const distCx = computed(() => distChartWidth.value < 520 ? distChartWidth.value / 2 : distChartWidth.value * 0.34)
+const distCy = computed(() => distChartWidth.value < 520 ? 120 : distChartHeight.value / 2)
+const distR = computed(() => Math.min(distChartWidth.value * 0.2, 82))
+const innerR = computed(() => distR.value * 0.58)
+const legendX = computed(() => distChartWidth.value < 520 ? 24 : distChartWidth.value * 0.58)
+const legendY = computed(() => distChartWidth.value < 520 ? 220 : 66)
+
+const scoreDistSlices = computed(() => {
+  const total = scoreDistTotal.value
+  let startAngle = -Math.PI / 2
+  const labelR = (distR.value + innerR.value) / 2
+  return scoreDistItems.value.map(item => {
+    const angle = total > 0 ? (item.count / total) * 2 * Math.PI : 0
+    const endAngle = startAngle + angle
+    const largeArc = angle > Math.PI ? 1 : 0
+
+    const x1o = distCx.value + distR.value * Math.cos(startAngle)
+    const y1o = distCy.value + distR.value * Math.sin(startAngle)
+    const x2o = distCx.value + distR.value * Math.cos(endAngle)
+    const y2o = distCy.value + distR.value * Math.sin(endAngle)
+    const x1i = distCx.value + innerR.value * Math.cos(startAngle)
+    const y1i = distCy.value + innerR.value * Math.sin(startAngle)
+    const x2i = distCx.value + innerR.value * Math.cos(endAngle)
+    const y2i = distCy.value + innerR.value * Math.sin(endAngle)
+
+    const path = `M${x1o.toFixed(1)},${y1o.toFixed(1)} A${distR.value},${distR.value} 0 ${largeArc} 1 ${x2o.toFixed(1)},${y2o.toFixed(1)} L${x2i.toFixed(1)},${y2i.toFixed(1)} A${innerR.value},${innerR.value} 0 ${largeArc} 0 ${x1i.toFixed(1)},${y1i.toFixed(1)} Z`
+    const mid = startAngle + angle / 2
+    const percent = total > 0 ? (item.count / total) * 100 : 0
+    const labelX = distCx.value + labelR * Math.cos(mid)
+    const labelY = distCy.value + labelR * Math.sin(mid)
+    startAngle = endAngle
+    return { path, color: item.color, percent, labelX, labelY }
+  })
+})
 
 // ===== 访问统计（后端，best-effort） =====
 const pageStats = computed(() => ({
@@ -180,7 +471,7 @@ async function loadStats() {
   }
 }
 
-async function captureReport() {
+async function captureReport(): Promise<HTMLCanvasElement | null> {
   if (!reportExportRef.value) return null
   return html2canvas(reportExportRef.value, {
     backgroundColor: '#ffffff',
@@ -220,42 +511,326 @@ function downloadCanvasAsPDF(canvas: HTMLCanvasElement, title: string, filename:
 }
 
 async function exportPNG() {
-  const canvas = await captureReport()
-  if (!canvas) return
-  downloadCanvasAsPNG(canvas, `月度系统数据报告_${new Date().toISOString().slice(0, 10)}.png`)
+  await runExport(async canvas => {
+    if (!canvas) return
+    downloadCanvasAsPNG(canvas, `月度系统数据报告_${new Date().toISOString().slice(0, 10)}.png`)
+  })
 }
 
 async function exportPDF() {
-  const canvas = await captureReport()
-  if (!canvas) return
-  downloadCanvasAsPDF(canvas, '月度系统数据报告', `月度系统数据报告_${new Date().toISOString().slice(0, 10)}.pdf`)
+  await runExport(async canvas => {
+    if (!canvas) return
+    downloadCanvasAsPDF(canvas, '月度系统数据报告', `月度系统数据报告_${new Date().toISOString().slice(0, 10)}.pdf`)
+  })
 }
 
-onMounted(loadStats)
+async function runExport(callback: (canvas: HTMLCanvasElement | null) => Promise<void>) {
+  const prevExpertPage = expertPage.value
+  const prevProjectPage = projectPage.value
+  const prevExpertExpanded = expertDetailExpanded.value
+  const prevProjectExpanded = projectDetailExpanded.value
+  isExporting.value = true
+  expertDetailExpanded.value = true
+  projectDetailExpanded.value = true
+  expertPage.value = 1
+  projectPage.value = 1
+  await nextTick()
+  await new Promise(resolve => setTimeout(resolve, 300))
+  const canvas = await captureReport()
+  await callback(canvas)
+  isExporting.value = false
+  expertDetailExpanded.value = prevExpertExpanded
+  projectDetailExpanded.value = prevProjectExpanded
+  expertPage.value = prevExpertPage
+  projectPage.value = prevProjectPage
+}
 </script>
 
 <style scoped>
-.admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.toolbar-actions { display: flex; gap: 8px; align-items: center; }
-.report-body { background: #fff; padding: 4px; }
-.report-note { font-size: 12px; color: #6b7280; margin: 0 0 16px; line-height: 1.6; }
-.report-h4 { font-size: 15px; margin: 20px 0 10px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 8px; }
-.stats-grid.sm { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-.stat-card { padding: 18px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-.stat-card span { display: block; color: #6b7280; font-size: 13px; }
-.stat-card strong { display: block; margin-top: 8px; font-size: 32px; color: #111827; }
-.stat-card strong.ok { color: #059669; }
-.stat-card strong.warn { color: #d97706; }
-.stat-card strong.danger { color: #dc2626; }
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
 
-.dist-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.dist-label { width: 36px; font-size: 13px; color: #374151; text-align: right; }
-.dist-bar-track { flex: 1; background: #f3f4f6; border-radius: 6px; height: 18px; overflow: hidden; }
-.dist-bar { height: 100%; background: linear-gradient(90deg, #60a5fa, #2563eb); border-radius: 6px; transition: width 0.3s; }
-.dist-count { width: 64px; font-size: 13px; color: #6b7280; }
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
-.admin-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-th, td { padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 13px; }
-.btn { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; }
+.report-body {
+  background: #fff;
+  padding: 4px;
+}
+
+.report-header {
+  margin-bottom: 16px;
+}
+
+.report-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.report-date {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.report-note {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+  max-width: 320px;
+}
+
+.overview-card {
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+
+.overview-value {
+  font-size: 36px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.overview-label {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.report-section-title {
+  font-size: 15px;
+  margin: 24px 0 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.dashboard-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.dashboard-card.full {
+  grid-column: 1 / -1;
+}
+
+.dashboard-card h4 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chart-container {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-container.tall {
+  min-height: 200px;
+}
+
+.dist-chart-wrap {
+  align-items: stretch;
+}
+
+.dist-chart {
+  width: 100%;
+  height: auto;
+}
+
+.score-numeric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.score-numeric-item .label {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.score-numeric-item .value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.score-numeric-item .value.blue { color: #3b82f6; }
+.score-numeric-item .value.amber { color: #f59e0b; }
+.score-numeric-item .value.green { color: #22c55e; }
+
+.score-numeric-item .sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.stats-grid.sm {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.stat-card {
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.stat-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 32px;
+  color: #111827;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.admin-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+
+.empty-cell {
+  text-align: center;
+  color: #9ca3af;
+  padding: 20px;
+}
+
+.detail-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  margin-bottom: 16px;
+}
+
+.detail-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.detail-summary strong {
+  color: #111827;
+}
+
+.detail-body {
+  margin-top: 12px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag.new {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tag.modified {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid,
+  .score-numeric-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
