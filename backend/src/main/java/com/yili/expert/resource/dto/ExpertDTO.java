@@ -22,6 +22,7 @@ public class ExpertDTO {
     private Boolean isSupplier;
     private String qualDisplay;
     private String advDisplay;
+    private String ratingReference;
     private Object scores;
     private String status;
     private String observationStatus;

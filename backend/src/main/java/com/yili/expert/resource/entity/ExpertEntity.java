@@ -35,6 +35,7 @@ public class ExpertEntity {
     private Boolean isSupplier;
     private String qualDisplay;
     private String advDisplay;
+    private String ratingReference;
 
     private String scores;
 

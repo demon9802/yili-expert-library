@@ -48,6 +48,7 @@ function buildText(expert: Expert): string {
     })
   }
   if (expert.education) parts.push(expert.education)
+  if (expert.ratingReference) parts.push(expert.ratingReference)
   return parts.join(' ')
 }
 

@@ -24,6 +24,7 @@ export interface Expert {
   isSupplier: boolean
   qualDisplay: string
   advDisplay: string
+  ratingReference?: string
   scores: Scores
   status: string
   observationStatus: string | null

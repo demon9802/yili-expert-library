@@ -122,6 +122,7 @@ public class ExpertServiceImpl implements ExpertService {
         dto.setIsSupplier(e.getIsSupplier() != null ? e.getIsSupplier() : false);
         dto.setQualDisplay(e.getQualDisplay() != null ? e.getQualDisplay() : "");
         dto.setAdvDisplay(e.getAdvDisplay() != null ? e.getAdvDisplay() : "");
+        dto.setRatingReference(e.getRatingReference() != null ? e.getRatingReference() : "");
 
         // Parse scores JSON
         if (e.getScores() != null) {
@@ -184,6 +185,7 @@ public class ExpertServiceImpl implements ExpertService {
         e.setIsSupplier(dto.getIsSupplier() != null ? dto.getIsSupplier() : false);
         e.setQualDisplay(dto.getQualDisplay() != null ? dto.getQualDisplay() : "");
         e.setAdvDisplay(dto.getAdvDisplay() != null ? dto.getAdvDisplay() : "");
+        e.setRatingReference(dto.getRatingReference() != null ? dto.getRatingReference() : "");
 
         // Serialize scores (merge subScores into scores)
         try {
