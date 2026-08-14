@@ -4,6 +4,30 @@
       <h3>系统设置</h3>
     </div>
 
+    <!-- 数据源管理 -->
+    <div class="setting-card">
+      <h4>数据源管理</h4>
+      <p class="setting-hint">从腾讯文档源数据更新专家库。更新不会覆盖已有数据，重复项由管理员确认处理。</p>
+
+      <div class="setting-row">
+        <input v-model="sourceDocLink" class="setting-input" placeholder="粘贴腾讯文档分享链接..." />
+        <button class="btn primary" :disabled="savingLink" @click="saveSourceLink">保存链接</button>
+      </div>
+
+      <div class="src-links">
+        <div class="src-link-item">
+          <div class="src-link-title">📎 核心源数据表（初始专家数据）</div>
+          <a class="src-link-url" :href="CORE_SOURCE_URL" target="_blank" rel="noopener">{{ CORE_SOURCE_URL }}</a>
+          <div class="src-link-sub">主管理员维护的线上文档，点击可在新窗口打开</div>
+        </div>
+        <div class="src-link-item">
+          <div class="src-link-title">📎 进度更新表（合作项目 / 评分进度）</div>
+          <a class="src-link-url" :href="PROGRESS_SOURCE_URL" target="_blank" rel="noopener">{{ PROGRESS_SOURCE_URL }}</a>
+          <div class="src-link-sub">进度与评分维护表，点击可在新窗口打开</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 主标题名称 -->
     <div class="setting-card">
       <h4>主标题名称</h4>
@@ -69,14 +93,22 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
+import { settingApi } from '@/api/setting'
 
 const store = useAppStore()
 const DEFAULT_TITLE = 'DACC·数智化赋能优质专家资源库'
+
+// 两个腾讯文档嵌套表格（数据源）
+const CORE_SOURCE_URL = 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou'
+const PROGRESS_SOURCE_URL = 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h'
 
 const titleInput = ref(store.platformTitle || DEFAULT_TITLE)
 const descInput = ref(store.appDescription || '')
 const saving = ref(false)
 const message = ref('')
+
+const sourceDocLink = ref('')
+const savingLink = ref(false)
 
 const schemes = computed(() => store.COLOR_SCHEMES)
 
@@ -89,10 +121,28 @@ const updateTimeText = computed(() => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 })
 
-onMounted(() => {
+onMounted(async () => {
   titleInput.value = store.platformTitle || DEFAULT_TITLE
   descInput.value = store.appDescription || ''
+  try {
+    const link = await settingApi.get('sourceDocLink')
+    if (link) sourceDocLink.value = link
+  } catch {
+    /* 忽略：数据源链接为可选项 */
+  }
 })
+
+async function saveSourceLink() {
+  savingLink.value = true
+  try {
+    await settingApi.save('sourceDocLink', sourceDocLink.value.trim())
+    message.value = '源文档链接已保存'
+  } catch {
+    message.value = '源文档链接保存失败'
+  } finally {
+    savingLink.value = false
+  }
+}
 
 async function saveTitle() {
   const t = titleInput.value.trim()
@@ -156,6 +206,38 @@ function clearCache() {
   padding: 16px;
   margin-bottom: 16px;
   background: var(--surface);
+}
+
+.src-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+.src-link-item {
+  background: var(--primary-light, #eff6ff);
+  border: 1px solid #93c5fd;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.src-link-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary, #2563eb);
+  margin-bottom: 4px;
+}
+.src-link-url {
+  display: block;
+  font-size: 12px;
+  color: var(--primary, #2563eb);
+  word-break: break-all;
+  line-height: 1.6;
+  text-decoration: underline;
+}
+.src-link-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
 }
 .setting-card h4 {
   margin: 0 0 4px;
