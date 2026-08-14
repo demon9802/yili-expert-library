@@ -60,11 +60,25 @@
                     stroke-width="2"
                     opacity="0.95"
                   />
+                  <!-- 占比足够时显示在环内 -->
                   <text
-                    v-if="slice.percent >= 3"
+                    v-if="slice.showInside"
                     :x="slice.labelX" :y="slice.labelY + 4"
                     text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff"
                   >{{ slice.percent.toFixed(1) }}%</text>
+                  <!-- 占比过小时移到环外，黑灰色字+引线 -->
+                  <g v-if="!slice.showInside && slice.count > 0">
+                    <line
+                      :x1="slice.lineStartX" :y1="slice.lineStartY"
+                      :x2="slice.outerX" :y2="slice.outerY"
+                      stroke="#94a3b8" stroke-width="1"
+                    />
+                    <text
+                      :x="slice.outerLabelX" :y="slice.outerLabelY"
+                      :text-anchor="slice.textAnchor"
+                      font-size="12" font-weight="600" fill="#334155"
+                    >{{ slice.percent.toFixed(1) }}%</text>
+                  </g>
                 </g>
                 <text :x="cx" :y="cy - 4" text-anchor="middle" font-size="24" font-weight="600" fill="#1e293b">{{ scoreTotal }}</text>
                 <text :x="cx" :y="cy + 16" text-anchor="middle" font-size="12" fill="#64748b">位专家</text>
@@ -171,17 +185,34 @@ const innerR = 55
 
 const scoreSlices = computed(() => {
   let start = -Math.PI / 2
+  const labelR = (r + innerR) / 2
+  const outerR = r + 14
+  const margin = 10
   return scoreCounts.value.map((count, i) => {
     const angle = scoreTotal.value ? (count / scoreTotal.value) * 2 * Math.PI : 0
     const end = start + angle
     const path = angle > 0 ? describeDonutSlice(cx, cy, r, innerR, start, end) : ''
     const mid = start + angle / 2
-    const labelR = (r + innerR) / 2
     const labelX = cx + labelR * Math.cos(mid)
     const labelY = cy + labelR * Math.sin(mid)
     const percent = scoreTotal.value ? (count / scoreTotal.value) * 100 : 0
+    const showInside = count > 0 && angle * labelR >= 36
+    let outerX = cx + outerR * Math.cos(mid)
+    let outerY = cy + outerR * Math.sin(mid)
+    outerX = Math.max(margin, Math.min(360 - margin, outerX))
+    outerY = Math.max(margin, Math.min(250 - margin, outerY))
+    const textAnchor = outerX >= cx ? 'start' : 'end'
+    const outerLabelX = outerX + (textAnchor === 'start' ? 4 : -4)
+    const outerLabelY = outerY + 4
+    const lineStartX = cx + r * Math.cos(mid)
+    const lineStartY = cy + r * Math.sin(mid)
     start = end
-    return { path, color: colors[i], percent, labelX, labelY }
+    return {
+      path, color: colors[i], percent, count,
+      labelX, labelY, showInside,
+      outerX, outerY, outerLabelX, outerLabelY, textAnchor,
+      lineStartX, lineStartY
+    }
   })
 })
 

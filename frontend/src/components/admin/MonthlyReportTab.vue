@@ -135,12 +135,29 @@
                   stroke-width="2"
                   opacity="0.9"
                 />
+                <!-- 占比足够时显示在环内 -->
                 <text
-                  v-for="(slice, i) in scoreDistSlices.filter(s => s.percent >= 3)"
-                  :key="'t' + i"
+                  v-for="(slice, i) in scoreDistSlices.filter(s => s.showInside && s.count > 0)"
+                  :key="'t-in' + i"
                   :x="slice.labelX" :y="slice.labelY + 4"
                   text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff"
                 >{{ slice.percent.toFixed(1) }}%</text>
+                <!-- 占比过小时移到环外，黑灰色字+引线 -->
+                <g
+                  v-for="(slice, i) in scoreDistSlices.filter(s => !s.showInside && s.count > 0)"
+                  :key="'t-out' + i"
+                >
+                  <line
+                    :x1="slice.lineStartX" :y1="slice.lineStartY"
+                    :x2="slice.outerX" :y2="slice.outerY"
+                    stroke="#94a3b8" stroke-width="1"
+                  />
+                  <text
+                    :x="slice.outerLabelX" :y="slice.outerLabelY"
+                    :text-anchor="slice.textAnchor"
+                    font-size="12" font-weight="600" fill="#334155"
+                  >{{ slice.percent.toFixed(1) }}%</text>
+                </g>
               </g>
               <circle v-else :cx="distCx" :cy="distCy" :r="distR" fill="#e2e8f0" />
               <circle :cx="distCx" :cy="distCy" :r="innerR" fill="#fff" />
@@ -669,6 +686,7 @@ const scoreDistSlices = computed(() => {
   const total = scoreDistTotal.value
   let startAngle = -Math.PI / 2
   const labelR = (distR.value + innerR.value) / 2
+  const margin = 12
   return scoreDistItems.value.map(item => {
     const angle = total > 0 ? (item.count / total) * 2 * Math.PI : 0
     const endAngle = startAngle + angle
@@ -688,8 +706,24 @@ const scoreDistSlices = computed(() => {
     const percent = total > 0 ? (item.count / total) * 100 : 0
     const labelX = distCx.value + labelR * Math.cos(mid)
     const labelY = distCy.value + labelR * Math.sin(mid)
+    const showInside = item.count > 0 && angle * labelR >= 36
+    const outerR = distR.value + 16
+    let outerX = distCx.value + outerR * Math.cos(mid)
+    let outerY = distCy.value + outerR * Math.sin(mid)
+    outerX = Math.max(margin, Math.min(distChartWidth.value - margin, outerX))
+    outerY = Math.max(margin, Math.min(distChartHeight.value - margin, outerY))
+    const textAnchor = outerX >= distCx.value ? 'start' : 'end'
+    const outerLabelX = outerX + (textAnchor === 'start' ? 4 : -4)
+    const outerLabelY = outerY + 4
+    const lineStartX = distCx.value + distR.value * Math.cos(mid)
+    const lineStartY = distCy.value + distR.value * Math.sin(mid)
     startAngle = endAngle
-    return { path, color: item.color, percent, labelX, labelY }
+    return {
+      path, color: item.color, percent, count: item.count,
+      labelX, labelY, showInside,
+      outerX, outerY, outerLabelX, outerLabelY, textAnchor,
+      lineStartX, lineStartY
+    }
   })
 })
 
