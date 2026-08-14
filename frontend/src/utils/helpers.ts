@@ -35,6 +35,45 @@ export function formatDateYMD(date: Date | string | number | null): string {
   return `${y}-${m}-${day}`
 }
 
+// 解析 YYYY-MM-DD 为本地时间 Date（避免 ISO 解析的时区偏移）
+function parseYMD(s: string | null | undefined): Date | null {
+  if (!s) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s).trim())
+  if (!m) {
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? null : d
+  }
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return isNaN(d.getTime()) ? null : d
+}
+
+// 在 YYYY-MM-DD 基础上加 n 个月，返回 YYYY-MM-DD
+export function addMonthsToDateYMD(dateStr: string | null | undefined, months: number): string {
+  const d = parseYMD(dateStr)
+  if (!d) return ''
+  const nd = new Date(d.getFullYear(), d.getMonth() + months, d.getDate())
+  return formatDateYMD(nd)
+}
+
+// 两个 YYYY-MM-DD 之间的天数差（b - a，向上取整到整日）
+export function daysBetweenDates(a: string | null | undefined, b: string | null | undefined): number | null {
+  const da = parseYMD(a)
+  const db = parseYMD(b)
+  if (!da || !db) return null
+  return Math.round((db.getTime() - da.getTime()) / 86400000)
+}
+
+// 观察截止日：已存则用之，否则按入库日期 + 6 个月推算
+export function computeObservationDeadline(
+  observationDate: string | null | undefined,
+  scores: any
+): string {
+  const existing = scores && scores.observationDeadline
+  if (existing) return String(existing)
+  const entry = observationDate || formatDateYMD(new Date())
+  return addMonthsToDateYMD(entry, 6)
+}
+
 export function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number

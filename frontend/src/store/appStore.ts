@@ -13,7 +13,7 @@ import { favoriteApi } from '@/api/favorite'
 import { authApi } from '@/api/auth'
 import { settingApi } from '@/api/setting'
 import { setToken, removeToken, getToken } from '@/api/request'
-import { lsGet, lsSet, lsRemove, debounce, formatDateYMD } from '@/utils/helpers'
+import { lsGet, lsSet, lsRemove, debounce, formatDateYMD, addMonthsToDateYMD } from '@/utils/helpers'
 import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
 import { observationApi } from '@/api/observation'
 
@@ -458,7 +458,11 @@ export const useAppStore = defineStore('app', () => {
     const { status, obsStatus, enteringObservation } = statusFromScores(overall, currentStatus, currentObsStatus)
     payload.status = status
     payload.observationStatus = obsStatus
-    if (enteringObservation) payload.observationDate = formatDateYMD(new Date())
+    if (enteringObservation) {
+      const entry = formatDateYMD(new Date())
+      payload.observationDate = entry
+      payload.scores = { ...((payload.scores as any) || {}), observationDeadline: addMonthsToDateYMD(entry, 6) }
+    }
   }
 
   // ===== 自动评分 =====
@@ -468,13 +472,14 @@ export const useAppStore = defineStore('app', () => {
     const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
     const payload: Partial<Expert> = {
       scores: {
+        ...(experts.value[idx].scores || {}),
         professional: result.professional,
         influence: result.influence,
         overall: result.overall,
-      },
-      subScores: {
-        professional: result.professionalItems,
-        influence: result.influenceItems,
+        subScores: {
+          professional: result.professionalItems,
+          influence: result.influenceItems,
+        },
       },
     }
     applyStatusPayload(payload, result.overall, experts.value[idx].status, experts.value[idx].observationStatus)
@@ -490,6 +495,7 @@ export const useAppStore = defineStore('app', () => {
       const result = autoScoreExpert(e, yiliProjects.value)
       const payload: Partial<Expert> = {
         scores: {
+          ...(e.scores || {}),
           professional: result.professional,
           influence: result.influence,
           overall: result.overall,

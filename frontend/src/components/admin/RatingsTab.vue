@@ -150,7 +150,7 @@ import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
 import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
-import { formatDateYMD } from '@/utils/helpers'
+import { formatDateYMD, computeObservationDeadline } from '@/utils/helpers'
 import type { Expert, Scores, SubScores } from '@/types'
 
 const store = useAppStore()
@@ -377,10 +377,13 @@ function statusPayload(e: Expert, overall: number | null): Partial<Expert> | nul
 
 async function moveToObservation(e: Expert) {
   const wasObserving = e.status === 'observation' || !!e.observationStatus
+  const entry = wasObserving && e.observationDate ? formatDateYMD(e.observationDate) : formatDateYMD(new Date())
   const updated = await expertApi.update(e.id, {
     status: 'observation',
     observationStatus: wasObserving ? e.observationStatus || 'evaluating' : 'evaluating',
-    observationDate: wasObserving && e.observationDate ? formatDateYMD(e.observationDate) : formatDateYMD(new Date()),
+    observationDate: entry,
+    scores: { ...(e.scores || {}), observationDeadline: computeObservationDeadline(entry, e.scores) },
+    subScores: e.subScores,
   })
   syncExpert(updated)
   store.recordObservationOperation({

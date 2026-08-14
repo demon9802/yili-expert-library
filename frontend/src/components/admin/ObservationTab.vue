@@ -5,8 +5,9 @@
       <span class="count-badge">{{ obsExperts.length }} 位</span>
     </div>
     <p class="tab-desc">
-      综合评分 < 3★ 的专家自动归入此处。可在此持续评估、淘汰、延期或调分。
+      综合评分 &lt; 3★ 的专家自动归入此处。可在此持续评估、淘汰、延期或调分。
       评分变化由系统自动同步进出（低于 3★ 进入，调高至 ≥ 3★ 自动退出）。
+      观察期为 6 个月，到期前可点击「延期」顺延 6 个月。
     </p>
 
     <div v-if="obsExperts.length === 0" class="empty-box">观察库为空</div>
@@ -20,7 +21,7 @@
       <div class="obs-head">
         <div class="obs-title">
           <strong>{{ expert.name }}</strong>
-          <span class="obs-score">综合：{{ expert.scores?.overall != null ? expert.scores.overall.toFixed(1) : '-' }}★</span>
+          <span class="obs-score">综合：{{ overallText(expert) }}★</span>
           <span class="status-tag" :class="statusClass(expert)">{{ statusText(expert) }}</span>
         </div>
         <div class="obs-actions">
@@ -32,16 +33,49 @@
             <option value="evaluating">持续评估</option>
             <option value="eliminated">淘汰</option>
           </select>
-          <button class="btn btn-sm btn-extend" type="button" @click="openExtend(expert)">延期</button>
-          <button class="btn btn-sm btn-adjust" type="button" @click="openScoreModal(expert)">调整评分</button>
+          <button class="btn btn-sm btn-extend" type="button" :disabled="expert.status === 'eliminated'" @click="openExtend(expert)">延期</button>
+          <button class="btn btn-sm btn-adjust" type="button" :disabled="expert.status === 'eliminated'" @click="openScoreModal(expert)">调整评分</button>
           <button class="btn btn-danger btn-sm" type="button" @click="remove(expert)">删除</button>
         </div>
       </div>
 
-      <div class="obs-meta">
-        专业度：{{ expert.scores?.professional != null ? expert.scores.professional.toFixed(1) : '-' }}★
-        ｜ 影响力：{{ expert.scores?.influence != null ? expert.scores.influence.toFixed(1) : '-' }}★
-        <span v-if="expert.observationDate">｜ 录入/延期日期：{{ formatDate(expert.observationDate) }}</span>
+      <!-- 入库 / 截止日 统计 -->
+      <div class="obs-meta-grid">
+        <div class="meta-cell">
+          <span class="meta-label">专业度</span>
+          <span class="meta-val">{{ profText(expert) }}★</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">影响力</span>
+          <span class="meta-val">{{ inflText(expert) }}★</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">入库日期</span>
+          <span class="meta-val">{{ fmtDate(expert.observationDate) }}</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">已入库</span>
+          <span class="meta-val">{{ entryDaysText(expert) }}</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">观察截止日</span>
+          <span class="meta-val">{{ fmtDate(deadline(expert)) }}</span>
+        </div>
+        <div class="meta-cell">
+          <span class="meta-label">截止倒计时</span>
+          <span class="meta-val" :class="remainClass(expert)">{{ remainText(expert) }}</span>
+        </div>
+      </div>
+
+      <!-- 评分明细（低分原因） -->
+      <div class="obs-subscores">
+        <span class="subscores-title">评分明细（低分原因）：</span>
+        <span v-for="it in professionalItems" :key="'p-' + it" class="subscore-chip prof">
+          {{ it }} {{ subScoreVal(expert, 'professional', it) ?? '—' }}★
+        </span>
+        <span v-for="it in influenceItems" :key="'i-' + it" class="subscore-chip infl">
+          {{ it }} {{ subScoreVal(expert, 'influence', it) ?? '—' }}★
+        </span>
       </div>
 
       <div v-if="isOverOneYear(expert)" class="year-warning">
@@ -93,7 +127,7 @@
           专业度 <b>{{ scorePreview.professional.toFixed(1) }}</b>★ ｜
           影响力 <b>{{ scorePreview.influence.toFixed(1) }}</b>★ ｜
           综合 <b>{{ scorePreview.overall.toFixed(1) }}</b>★
-          <span class="score-flow">{{ scorePreview.overall >= 3.5 ? '（调高后将退出观察库）' : '（仍保留在观察库）' }}</span>
+          <span class="score-flow">{{ scorePreview.overall >= 3 ? '（调高后将退出观察库）' : '（仍保留在观察库）' }}</span>
         </div>
         <label class="opinion-label">操作意见（必填）</label>
         <textarea
@@ -117,7 +151,7 @@
         <p class="modal-hint">
           {{ opinionModal.action === 'eliminated'
             ? '淘汰后该专家将从前端移除，且操作不可逆转。'
-            : '延期将重置观察期计时，继续留在观察库。' }}
+            : '延期将在当前观察截止日基础上顺延 6 个月，继续留在观察库。' }}
           请填写操作意见（必填）。
         </p>
         <label class="opinion-label">操作意见（必填）</label>
@@ -148,7 +182,7 @@ import { expertApi } from '@/api/expert'
 import { observationApi } from '@/api/observation'
 import { useAppStore } from '@/store/appStore'
 import { autoScoreExpert } from '@/utils/scoring'
-import { formatDateYMD } from '@/utils/helpers'
+import { formatDateYMD, formatDateTime as fmtDateTime, addMonthsToDateYMD, daysBetweenDates, computeObservationDeadline } from '@/utils/helpers'
 import type { Expert } from '@/types'
 
 const store = useAppStore()
@@ -177,7 +211,48 @@ function computeFromSubs(profMap: FiveMap, inflMap: FiveMap) {
 }
 function statusForOverall(overall: number | null, e: Expert): string {
   if (e.status === 'eliminated') return 'eliminated'
-  return overall != null && overall >= 3.5 ? 'active' : 'observation'
+  // 阈值：综合 ≥ 3★ 退出观察库，< 3★ 留在观察库
+  return overall != null && overall >= 3 ? 'active' : 'observation'
+}
+
+// ===== 展示辅助 =====
+const today = formatDateYMD(new Date())
+function overallText(e: Expert): string {
+  return e.scores?.overall != null ? e.scores.overall.toFixed(1) : '-'
+}
+function profText(e: Expert): string {
+  return e.scores?.professional != null ? e.scores.professional.toFixed(1) : '-'
+}
+function inflText(e: Expert): string {
+  return e.scores?.influence != null ? e.scores.influence.toFixed(1) : '-'
+}
+function fmtDate(value: string | null | undefined): string {
+  return value ? String(value) : '-'
+}
+function deadline(e: Expert): string {
+  return computeObservationDeadline(e.observationDate, e.scores)
+}
+function entryDaysText(e: Expert): string {
+  const d = daysBetweenDates(e.observationDate, today)
+  return d == null ? '-' : d + ' 天'
+}
+function remainText(e: Expert): string {
+  const d = daysBetweenDates(today, deadline(e))
+  if (d == null) return '-'
+  if (d < 0) return '已逾期 ' + -d + ' 天'
+  return d + ' 天'
+}
+function remainClass(e: Expert): string {
+  const d = daysBetweenDates(today, deadline(e))
+  if (d == null) return ''
+  if (d < 0) return 'remain-over'
+  if (d <= 30) return 'remain-near'
+  return ''
+}
+function subScoreVal(expert: Expert, dim: 'professional' | 'influence', item: string): number | null {
+  const m = expert.subScores?.[dim] as Record<string, number> | undefined
+  if (m && typeof m === 'object' && item in m) return m[item]
+  return null
 }
 
 // ===== 观察库列表 =====
@@ -205,16 +280,8 @@ function statusClass(e: Expert): string {
   if (e.observationStatus === 'extended') return 'tag-extended'
   return 'tag-evaluating'
 }
-function formatDate(value: string | null) {
-  if (!value) return '-'
-  const d = new Date(value)
-  return isNaN(d.getTime()) ? value : d.toLocaleDateString('zh-CN')
-}
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return value
-  return d.toLocaleString('zh-CN', { hour12: false })
+  return fmtDateTime(value as any)
 }
 function isOverOneYear(expert: Expert): boolean {
   if (expert.status !== 'eliminated' || !expert.observationDate) return false
@@ -269,7 +336,6 @@ async function loadLogs() {
 function visibleLogs(expert: Expert): OpLog[] {
   const list = logsMap.value.get(expert.id) || []
   if (isMaster.value) return list
-  // 子管理员仅可见本人操作
   if (isSubAdmin.value) return list.filter(l => l.operatorId === currentUserId.value)
   return []
 }
@@ -297,10 +363,13 @@ async function onStatusSelect(expert: Expert, val: string) {
 }
 
 async function applyEvaluating(expert: Expert) {
+  const entry = expert.observationDate ? formatDateYMD(expert.observationDate) : formatDateYMD(new Date())
   const updated = await expertApi.update(expert.id, {
     status: 'observation',
     observationStatus: 'evaluating',
-    observationDate: expert.observationDate ? formatDateYMD(expert.observationDate) : formatDateYMD(new Date()),
+    observationDate: entry,
+    scores: { ...(expert.scores || {}), observationDeadline: computeObservationDeadline(entry, expert.scores) },
+    subScores: expert.subScores,
   })
   syncExpert(updated)
   store.recordObservationOperation({
@@ -375,7 +444,12 @@ async function confirmScoreModal() {
   const status = statusForOverall(scores.overall, expert)
   const wasObserving = expert.status === 'observation' || !!expert.observationStatus
   const payload: any = {
-    scores,
+    scores: {
+      ...scores,
+      observationDeadline:
+        (expert.scores && expert.scores.observationDeadline) ||
+        computeObservationDeadline(expert.observationDate, expert.scores),
+    },
     subScores: { professional: { ...scoreModal.prof }, influence: { ...scoreModal.infl } },
   }
   if (expert.status !== 'eliminated') {
@@ -384,7 +458,6 @@ async function confirmScoreModal() {
       payload.observationStatus = wasObserving ? (expert.observationStatus || 'evaluating') : 'evaluating'
       if (!wasObserving) payload.observationDate = formatDateYMD(new Date())
     } else {
-      // 调高至合格分：退出观察库
       payload.observationStatus = null
     }
   }
@@ -432,6 +505,8 @@ async function confirmOpinionModal() {
       status: 'eliminated',
       observationStatus: 'eliminated',
       observationDate: formatDateYMD(new Date()),
+      scores: { ...(expert.scores || {}) },
+      subScores: expert.subScores,
     })
     syncExpert(updated)
     store.recordObservationOperation({
@@ -444,18 +519,24 @@ async function confirmOpinionModal() {
       tags: ['eliminated'],
     })
   } else {
+    // 延期：在当前观察截止日基础上顺延 6 个月，保留入库日期与评分
+    const currentDeadline = computeObservationDeadline(expert.observationDate, expert.scores)
+    const newDeadline = addMonthsToDateYMD(currentDeadline, 6)
+    const entry = expert.observationDate ? formatDateYMD(expert.observationDate) : formatDateYMD(new Date())
     const updated = await expertApi.update(expert.id, {
       status: 'observation',
       observationStatus: 'extended',
-      observationDate: formatDateYMD(new Date()),
+      observationDate: entry,
+      scores: { ...(expert.scores || {}), observationDeadline: newDeadline },
+      subScores: expert.subScores,
     })
     syncExpert(updated)
     store.recordObservationOperation({
       expertId: expert.id,
       expertName: expert.name,
       operation: '延期观察',
-      before: { status: expert.status, observationStatus: expert.observationStatus },
-      after: { status: 'observation', observationStatus: 'extended' },
+      before: { status: expert.status, observationStatus: expert.observationStatus, deadline: currentDeadline },
+      after: { status: 'observation', observationStatus: 'extended', deadline: newDeadline },
       note: opinionModal.opinion.trim(),
       tags: ['extended'],
     })
@@ -507,7 +588,7 @@ onMounted(() => {
 .obs-card.eliminated { background: #fef2f2; border-color: #fecaca; }
 .obs-card.extended { background: #eff6ff; border-color: #bfdbfe; }
 
-.obs-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.obs-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .obs-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .obs-title strong { font-size: 15px; }
 .obs-score { font-size: 12px; color: var(--text-secondary); background: var(--surface); padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border); }
@@ -526,7 +607,18 @@ onMounted(() => {
 .btn-extend { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 .btn-adjust { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
 
-.obs-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.obs-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 12px; margin-bottom: 10px; }
+.meta-cell { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+.meta-label { font-size: 11px; color: var(--text-muted); }
+.meta-val { font-size: 13px; font-weight: 600; color: var(--text); }
+.meta-val.remain-over { color: #dc2626; }
+.meta-val.remain-near { color: #d97706; }
+
+.obs-subscores { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.subscores-title { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.subscore-chip { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--border); }
+.subscore-chip.prof { background: #eff6ff; color: #1d4ed8; }
+.subscore-chip.infl { background: #fef3c7; color: #b45309; }
 
 .year-warning { margin-top: 8px; padding: 8px 12px; background: #fff1f2; border-radius: 6px; font-size: 12px; color: #be123c; }
 

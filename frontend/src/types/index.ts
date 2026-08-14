@@ -40,6 +40,7 @@ export interface Scores {
   influence: number | null
   overall: number | null
   subScores?: SubScores
+  observationDeadline?: string
 }
 
 export interface DimensionSubScores {
