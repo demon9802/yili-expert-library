@@ -17,100 +17,17 @@
 
     <!-- ② 评分配置（规则及文档） -->
     <div class="config-card">
-      <h4>② 评分配置（规则及文档）</h4>
-
-      <div class="doc-embed-head">
-        <div class="doc-embed-title">评分规则 · 五星制</div>
+      <div class="section-title-row">
+        <h4>② 评分配置（规则及文档）</h4>
         <button class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
 
-      <div class="rule-detail-wrap">
-        <table class="rule-detail-table">
-          <thead>
-            <tr><th>维度</th><th>评分项</th><th>每项各占20%</th></tr>
-          </thead>
-          <tbody>
-            <tr class="prof-row">
-              <td class="dimension" rowspan="3">专业度</td>
-              <td>① 学历与学术背景</td>
-              <td rowspan="3">每项各占20%</td>
-            </tr>
-            <tr class="prof-row">
-              <td>② 行业资质与认证</td>
-            </tr>
-            <tr class="prof-row">
-              <td>③ 专业成果与经验</td>
-            </tr>
-            <tr class="infl-row">
-              <td class="dimension" rowspan="2">影响力</td>
-              <td>④ 社会荣誉与奖项</td>
-              <td rowspan="2">每项各占20%</td>
-            </tr>
-            <tr class="infl-row">
-              <td>⑤ 职称、管理履历与行业地位</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="rule-summary">
+        <div class="rule-line prof">专业度：①②③</div>
+        <div class="rule-line infl">影响力：①②</div>
       </div>
 
-      <div class="rule-detail-wrap">
-        <table class="rule-detail-table matrix">
-          <thead>
-            <tr>
-              <th>评分项</th>
-              <th>1★</th>
-              <th>2★</th>
-              <th>3★</th>
-              <th>4★</th>
-              <th>5★</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="item-name">① 学历与学术背景</td>
-              <td>大专 / 中专及以下</td>
-              <td>普通本科（一般院校）</td>
-              <td>较好本科（211 / 双一流）或普通硕士（授课型 / 一般院校）</td>
-              <td>名校硕士（985 / 双一流 / 海外知名）或普通博士</td>
-              <td>博士 + 顶尖院校（清北 / C9 / QS 前 50 等）</td>
-            </tr>
-            <tr>
-              <td class="item-name">② 行业资质与认证</td>
-              <td>无相关认证</td>
-              <td>培训 / 通用认证</td>
-              <td>行业厂商认证（华为 / 微软等）或国家级执业资格（单一）</td>
-              <td>国家级执业 / 行业权威认证（多重领域）</td>
-              <td>国际权威认证（CFA / CPA / ACCA 等）或多项国家级</td>
-            </tr>
-            <tr>
-              <td class="item-name">③ 专业成果与经验</td>
-              <td>一般服务经验 / 仅公开演讲</td>
-              <td>参与级项目 / 普通论文</td>
-              <td>省级 / 行业级项目 · SCI/EI 论文</td>
-              <td>战略级 / 国家级项目 · 顶刊论文</td>
-              <td>标杆级（牵头国标行标 / 高被引 / 重大成果转化）</td>
-            </tr>
-            <tr>
-              <td class="item-name">④ 社会荣誉与奖项</td>
-              <td>无荣誉 / 一般协会成员</td>
-              <td>地市级荣誉 / 国家级学会成员</td>
-              <td>省部级荣誉或称号</td>
-              <td>国家级荣誉或称号</td>
-              <td>顶尖人才（两院院士 / 国家级人才计划）</td>
-            </tr>
-            <tr>
-              <td class="item-name">⑤ 职称、管理履历与行业地位</td>
-              <td>无职称 / 基层岗位</td>
-              <td>经理 / 高工 / 主管（普通企业）</td>
-              <td>副教授 / 总监 / VP / 合伙人（或同级别 · 普通企业）</td>
-              <td>教授 / CEO / 创始人（行业百强 / 大厂）</td>
-              <td>教授 / CEO / 创始人（世界 500 强 / 央企 / 上市公司）</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计。</p>
+      <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2.5★ 计，避免粗糙模型批量误判。</p>
 
       <div class="toggle-row auto-row">
         <label class="inline-check">
@@ -215,7 +132,7 @@
       <div v-else class="warn-banner">
         <span class="warn-icon">⚠</span>
         <div class="warn-text">
-          <strong>共 {{ lowExperts.length }} 位专家综合评分低于 3★</strong>
+          <strong>共 {{ lowExperts.length }} 位专家综合评分低于 3.5★</strong>
           <span>已自动同步至观察库，可前往查看和处理。</span>
         </div>
         <button class="btn btn-warn btn-sm" type="button" @click="goObservation">前往观察库</button>
@@ -232,7 +149,7 @@ import ScoringRulesDocModal from '@/components/admin/ScoringRulesDocModal.vue'
 import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
-import { autoScoreExpert } from '@/utils/scoring'
+import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
 import type { Expert, Scores, SubScores } from '@/types'
 
 const store = useAppStore()
@@ -328,10 +245,14 @@ async function onSubChange(e: Expert, dim: RatingDim, item: string, ev: Event) {
   const inflMap = { ...cur.influence }
   if (dim === 'professional') profMap[item] = v
   else inflMap[item] = v
-  const updated = await expertApi.update(e.id, {
-    scores: computeFromSubs(profMap, inflMap),
+  const scores = computeFromSubs(profMap, inflMap)
+  const payload: any = {
+    scores,
     subScores: { professional: profMap, influence: inflMap },
-  })
+  }
+  const sp = statusPayload(e, scores.overall)
+  if (sp) Object.assign(payload, sp)
+  const updated = await expertApi.update(e.id, payload)
   syncExpert(updated)
 }
 
@@ -363,7 +284,11 @@ async function autoScoreOne(e: Expert) {
   runningId.value = e.id
   try {
     const auto = buildAutoScores(e)
-    const updated = await expertApi.update(e.id, auto)
+    const scores = auto.scores
+    const payload: any = { ...auto }
+    const sp = statusPayload(e, scores.overall)
+    if (sp) Object.assign(payload, sp)
+    const updated = await expertApi.update(e.id, payload)
     syncExpert(updated)
   } finally {
     runningId.value = null
@@ -378,7 +303,11 @@ async function runBatchScoring() {
     let count = 0
     for (const e of store.experts.filter(item => item.status !== 'eliminated')) {
       const auto = buildAutoScores(e)
-      const updated = await expertApi.update(e.id, auto)
+      const scores = auto.scores
+      const payload: any = { ...auto }
+      const sp = statusPayload(e, scores.overall)
+      if (sp) Object.assign(payload, sp)
+      const updated = await expertApi.update(e.id, payload)
       syncExpert(updated)
       count += 1
     }
@@ -426,18 +355,42 @@ function num(v: number | null | undefined): string {
   return v == null ? '-' : `${v.toFixed(1)}★`
 }
 
-const WARN_THRESHOLD = 3
+const WARN_THRESHOLD = OBSERVATION_THRESHOLD
 const lowExperts = computed(() =>
   store.experts.filter(e => e.status !== 'eliminated' && (e.scores?.overall ?? 0) < WARN_THRESHOLD)
 )
 
+// 依据综合分计算动态展示状态（与观察库阈值一致），供打分写入时合并进 payload。
+function statusPayload(e: Expert, overall: number | null): Partial<Expert> | null {
+  if (e.status === 'eliminated') return null
+  if (overall != null && overall >= OBSERVATION_THRESHOLD) {
+    return { status: 'active', observationStatus: null }
+  }
+  const wasObserving = e.status === 'observation' || !!e.observationStatus
+  return {
+    status: 'observation',
+    observationStatus: wasObserving ? (e.observationStatus || 'evaluating') : 'evaluating',
+    observationDate: wasObserving && e.observationDate ? e.observationDate : new Date().toISOString(),
+  }
+}
+
 async function moveToObservation(e: Expert) {
+  const wasObserving = e.status === 'observation' || !!e.observationStatus
   const updated = await expertApi.update(e.id, {
     status: 'observation',
-    observationStatus: 'evaluating',
-    observationDate: new Date().toISOString(),
+    observationStatus: wasObserving ? e.observationStatus || 'evaluating' : 'evaluating',
+    observationDate: wasObserving && e.observationDate ? e.observationDate : new Date().toISOString(),
   })
   syncExpert(updated)
+  store.recordObservationOperation({
+    expertId: e.id,
+    expertName: e.name,
+    operation: '移入观察库',
+    before: { status: e.status, observationStatus: e.observationStatus },
+    after: { status: 'observation', observationStatus: 'evaluating' },
+    note: '从评分管理移入观察库',
+    tags: ['observation'],
+  })
   openDropdownId.value = null
 }
 
@@ -486,29 +439,21 @@ const vClickOutside = {
 .inline-hint { margin: 0; }
 .adjust-hint { margin-bottom: 12px; }
 
-.doc-embed-head {
+.section-title-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
-.doc-embed-title { font-size: 14px; font-weight: 700; color: var(--text); }
-.doc-link { border: none; background: transparent; color: #2563eb; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.section-title-row h4 { margin: 0; }
+.doc-link { border: 1px solid var(--border); background: #fff; color: #2563eb; padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.doc-link:hover { background: #eff6ff; }
 
-.rule-detail-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
-.rule-detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 600px; }
-.rule-detail-table th, .rule-detail-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-.rule-detail-table th { background: var(--surface); color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
-.rule-detail-table tr:last-child td { border-bottom: none; }
-.rule-detail-table .dimension { width: 72px; font-weight: 700; text-align: center; vertical-align: middle; }
-.rule-detail-table .prof-row { background: #eff6ff; }
-.rule-detail-table .prof-row .dimension { color: #1e40af; background: #dbeafe; }
-.rule-detail-table .infl-row { background: #fffbeb; }
-.rule-detail-table .infl-row .dimension { color: #b45309; background: #fef3c7; }
-.rule-detail-table .item-name { font-weight: 600; white-space: nowrap; }
-.rule-detail-table.matrix { min-width: 900px; }
-.rule-detail-table.matrix td { font-size: 12px; line-height: 1.45; }
+.rule-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.rule-line { font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); }
+.rule-line.prof { background: #eff6ff; color: #1e40af; border-color: #dbeafe; }
+.rule-line.infl { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 
 .missing-tip { margin: 0 0 12px; padding: 8px 10px; border-radius: 6px; background: #fefce8; color: #854d0e; font-size: 12px; }
 .auto-row { margin-top: 4px; }

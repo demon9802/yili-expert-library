@@ -14,7 +14,8 @@ import { authApi } from '@/api/auth'
 import { settingApi } from '@/api/setting'
 import { setToken, removeToken, getToken } from '@/api/request'
 import { lsGet, lsSet, lsRemove, debounce } from '@/utils/helpers'
-import { autoScoreExpert } from '@/utils/scoring'
+import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
+import { observationApi } from '@/api/observation'
 
 const STORAGE_KEY = 'yili_expert_db'
 const SEARCH_HISTORY_KEY = 'yili_search_history'
@@ -397,12 +398,75 @@ export const useAppStore = defineStore('app', () => {
     experts.value = experts.value.filter(e => e.id !== id)
   }
 
+  // ===== 观察库操作记录 =====
+  // 记录一次观察库操作（移入/淘汰/延期/调分等），后端不可用时静默失败不影响主操作。
+  async function recordObservationOperation(payload: {
+    expertId: number
+    expertName: string
+    operation: string
+    before: Record<string, any>
+    after: Record<string, any>
+    note: string
+    tags?: string[]
+  }) {
+    const user = currentUser.value
+    try {
+      await observationApi.create({
+        expertId: payload.expertId,
+        expertName: payload.expertName,
+        operation: payload.operation,
+        operatorId: user ? String(user.id) : 'system',
+        operatorName: user?.email || 'system',
+        operatorRole: user?.role || 'unknown',
+        beforeState: JSON.stringify(payload.before ?? {}),
+        afterState: JSON.stringify(payload.after ?? {}),
+        note: payload.note || '',
+        tags: payload.tags || [],
+        createdAt: new Date().toISOString(),
+      } as any)
+    } catch (e) {
+      console.warn('记录观察库操作失败（不影响主操作）', e)
+    }
+  }
+
+  // 依据综合分计算专家展示状态（动态流动）。已淘汰的不覆盖。
+  // 返回 status / obsStatus（调高至合格分时 obsStatus=null 表示退出观察库）/ enteringObservation（是否新进入观察）。
+  function statusFromScores(overall: number, currentStatus: string, currentObsStatus: string | null) {
+    if (currentStatus === 'eliminated') {
+      return { status: 'eliminated' as string, obsStatus: currentObsStatus, enteringObservation: false }
+    }
+    if (overall >= OBSERVATION_THRESHOLD) {
+      // 合格：退出观察库
+      return { status: 'active' as string, obsStatus: null, enteringObservation: false }
+    }
+    const wasObserving = currentStatus === 'observation' || !!currentObsStatus
+    return {
+      status: 'observation' as string,
+      obsStatus: wasObserving ? (currentObsStatus || 'evaluating') : 'evaluating',
+      enteringObservation: !wasObserving,
+    }
+  }
+
+  // 把状态结论合并进更新 payload
+  function applyStatusPayload(
+    payload: Partial<Expert>,
+    overall: number,
+    currentStatus: string,
+    currentObsStatus: string | null
+  ) {
+    if (currentStatus === 'eliminated') return
+    const { status, obsStatus, enteringObservation } = statusFromScores(overall, currentStatus, currentObsStatus)
+    payload.status = status
+    payload.observationStatus = obsStatus
+    if (enteringObservation) payload.observationDate = new Date().toISOString()
+  }
+
   // ===== 自动评分 =====
   async function autoScoreExpertById(id: number) {
     const idx = experts.value.findIndex(e => e.id === id)
     if (idx < 0) return null
     const result = autoScoreExpert(experts.value[idx], yiliProjects.value)
-    const updated = await expertApi.update(id, {
+    const payload: Partial<Expert> = {
       scores: {
         professional: result.professional,
         influence: result.influence,
@@ -412,16 +476,19 @@ export const useAppStore = defineStore('app', () => {
         professional: result.professionalItems,
         influence: result.influenceItems,
       },
-    })
+    }
+    applyStatusPayload(payload, result.overall, experts.value[idx].status, experts.value[idx].observationStatus)
+    const updated = await expertApi.update(id, payload)
     experts.value[idx] = updated
     return result
   }
 
   async function autoScoreAllExperts(): Promise<number> {
-    const items = experts.value.map(e => {
+    let count = 0
+    for (const e of experts.value) {
+      if (e.status === 'eliminated') continue
       const result = autoScoreExpert(e, yiliProjects.value)
-      return {
-        id: e.id,
+      const payload: Partial<Expert> = {
         scores: {
           professional: result.professional,
           influence: result.influence,
@@ -430,14 +497,15 @@ export const useAppStore = defineStore('app', () => {
             professional: result.professionalItems,
             influence: result.influenceItems,
           },
-        }
+        },
       }
-    })
-    const updated = await expertApi.bulkUpdateScores(items)
-    // 刷新本地数据
-    const data = await appDataApi.loadAppData()
-    experts.value = data.experts || []
-    return updated
+      applyStatusPayload(payload, result.overall, e.status, e.observationStatus)
+      const updated = await expertApi.update(e.id, payload)
+      const idx = experts.value.findIndex(x => x.id === e.id)
+      if (idx >= 0) experts.value[idx] = updated
+      count += 1
+    }
+    return count
   }
 
   // ===== 项目 CRUD =====
@@ -602,7 +670,7 @@ export const useAppStore = defineStore('app', () => {
     filteredExperts, totalPages, paginatedExperts, isMaster, isSubAdmin,
     // Actions
     loadAppData, checkAuthState, login, signUp, logout,
-    saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts,
+    saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts, recordObservationOperation,
     saveProject, deleteProject,
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
     setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, applyColorScheme,

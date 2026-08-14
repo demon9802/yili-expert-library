@@ -33,8 +33,8 @@
         </div>
       </div>
       <div class="sort-row">
-        <span class="sort-label">排序</span>
         <div class="sort-buttons" role="group" aria-label="项目排序">
+          <span class="sort-prefix">排序</span>
           <button
             v-for="option in sortOptions"
             :key="option.value"
@@ -663,9 +663,9 @@ function importProjectsFromFile(file: File) {
 .search-input { flex: 1; max-width: 280px; min-width: 180px; padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
 .search-input:focus { outline: none; border-color: var(--primary); }
 .filter-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--surface); min-width: 118px; }
-.sort-row { display: flex; align-items: center; gap: 8px; }
-.sort-label { color: var(--text-muted); font-size: 12px; }
+.sort-row { display: flex; align-items: center; }
 .sort-buttons { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.sort-prefix { color: var(--text-muted); font-size: 12px; padding: 5px 6px 5px 9px; user-select: none; border-right: 1px solid var(--border); margin-right: 2px; }
 .sort-btn { border: 0; background: transparent; color: var(--text-secondary); padding: 5px 9px; border-radius: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .sort-btn:hover { background: var(--bg); color: var(--text); }
 .sort-btn.active { background: var(--primary); color: #fff; }

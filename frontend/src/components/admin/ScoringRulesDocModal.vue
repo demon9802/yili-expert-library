@@ -7,19 +7,11 @@
       </div>
       <div class="doc-body">
         <h4>一、评分结构与计算</h4>
-        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项，每项占20%。</p>
-        <table class="doc-table">
-          <thead>
-            <tr><th>维度</th><th>评分项</th></tr>
-          </thead>
-          <tbody>
-            <tr><td class="dim" rowspan="3">专业度</td><td>① 学历与学术背景</td></tr>
-            <tr><td>② 行业资质与认证</td></tr>
-            <tr><td>③ 专业成果与经验</td></tr>
-            <tr><td class="dim" rowspan="2">影响力</td><td>④ 社会荣誉与奖项</td></tr>
-            <tr><td>⑤ 职称、管理履历与行业地位</td></tr>
-          </tbody>
-        </table>
+        <div class="rule-summary">
+          <div class="rule-line prof">专业度：①②③</div>
+          <div class="rule-line infl">影响力：①②</div>
+        </div>
+        <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项。综合评分 = 专业度 × 60% + 影响力 × 40%。</p>
         <h4>二、评分规则</h4>
         <table class="doc-table matrix">
           <thead>
@@ -75,7 +67,7 @@
             </tr>
           </tbody>
         </table>
-        <p class="missing">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计。</p>
+        <p class="missing">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2.5★ 计，避免粗糙模型批量误判。</p>
 
         <h4>三、测算</h4>
         <table class="doc-table">
@@ -83,13 +75,13 @@
             <tr><th>情形</th><th>①</th><th>②</th><th>③</th><th>④</th><th>⑤</th><th>综合得分</th><th>是否进观察库</th></tr>
           </thead>
           <tbody>
-            <tr><td>全部缺失（默认 2★）</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2</td><td>2.0</td><td class="bad">是</td></tr>
-            <tr><td>1 项信息缺失，其余中等</td><td>2</td><td>3</td><td>3</td><td>3</td><td>3</td><td>2.8</td><td class="bad">是</td></tr>
-            <tr><td>2 项信息缺失，其余中等</td><td>2</td><td>2</td><td>3</td><td>3</td><td>3</td><td>2.6</td><td class="bad">是</td></tr>
+            <tr><td>全部缺失（默认 2.5★）</td><td>2.5</td><td>2.5</td><td>2.5</td><td>2.5</td><td>2.5</td><td>2.5</td><td class="bad">是</td></tr>
+            <tr><td>1 项信息缺失，其余中等</td><td>2.5</td><td>3</td><td>3</td><td>3</td><td>3</td><td>2.9</td><td class="bad">是</td></tr>
+            <tr><td>2 项信息缺失，其余中等</td><td>2.5</td><td>2.5</td><td>3</td><td>3</td><td>3</td><td>2.8</td><td class="bad">是</td></tr>
             <tr><td>中等水平（各项 3★）</td><td>3</td><td>3</td><td>3</td><td>3</td><td>3</td><td>3.0</td><td class="good">否（达标线）</td></tr>
             <tr><td>良好水平（各项 4★）</td><td>4</td><td>4</td><td>4</td><td>4</td><td>4</td><td>4.0</td><td class="good">否</td></tr>
-            <tr><td>专业度强、影响力弱</td><td>5</td><td>5</td><td>5</td><td>2</td><td>2</td><td>3.8</td><td class="good">否</td></tr>
-            <tr><td>专业度弱、影响力强</td><td>2</td><td>2</td><td>2</td><td>5</td><td>5</td><td>3.2</td><td class="good">否</td></tr>
+            <tr><td>专业度强、影响力弱</td><td>5</td><td>5</td><td>5</td><td>2.5</td><td>2.5</td><td>4.0</td><td class="good">否</td></tr>
+            <tr><td>专业度弱、影响力强</td><td>2.5</td><td>2.5</td><td>2.5</td><td>5</td><td>5</td><td>3.5</td><td class="good">否</td></tr>
           </tbody>
         </table>
       </div>
@@ -152,6 +144,10 @@ const emit = defineEmits<{ close: [] }>()
   padding-bottom: 6px;
 }
 .doc-body h4:first-child { margin-top: 0; }
+.rule-summary { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.rule-line { font-size: 15px; font-weight: 600; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); }
+.rule-line.prof { background: #eff6ff; color: #1e40af; border-color: #dbeafe; }
+.rule-line.infl { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 .dim-lead { margin: 0 0 12px; color: #64748b; }
 .formula { margin: 12px 0 0; padding: 10px 14px; background: #f8fafc; border-radius: 6px; color: #475569; }
 .missing { margin: 12px 0 0; padding: 8px 12px; background: #fefce8; border-radius: 6px; color: #854d0e; }

@@ -149,9 +149,9 @@ function shortFieldName(name: string) {
 // 分值分布（V5.9.5 五星制：按综合评分区间统计活跃专家）
 const buckets = [
   { label: '4.5-5.0分', min: 4.5, max: 5.0, includeMax: true },
-  { label: '4.0-4.5分', min: 4.0, max: 4.5 },
-  { label: '3.5-4.0分', min: 3.5, max: 4.0 },
-  { label: '3.0-3.5分', min: 3.0, max: 3.5 }
+  { label: '4.0-4.5分（不含4.5）', min: 4.0, max: 4.5 },
+  { label: '3.5-4.0分（不含4.0）', min: 3.5, max: 4.0 },
+  { label: '3.0-3.5分（不含3.5）', min: 3.0, max: 3.5 }
 ]
 const colors = ['#22c55e', '#86efac', '#f59e0b', '#f97316']
 

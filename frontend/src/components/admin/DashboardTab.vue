@@ -136,9 +136,9 @@ const avgOverall = computed(() => avgScore('overall'))
 
 const scoreRanges = [
   { range: '4.5-5.0分', min: 4.5, max: 5.0, color: '#22c55e' },
-  { range: '4.0-4.5分', min: 4.0, max: 4.5, color: '#86efac' },
-  { range: '3.5-4.0分', min: 3.5, max: 4.0, color: '#f59e0b' },
-  { range: '3.0-3.5分', min: 3.0, max: 3.5, color: '#f97316' },
+  { range: '4.0-4.5分（不含4.5）', min: 4.0, max: 4.5, color: '#86efac' },
+  { range: '3.5-4.0分（不含4.0）', min: 3.5, max: 4.0, color: '#f59e0b' },
+  { range: '3.0-3.5分（不含3.5）', min: 3.0, max: 3.5, color: '#f97316' },
 ]
 
 const scoreDistItems = computed(() => {

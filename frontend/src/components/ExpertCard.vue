@@ -116,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project, ContactInfo } from '@/types'
 import { isNarrowScreen, contactTypeIcon, formatPhoneDisplay, resolveContactType } from '@/utils/helpers'
@@ -136,6 +136,15 @@ const store = useAppStore()
 
 const activeContact = ref<ContactInfo | null>(null)
 const contactAnchor = ref<{ x: number; y: number }>({ x: 0, y: 0 })
+const narrowScreen = ref(isNarrowScreen())
+const windowWidth = ref(window.innerWidth)
+
+function onResize() {
+  windowWidth.value = window.innerWidth
+  narrowScreen.value = isNarrowScreen()
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onUnmounted(() => window.removeEventListener('resize', onResize))
 
 function openContact(m: ContactInfo, e: MouseEvent) {
   contactAnchor.value = { x: e.clientX, y: e.clientY }
@@ -149,7 +158,7 @@ const surname = computed(() => props.expert.name.charAt(0))
 const cardDisplayName = computed(() => {
   const name = props.expert.name
   if (name.length <= 6) return name
-  if (window.innerWidth <= 480) return name.slice(0, 4) + '…'
+  if (windowWidth.value <= 480) return name.slice(0, 4) + '…'
   return name
 })
 
@@ -172,7 +181,7 @@ function fieldStyle(fieldName: string) {
 }
 
 function displayFieldName(name: string) {
-  if (isNarrowScreen()) {
+  if (narrowScreen.value) {
     if (name.startsWith('通用')) return '通用…'
     if (name.startsWith('战略') || name.includes('战略规划') || name.includes('战略解码') || name.includes('战略落地')) return '战略…'
     if (name.length > 4) return name.slice(0, 2) + '…'

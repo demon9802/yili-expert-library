@@ -465,59 +465,63 @@ function toggleMobileMode() {
    按钮沿用 V5 实心描边质感（border + surface 背景 + 13px），并整体压缩高度。 */
 .page-navigation-float {
   position: fixed;
-  bottom: 8px;
-  left: 50%;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 888;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 999px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
   opacity: 0;
-  transform: translateX(-50%) translateY(100%);
+  transform: translateY(100%);
   transition: opacity 0.3s ease, transform 0.3s ease;
   pointer-events: none;
 }
 .page-navigation-float.visible {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 .page-navigation-float :deep(.page-navigation-inline) {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .page-navigation-float :deep(.page-nav-inline-btn) {
-  padding: 0 8px;
-  height: 22px;
-  font-size: 11px;
-  line-height: 22px;
+  padding: 0 10px;
+  height: 28px;
+  font-size: 12px;
+  line-height: 28px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--surface);
+  background: #ffffff;
   color: var(--primary);
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   transition: all var(--transition);
 }
+.page-navigation-float :deep(.page-nav-inline-btn.disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .page-navigation-float :deep(.page-nav-inline-num) {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 3px;
-  font-size: 11px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  font-size: 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--surface);
+  background: #ffffff;
   color: var(--text-secondary);
   font-weight: 500;
   display: inline-flex;
@@ -526,10 +530,32 @@ function toggleMobileMode() {
   cursor: pointer;
   transition: all var(--transition);
 }
+.page-navigation-float :deep(.page-nav-inline-num.active) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
 .page-navigation-float :deep(.page-nav-inline-info) {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-left: 4px;
   white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .page-navigation-float {
+    padding: 5px 8px;
+  }
+  .page-navigation-float :deep(.page-navigation-inline) {
+    gap: 4px;
+  }
+  .page-navigation-float :deep(.page-nav-inline-btn),
+  .page-navigation-float :deep(.page-nav-inline-num) {
+    height: 26px;
+    font-size: 11px;
+    line-height: 26px;
+  }
+  .page-navigation-float :deep(.page-nav-inline-num) {
+    min-width: 26px;
+  }
 }
 </style>

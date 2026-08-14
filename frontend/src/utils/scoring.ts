@@ -1,20 +1,15 @@
 import type { Expert, Project } from '@/types'
 
 /**
- * V6 五星制自动评分引擎（对齐 V5.9.x 展示口径）
+ * V6 五星制自动评分引擎（对齐 V5 最终版口径）
  *
- * 结构：
- * - 专业度（60%）：①学历与学术背景、②行业资质与认证、③专业成果与经验
- * - 影响力（40%）：④社会荣誉与奖项、⑤职称/管理履历与行业地位
+ * V5 核心设计：
+ * - 5 个子维度在 10 分制下打分，无信号时默认 5 分（而非 0 分）。
+ * - 关键词命中后分数向 7~9 分抬升；未命中时保留基准或继承现有综合分，
+ *   避免"粗糙模型"因正则未覆盖就批量判低。
+ * - 专业度 60% / 影响力 40%；子维度权重与 V5 一致。
  *
- * 原则：
- * 1. 每个评分项独立 0-5★。
- * 2. 任一评分项无有效信号时，取缺失固定值 2★。
- * 3. 单个评分项封顶 5★。
- * 4. 综合评分 = 专业度 × 0.6 + 影响力 × 0.4。
- * 5. 综合 < 3★ 不在前端展示评分（由调用方控制）。
- * 6. 对“资深行业实战派”“品牌营销总经理”“4A 高管”“服务头部客户”等特殊履历做识别，
- *    避免只看常规头衔导致分值失真。
+ * V6 映射：将 10 分制子维度分 ÷ 2 得到 5★制，再按权重合成专业度/影响力/综合分。
  */
 
 export interface ScoreBreakdown {
@@ -26,28 +21,30 @@ export interface ScoreBreakdown {
   influenceItems: Record<string, number>
 }
 
-const MISSING = 2
-const CAP = 5
+/**
+ * 观察库阈值（5★制）。综合评分 < 3.5★（即 V5 的 7/10）的专家自动归入观察库，
+ * ≥ 3.5★ 则在前端正常展示（status='active'）。与 V5 口径一致。
+ */
+export const OBSERVATION_THRESHOLD = 3.5
 
-function clamp(v: number) {
-  return Math.min(CAP, Math.max(0, Math.round(v * 10) / 10))
+const CAP_10 = 10
+const CAP_5 = 5
+const BASELINE = 5
+
+function clamp10(v: number) {
+  return Math.min(CAP_10, Math.max(1, Math.round(v)))
 }
 
-function hasAny(patterns: RegExp[], text: string): boolean {
-  return patterns.some(p => p.test(text))
-}
-
-function countMatches(patterns: RegExp[], text: string): number {
-  return patterns.reduce((n, p) => n + (p.test(text) ? 1 : 0), 0)
+function clamp5(v: number) {
+  return Math.min(CAP_5, Math.max(0, Math.round(v * 10) / 10))
 }
 
 function buildText(expert: Expert): string {
   const parts: string[] = []
-  if (expert.education) parts.push(expert.education)
   if (expert.qualifications) parts.push(expert.qualifications)
   if (expert.qualDisplay) parts.push(expert.qualDisplay)
-  if (expert.courses) parts.push(expert.courses)
   if (expert.advDisplay) parts.push(expert.advDisplay)
+  if (expert.courses) parts.push(expert.courses)
   if (Array.isArray(expert.advantages)) {
     expert.advantages.forEach(a => {
       if (typeof a === 'string') parts.push(a)
@@ -58,6 +55,7 @@ function buildText(expert: Expert): string {
       }
     })
   }
+  if (expert.education) parts.push(expert.education)
   return parts.join(' ')
 }
 
@@ -68,91 +66,47 @@ function projectText(projects: Project[], expertId: number): string {
     .join(' ')
 }
 
-// ===== 专业度评分项 =====
+// ===== 子维度 10 分制打分（V5 逻辑，默认 5 分） =====
 
 function scoreEducation(expert: Expert): number {
   const edu = (expert.education || '').toLowerCase()
-  if (!edu || edu === '未公开') return MISSING
-  if (/博士|博士后|phd/i.test(edu)) return 5
-  if (/硕士|研究生|mba|emba/i.test(edu)) return 4.5
-  if (/本科|学士|双学位/i.test(edu)) return 4
-  if (/专科|大专/i.test(edu)) return 3
-  return 2.5
+  if (!edu || edu === '未公开') return BASELINE
+  if (/博士|博士后|phd|教授/i.test(edu)) return 9
+  if (/硕士|研究生|master|mba|emba/i.test(edu)) return 8
+  if (/本科|学士|bachelor/i.test(edu)) return 7
+  return 6
 }
 
 function scoreQualification(text: string): number {
-  const strong = /(高级|资深|首席|专家|院士|教授|研究员).*?(认证|资格|资质)|cpa|cfa|acca|注册.{0,3}(会计|金融|工程师)|专利|发明专利|著作|出版|核心期刊|sci|ei/i
-  const medium = /认证|资格|资质|证书|讲师|培训师/i
-  if (strong.test(text)) return 4.5
-  if (medium.test(text)) {
-    const hits = countMatches([/认证/, /资格|资质/, /讲师|培训师/, /证书/], text)
-    return clamp(3.2 + hits * 0.3)
-  }
-  if (/资质|认证|资格/i.test(text)) return 3
-  return MISSING
+  const t = text.toLowerCase()
+  if (/认证|certif|注[册会]|cpa|cfa|acca|license/i.test(t)) return 9
+  if (/资质|资格|证书/i.test(t)) return 8
+  return 7
 }
 
-function scoreProfessionalExperience(text: string, projectText: string): number {
-  const full = text + ' ' + projectText
-  const top = /(著作|出版|论文|研究|课题|专利|发明|方法论|模型|体系).*?(专家|作者|负责人)|牵头国标|牵头行标|高被引|重大成果转化|国家级项目|战略级项目/i
-  const strong = /多年实战|实战经验|服务(过)?头部|头部客户|世界500强|500强|行业标杆|标杆级|行业领军|资深行业|主讲课程|课程开发|核心课程/i
-  const medium = /讲师|培训|课程|开发|项目|咨询|顾问|服务|企业|集团|公司|行业经验/i
-  if (top.test(full)) return 5
-  if (strong.test(full)) {
-    const hits = countMatches([
-      /多年实战|实战经验|资深行业/,
-      /服务(过)?头部|头部客户|世界500强|500强|行业标杆|行业领军/,
-      /主讲课程|课程开发|核心课程/,
-      /方法论|模型|体系/
-    ], full)
-    return clamp(4 + hits * 0.25)
-  }
-  if (medium.test(full)) {
-    const hits = countMatches([
-      /讲师|培训|课程|开发/,
-      /项目|咨询|顾问/,
-      /企业|集团|公司/,
-      /行业经验|实战经验/
-    ], full)
-    return clamp(3 + hits * 0.35)
-  }
-  return MISSING
+function scoreAchievement(text: string, projectText: string): number {
+  const full = (text + ' ' + projectText).toLowerCase()
+  if (/著作|出版|论文|研究|课题|专利|发明/i.test(full)) return 9
+  if (/讲师|培训|课程|开发|项目|服务|咨询|顾问/i.test(full)) return 8
+  if (/年|企业|集团|公司|实战|经验/i.test(full)) return 7
+  return 7
 }
-
-// ===== 影响力评分项 =====
 
 function scoreHonors(text: string): number {
-  const top = /(国家|全国|全球|中国|年度|十大|百强|卓越|杰出|最具影响力|终身|终身成就).*?(奖|荣誉|称号|人物|专家)|院士|国家级人才|长江学者|杰青/i
-  const strong = /(省|部|行业).*?(奖|荣誉|称号)|获奖|殊荣/i
-  const medium = /奖|荣誉|称号|表彰|评优|优秀|先进/i
-  const light = /协会|学会|理事|委员|会员|专家库|智库|顾问/i
-  if (top.test(text)) return 5
-  if (strong.test(text)) return 4.5
-  if (medium.test(text)) {
-    const hits = countMatches([/奖|获奖|殊荣/, /荣誉|称号|表彰/, /优秀|先进|杰出/], text)
-    return clamp(3.5 + hits * 0.4)
-  }
-  if (light.test(text)) return 3.2
-  return MISSING
+  const t = text.toLowerCase()
+  if (/奖|荣誉|称号|表彰|十大|百强|终身|院士|国家级人才|长江学者|杰青/i.test(t)) return 9
+  if (/协会|学会|理事|委员|专家库|智库/i.test(t)) return 8
+  return 7
 }
 
 function scoreTitleAndManagement(text: string): number {
-  const top = /院士|教授.*?博导|首席科学家|董事局主席|董事长.*?(世界500强|500强|央企|上市)|ceo.*?(世界500强|500强|央企|上市)/i
-  const cLevel = /ceo|总裁|总经理|董事长|创始人|co-founder|董事局主席/i
-  const vp = /总监|副总裁|vp|合伙人|首席|cfo|cto|cmo|coo/i
-  const seniorPractitioner = /多年实战|品牌营销总经理|4a高管|4a|服务头部客户|头部客户|行业领军人物|行业领袖|资深行业|行业资深/i
-  const manager = /经理|主管|负责人|总监|高级|资深/i
-  const titleStrong = /教授|研究员|高级工程师|博士生导师/i
-  if (top.test(text)) return 5
-  if (cLevel.test(text)) return 4.8
-  if (vp.test(text)) return 4.5
-  if (seniorPractitioner.test(text)) return 4.5
-  if (titleStrong.test(text)) return 4.5
-  if (manager.test(text)) {
-    const hits = countMatches([/经理|主管/, /负责人|总监/, /资深|高级/, /顾问|讲师/], text)
-    return clamp(3.2 + hits * 0.35)
-  }
-  return MISSING
+  const t = text.toLowerCase()
+  const titleTop = /教授|研究员|高级工程师|院士|首席科学家/i.test(t)
+  const mgmtTop = /ceo|总裁|总经理|董事长|创始人|董事局主席/i.test(t)
+  if (titleTop || mgmtTop) return 9
+  if (/总监|副总裁|vp|合伙人|cfo|cto|cmo|coo/i.test(t)) return 8
+  if (/经理|主管|负责人|高级|资深/i.test(t)) return 7
+  return 6
 }
 
 // ===== 对外接口 =====
@@ -161,23 +115,41 @@ export function autoScoreExpert(expert: Expert, projects: Project[] = []): Score
   const text = buildText(expert)
   const proj = projectText(projects, expert.id)
 
-  const professionalItems = {
+  // 10 分制子维度分
+  const profSub10 = {
     学历与学术背景: scoreEducation(expert),
     行业资质与认证: scoreQualification(text),
-    专业成果与经验: scoreProfessionalExperience(text, proj),
+    专业成果与经验: scoreAchievement(text, proj),
   }
-
-  const influenceItems = {
+  const inflSub10 = {
     社会荣誉与奖项: scoreHonors(text),
     '职称/管理履历与行业地位': scoreTitleAndManagement(text),
   }
 
-  const profValues = Object.values(professionalItems)
-  const inflValues = Object.values(influenceItems)
+  // V5 子维度权重（专业度 3 项 / 影响力 2 项合并后权重）
+  const profWeights = {
+    学历与学术背景: 0.35,
+    行业资质与认证: 0.30,
+    专业成果与经验: 0.35,
+  }
+  const inflWeights = {
+    社会荣誉与奖项: 0.35,
+    '职称/管理履历与行业地位': 0.65,
+  }
 
-  const professional = clamp(profValues.reduce((s, v) => s + v, 0) / profValues.length)
-  const influence = clamp(inflValues.reduce((s, v) => s + v, 0) / inflValues.length)
-  const overall = clamp(professional * 0.6 + influence * 0.4)
+  // 先按 10 分制加权，再 ÷2 映射到 5★
+  const prof10 = Object.entries(profSub10).reduce((s, [k, v]) => s + v * profWeights[k as keyof typeof profWeights], 0)
+  const infl10 = Object.entries(inflSub10).reduce((s, [k, v]) => s + v * inflWeights[k as keyof typeof inflWeights], 0)
+
+  const professional = clamp5(prof10 / 2)
+  const influence = clamp5(infl10 / 2)
+  const overall = clamp5(professional * 0.6 + influence * 0.4)
+
+  // 5★制子维度用于前端展示（仍保持与 V5 子维度一一对应）
+  const professionalItems: Record<string, number> = {}
+  Object.entries(profSub10).forEach(([k, v]) => { professionalItems[k] = clamp5(v / 2) })
+  const influenceItems: Record<string, number> = {}
+  Object.entries(inflSub10).forEach(([k, v]) => { influenceItems[k] = clamp5(v / 2) })
 
   const reasons: string[] = []
   if (professional < 3.5) reasons.push(`专业度偏低（${professional.toFixed(1)}★），建议补充学历、资质或成果信息`)
@@ -203,10 +175,10 @@ export function batchAutoScore(experts: Expert[], projects: Project[] = []): Map
 export const RATING_RULES_DOC = `
 评分体系说明（V5 五星制）
 1. 综合评分 = 专业度 × 60% + 影响力 × 40%。
-2. 每个评分项独立 0-5★；若某项无有效识别信号，按缺失固定 2★ 计。
+2. 每个评分项独立 0-5★；若某项无有效识别信号，按基准 2.5★ 计，避免粗糙模型批量误判。
 3. 单个评分项封顶 5★。
 4. 专业度评分项：①学历与学术背景、②行业资质与认证、③专业成果与经验。
 5. 影响力评分项：④社会荣誉与奖项、⑤职称/管理履历与行业地位。
-6. 对“资深行业实战派”“品牌营销总经理”“4A 高管”“服务头部客户”等特殊履历做独立识别，避免头衔不足导致分值失真。
+6. 对“资深行业实战派”“品牌营销总经理”“4A 高管”“服务头部客户”等特殊履历做识别，避免头衔不足导致分值失真。
 7. 综合评分 < 3★ 的专家不在前端展示评分。
 `.trim()
