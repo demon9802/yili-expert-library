@@ -27,6 +27,61 @@
         <div class="rule-line">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
       </div>
 
+      <table class="rating-matrix">
+        <thead>
+          <tr>
+            <th>评分项</th>
+            <th>1★</th>
+            <th>2★</th>
+            <th>3★</th>
+            <th>4★</th>
+            <th>5★</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>① 学历与学术背景</td>
+            <td>大专 / 中专及以下</td>
+            <td>普通本科（一般院校）</td>
+            <td>较好本科（211 / 双一流）或普通硕士（授课型 / 一般院校）</td>
+            <td>名校硕士（985 / 双一流 / 海外知名）或普通博士</td>
+            <td>博士 + 顶尖院校（清北 / C9 / QS 前 50 等）</td>
+          </tr>
+          <tr>
+            <td>② 行业资质与认证</td>
+            <td>无相关认证</td>
+            <td>培训 / 通用认证</td>
+            <td>行业厂商认证（华为 / 微软等）或国家级执业资格（单一）</td>
+            <td>国家级执业 / 行业权威认证（多重领域）</td>
+            <td>国际权威认证（CFA / CPA / ACCA 等）或多项国家级</td>
+          </tr>
+          <tr>
+            <td>③ 专业成果与经验</td>
+            <td>一般服务经验 / 仅公开演讲</td>
+            <td>参与级项目 / 普通论文</td>
+            <td>省级 / 行业级项目 · SCI/EI 论文</td>
+            <td>战略级 / 国家级项目 · 顶刊论文</td>
+            <td>标杆级（牵头国标行标 / 高被引 / 重大成果转化）</td>
+          </tr>
+          <tr>
+            <td>④ 社会荣誉与奖项</td>
+            <td>无荣誉 / 一般协会成员</td>
+            <td>地市级荣誉 / 国家级学会成员</td>
+            <td>省部级荣誉或称号</td>
+            <td>国家级荣誉或称号</td>
+            <td>顶尖人才（两院院士 / 国家级人才计划）</td>
+          </tr>
+          <tr>
+            <td>⑤ 职称/管理履历与行业地位</td>
+            <td>无职称 / 基层岗位</td>
+            <td>经理 / 高工 / 主管（普通企业）</td>
+            <td>副教授 / 总监 / VP / 合伙人（或同级别 · 普通企业）</td>
+            <td>教授 / CEO / 创始人（行业百强 / 大厂）</td>
+            <td>教授 / CEO / 创始人（世界 500 强 / 央企 / 上市公司）</td>
+          </tr>
+        </tbody>
+      </table>
+
       <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计，避免粗糙模型批量误判。</p>
 
       <div class="toggle-row auto-row">
@@ -472,6 +527,12 @@ const vClickOutside = {
 .rule-line { font-size: 14px; font-weight: 400; color: var(--text); padding: 2px 0; }
 
 .missing-tip { margin: 0 0 12px; padding: 8px 10px; border-radius: 6px; background: #fefce8; color: #854d0e; font-size: 12px; }
+
+.rating-matrix { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; border: 1px solid var(--border); }
+.rating-matrix th, .rating-matrix td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; line-height: 1.5; }
+.rating-matrix th { background: var(--surface); font-weight: 600; color: var(--text-secondary); }
+.rating-matrix td:first-child { white-space: nowrap; font-weight: 500; }
+.rating-matrix tbody tr:nth-child(even) { background: #f8fafc; }
 .auto-row { margin-top: 4px; }
 
 .quick-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
