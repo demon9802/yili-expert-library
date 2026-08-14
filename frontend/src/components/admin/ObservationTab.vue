@@ -802,7 +802,7 @@ onMounted(() => {
 .log-type.type-other { background: #f1f5f9; color: #475569; }
 .log-empty { font-size: 12px; color: var(--text-muted); padding: 8px 0; }
 
-.log-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; }
+.log-pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 8px; }
 .page-btn { padding: 4px 10px; border: 1px solid var(--border); background: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--text-secondary); }
 .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .page-info { font-size: 12px; color: var(--text-secondary); }
