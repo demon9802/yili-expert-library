@@ -20,7 +20,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 server:
-  port: 9090
+  port: 8080
 
 # 本地环境开启更详细的 SQL 日志，方便调试
 logging:
