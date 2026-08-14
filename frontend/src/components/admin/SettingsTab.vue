@@ -53,50 +53,67 @@
       <!-- 排序标签 -->
       <div class="form-block">
         <label class="form-label">排序标签</label>
-        <p class="input-hint">管理前端展示的排序选项，可新增或删除。</p>
+        <p class="input-hint">勾选将在前端排序下拉中展示，点击名称可直接修改。</p>
         <div class="sort-list">
           <div v-for="(opt, idx) in sortOptionsInput" :key="opt.id" class="sort-item">
-            <span class="sort-name">{{ opt.name }}</span>
+            <label class="sort-check">
+              <input v-model="opt.enabled" type="checkbox" />
+            </label>
+            <input
+              v-model="opt.name"
+              class="sort-name-input"
+              :disabled="!opt.enabled"
+              :placeholder="opt.id"
+            />
             <span class="sort-id">ID: {{ opt.id }}</span>
-            <button
-              v-if="!isDefaultSort(opt.id)"
-              class="btn btn-danger btn-sm"
-              @click="removeSortOption(idx)"
-            >删除</button>
           </div>
         </div>
-        <div class="sort-add-row">
-          <input v-model="newSortName" class="setting-input" placeholder="排序名称" />
-          <input v-model="newSortId" class="setting-input" placeholder="排序ID（英文）" />
-          <button class="btn primary" :disabled="!canAddSort" @click="addSortOption">添加</button>
+      </div>
+    </div>
+
+    <!-- ② 系统环境 -->
+    <div class="setting-card">
+      <h4 class="section-title">② 系统环境</h4>
+
+      <!-- 系统更新时间 -->
+      <div class="form-block">
+        <label class="form-label">系统更新时间</label>
+        <div class="time-row">
+          <span>最近更新：{{ updateTimeText }}</span>
+          <button class="btn" @click="refreshTime">刷新</button>
+        </div>
+      </div>
+
+      <!-- 测试环境 -->
+      <div class="form-block test-mode-block">
+        <label class="form-label">测试环境</label>
+        <button class="btn btn-warning" @click="enterTestMode">进入测试模式</button>
+      </div>
+
+      <!-- 部署信息 -->
+      <div class="form-block">
+        <label class="form-label">部署信息</label>
+        <div class="deploy-info">
+          <div class="deploy-row">
+            <span class="deploy-label">正式链接</span>
+            <a class="deploy-value" :href="DEPLOY_URL" target="_blank" rel="noopener">{{ DEPLOY_URL }}</a>
+          </div>
+          <div class="deploy-row">
+            <span class="deploy-label">代码仓库</span>
+            <a class="deploy-value" :href="REPO_URL" target="_blank" rel="noopener">{{ REPO_URL }}</a>
+          </div>
+          <div class="deploy-row">
+            <span class="deploy-label">数据库</span>
+            <span class="deploy-value">Supabase（新加坡）</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 测试模式 -->
-    <div class="setting-card test-mode-card">
-      <div class="test-mode-header">
-        <span class="test-mode-icon">⚡</span>
-        <span class="test-mode-title">测试模式</span>
-      </div>
-      <p class="section-desc">使用独立数据空间模拟不同角色视角，修改不会影响真实生产数据。支持切换主管理员、子管理员、普通用户三种角色。</p>
-      <button class="btn btn-warning" @click="enterTestMode">进入测试模式</button>
-    </div>
-
-    <!-- ② 系统更新时间 -->
+    <!-- ③ 系统文档 -->
     <div class="setting-card">
-      <h4 class="section-title">② 系统更新时间</h4>
-      <p class="section-desc">记录系统配置与部署的最近更新日期（非专家数据更新时间）。</p>
-      <div class="time-row">
-        <span>最近更新：{{ updateTimeText }}</span>
-        <button class="btn" @click="refreshTime">刷新</button>
-      </div>
-    </div>
-
-    <!-- ③ 数据源 -->
-    <div class="setting-card">
-      <h4 class="section-title">③ 数据源</h4>
-      <p class="section-desc">核心数据来源及版本管理文档，仅供查看。批量导入请通过专家管理页的模板导入进行。</p>
+      <h4 class="section-title">③ 系统文档</h4>
+      <p class="section-desc">系统运维、权限规范、部署操作指引及数据来源文档，持续补充中。</p>
       <div class="doc-list">
         <div class="doc-card">
           <div class="doc-icon folder">📁</div>
@@ -114,14 +131,6 @@
             <a class="doc-link" :href="PROGRESS_SOURCE_URL" target="_blank" rel="noopener">打开进度表</a>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- ④ 系统文档 -->
-    <div class="setting-card">
-      <h4 class="section-title">④ 系统文档</h4>
-      <p class="section-desc">系统运维、权限规范及部署操作指引，持续补充中。</p>
-      <div class="doc-list">
         <div class="doc-card">
           <div class="doc-icon lock">🔒</div>
           <div class="doc-body">
@@ -141,29 +150,9 @@
       </div>
     </div>
 
-    <!-- ⑤ 部署信息 -->
-    <div class="setting-card">
-      <h4 class="section-title">⑤ 部署信息</h4>
-      <p class="section-desc">前端托管于 EdgeOne Pages（腾讯 CDN），数据库使用 Supabase（新加坡节点）。</p>
-      <div class="deploy-info">
-        <div class="deploy-row">
-          <span class="deploy-label">正式链接</span>
-          <a class="deploy-value" :href="DEPLOY_URL" target="_blank" rel="noopener">{{ DEPLOY_URL }}</a>
-        </div>
-        <div class="deploy-row">
-          <span class="deploy-label">代码仓库</span>
-          <a class="deploy-value" :href="REPO_URL" target="_blank" rel="noopener">{{ REPO_URL }}</a>
-        </div>
-        <div class="deploy-row">
-          <span class="deploy-label">数据库</span>
-          <span class="deploy-value">Supabase（新加坡）</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ⑥ 危险操作 -->
+    <!-- ④ 危险操作 -->
     <div class="setting-card danger">
-      <h4 class="section-title">⑥ 危险操作</h4>
+      <h4 class="section-title">④ 危险操作</h4>
       <p class="section-desc">清除本地缓存会移除浏览器中保存的收藏等本地数据，并重新从服务器加载。不会删除服务器上的专家数据。</p>
       <button class="btn danger" @click="clearCache">重置所有数据</button>
     </div>
@@ -191,10 +180,14 @@ const message = ref('')
 
 const schemes = computed(() => store.COLOR_SCHEMES)
 
-const defaultSortIds = ['default', 'overall', 'professional', 'influence']
-const sortOptionsInput = ref<{ id: string; name: string }[]>([])
-const newSortName = ref('')
-const newSortId = ref('')
+const defaultSortOptions = [
+  { id: 'default', name: '默认排序' },
+  { id: 'overall', name: '按综合评分' },
+  { id: 'professional', name: '按专业度' },
+  { id: 'influence', name: '按影响力' },
+]
+
+const sortOptionsInput = ref<{ id: string; name: string; enabled: boolean }[]>([])
 
 const updateTimeText = computed(() => {
   const t = store.updateTime
@@ -205,31 +198,26 @@ const updateTimeText = computed(() => {
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 })
 
-const canAddSort = computed(() => {
-  const name = newSortName.value.trim()
-  const id = newSortId.value.trim()
-  return name && id && /^[a-zA-Z0-9_-]+$/.test(id) && !sortOptionsInput.value.some(o => o.id === id)
-})
-
 onMounted(() => {
   titleInput.value = store.platformTitle || DEFAULT_TITLE
   mobileAdaptationInput.value = store.mobileAdaptation
-  sortOptionsInput.value = store.sortOptions.map(o => ({ ...o }))
+  initSortOptions()
 })
 
-function isDefaultSort(id: string) {
-  return defaultSortIds.includes(id)
-}
-
-function addSortOption() {
-  if (!canAddSort.value) return
-  sortOptionsInput.value.push({ id: newSortId.value.trim(), name: newSortName.value.trim() })
-  newSortName.value = ''
-  newSortId.value = ''
-}
-
-function removeSortOption(idx: number) {
-  sortOptionsInput.value.splice(idx, 1)
+function initSortOptions() {
+  const enabledIds = new Set(store.sortOptions.map(o => o.id))
+  const merged = defaultSortOptions.map(d => ({
+    id: d.id,
+    name: store.sortOptions.find(o => o.id === d.id)?.name || d.name,
+    enabled: enabledIds.has(d.id),
+  }))
+  // 保留已有的非默认项（enabled 始终为 true，因未在列表中即代表删除）
+  store.sortOptions.forEach(o => {
+    if (!defaultSortOptions.some(d => d.id === o.id)) {
+      merged.push({ id: o.id, name: o.name, enabled: true })
+    }
+  })
+  sortOptionsInput.value = merged
 }
 
 async function saveInterface() {
@@ -243,14 +231,14 @@ async function saveInterface() {
     await store.setPlatformTitle(t)
     await store.setMobileAdaptation(mobileAdaptationInput.value)
 
-    // 确保默认四项至少存在
-    const ids = sortOptionsInput.value.map(o => o.id)
-    const missing = defaultSortIds.filter(d => !ids.includes(d))
-    if (missing.length) {
-      message.value = '默认排序项（default/overall/professional/influence）不可删除'
-      return
+    const toSave = sortOptionsInput.value
+      .filter(o => o.enabled)
+      .map(o => ({ id: o.id, name: o.name.trim() || o.id }))
+    // 至少保留默认排序，避免前端无选项
+    if (!toSave.some(o => o.id === 'default')) {
+      toSave.unshift({ id: 'default', name: '默认排序' })
     }
-    await store.saveSortOptions(sortOptionsInput.value.map(o => ({ id: o.id, name: o.name })))
+    await store.saveSortOptions(toSave)
 
     message.value = '界面设置已保存并应用'
   } finally {
@@ -261,15 +249,10 @@ async function saveInterface() {
 function resetInterface() {
   titleInput.value = DEFAULT_TITLE
   mobileAdaptationInput.value = true
-  sortOptionsInput.value = [
-    { id: 'default', name: '默认排序' },
-    { id: 'overall', name: '按综合评分' },
-    { id: 'professional', name: '按专业度' },
-    { id: 'influence', name: '按影响力' }
-  ]
+  sortOptionsInput.value = defaultSortOptions.map(o => ({ ...o, enabled: true }))
   store.setPlatformTitle(DEFAULT_TITLE)
   store.setMobileAdaptation(true)
-  store.saveSortOptions(sortOptionsInput.value.map(o => ({ id: o.id, name: o.name })))
+  store.saveSortOptions(defaultSortOptions)
   message.value = '已恢复默认界面设置'
 }
 
@@ -431,61 +414,62 @@ function clearCache() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
 .sort-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 8px 10px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
 
-.sort-name {
+.sort-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sort-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.sort-name-input {
   flex: 1;
-  font-weight: 500;
+  min-width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.sort-name-input:disabled {
+  background: var(--bg);
+  color: var(--text-muted);
 }
 
 .sort-id {
   color: var(--text-muted);
   font-size: 12px;
+  white-space: nowrap;
 }
 
-.sort-add-row {
+.test-mode-block {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.test-mode-card {
-  background: #fffbeb;
-  border-color: #fde68a;
-}
-
-.test-mode-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.test-mode-icon {
-  font-size: 16px;
-}
-
-.test-mode-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #92400e;
-}
-
-.test-mode-card .section-desc {
-  color: #a16207;
+.test-mode-block .form-label {
+  margin-bottom: 0;
 }
 
 .time-row {
@@ -629,17 +613,6 @@ function clearCache() {
   background: #f59e0b;
   color: #fff;
   border-color: #f59e0b;
-}
-
-.btn-sm {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.btn-danger {
-  background: #fef2f2;
-  color: #dc2626;
-  border-color: #fecaca;
 }
 
 .message {
