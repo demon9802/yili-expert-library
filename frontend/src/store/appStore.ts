@@ -13,7 +13,7 @@ import { favoriteApi } from '@/api/favorite'
 import { authApi } from '@/api/auth'
 import { settingApi } from '@/api/setting'
 import { setToken, removeToken, getToken } from '@/api/request'
-import { lsGet, lsSet, lsRemove, debounce } from '@/utils/helpers'
+import { lsGet, lsSet, lsRemove, debounce, formatDateYMD } from '@/utils/helpers'
 import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
 import { observationApi } from '@/api/observation'
 
@@ -458,7 +458,7 @@ export const useAppStore = defineStore('app', () => {
     const { status, obsStatus, enteringObservation } = statusFromScores(overall, currentStatus, currentObsStatus)
     payload.status = status
     payload.observationStatus = obsStatus
-    if (enteringObservation) payload.observationDate = new Date().toISOString()
+    if (enteringObservation) payload.observationDate = formatDateYMD(new Date())
   }
 
   // ===== 自动评分 =====

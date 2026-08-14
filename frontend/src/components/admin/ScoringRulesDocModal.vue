@@ -10,7 +10,7 @@
         <p class="dim-lead">覆盖专业度、影响力 2 个维度，共 5 个评分项，各占 20%。综合评分 = 专业度 × 60% + 影响力 × 40%。</p>
         <div class="rule-summary plain">
           <div class="rule-line prof">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
-          <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称、管理履历与行业地位</div>
+          <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
         </div>
         <h4>二、评分规则</h4>
         <table class="doc-table matrix">
@@ -58,7 +58,7 @@
               <td>顶尖人才（两院院士 / 国家级人才计划）</td>
             </tr>
             <tr>
-              <td class="item">⑤ 职称、管理履历与行业地位</td>
+              <td class="item">⑤ 职称/管理履历与行业地位</td>
               <td>无职称 / 基层岗位</td>
               <td>经理 / 高工 / 主管（普通企业）</td>
               <td>副教授 / 总监 / VP / 合伙人（或同级别 · 普通企业）</td>

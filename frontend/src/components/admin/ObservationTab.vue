@@ -5,8 +5,8 @@
       <span class="count-badge">{{ obsExperts.length }} 位</span>
     </div>
     <p class="tab-desc">
-      综合评分 3.5★ 以下或不适合在前端展示的专家自动归入此处。可在此持续评估、淘汰、延期或调分。
-      评分变化由系统自动同步进出（低于 3.5★ 进入，调高至 3.5★ 以上自动退出）。
+      综合评分 < 3★ 的专家自动归入此处。可在此持续评估、淘汰、延期或调分。
+      评分变化由系统自动同步进出（低于 3★ 进入，调高至 ≥ 3★ 自动退出）。
     </p>
 
     <div v-if="obsExperts.length === 0" class="empty-box">观察库为空</div>
@@ -148,6 +148,7 @@ import { expertApi } from '@/api/expert'
 import { observationApi } from '@/api/observation'
 import { useAppStore } from '@/store/appStore'
 import { autoScoreExpert } from '@/utils/scoring'
+import { formatDateYMD } from '@/utils/helpers'
 import type { Expert } from '@/types'
 
 const store = useAppStore()
@@ -299,7 +300,7 @@ async function applyEvaluating(expert: Expert) {
   const updated = await expertApi.update(expert.id, {
     status: 'observation',
     observationStatus: 'evaluating',
-    observationDate: expert.observationDate || new Date().toISOString(),
+    observationDate: expert.observationDate ? formatDateYMD(expert.observationDate) : formatDateYMD(new Date()),
   })
   syncExpert(updated)
   store.recordObservationOperation({
@@ -381,7 +382,7 @@ async function confirmScoreModal() {
     payload.status = status
     if (status === 'observation') {
       payload.observationStatus = wasObserving ? (expert.observationStatus || 'evaluating') : 'evaluating'
-      if (!wasObserving) payload.observationDate = new Date().toISOString()
+      if (!wasObserving) payload.observationDate = formatDateYMD(new Date())
     } else {
       // 调高至合格分：退出观察库
       payload.observationStatus = null
@@ -430,7 +431,7 @@ async function confirmOpinionModal() {
     const updated = await expertApi.update(expert.id, {
       status: 'eliminated',
       observationStatus: 'eliminated',
-      observationDate: new Date().toISOString(),
+      observationDate: formatDateYMD(new Date()),
     })
     syncExpert(updated)
     store.recordObservationOperation({
@@ -446,7 +447,7 @@ async function confirmOpinionModal() {
     const updated = await expertApi.update(expert.id, {
       status: 'observation',
       observationStatus: 'extended',
-      observationDate: new Date().toISOString(),
+      observationDate: formatDateYMD(new Date()),
     })
     syncExpert(updated)
     store.recordObservationOperation({

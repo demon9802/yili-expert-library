@@ -21,6 +21,20 @@ export function formatDateTime(dateStr: string | null): string {
   }
 }
 
+/**
+ * 格式化为 MySQL DATE 类型接受的 YYYY-MM-DD 字符串。
+ * 数据库 observation_date 为 DATE，不接受带时间/Z 的 ISO 字符串。
+ */
+export function formatDateYMD(date: Date | string | number | null): string {
+  if (!date) return ''
+  const d = typeof date === 'object' ? date : new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number

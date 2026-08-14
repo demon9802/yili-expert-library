@@ -154,7 +154,7 @@ export function autoScoreExpert(expert: Expert, projects: Project[] = []): Score
   }
   const influenceItems = {
     社会荣誉与奖项: scoreHonors(text),
-    '职称、管理履历与行业地位': scoreTitleAndManagement(text),
+    '职称/管理履历与行业地位': scoreTitleAndManagement(text),
   }
 
   // V5 子维度权重
@@ -165,7 +165,7 @@ export function autoScoreExpert(expert: Expert, projects: Project[] = []): Score
   }
   const inflWeights = {
     社会荣誉与奖项: 0.35,
-    '职称、管理履历与行业地位': 0.65,
+    '职称/管理履历与行业地位': 0.65,
   }
 
   const profWeighted = Object.entries(professionalItems).reduce((s, [k, v]) => s + v * profWeights[k as keyof typeof profWeights], 0)
@@ -202,6 +202,6 @@ export const RATING_RULES_DOC = `
 2. 综合评分 = 专业度 × 60% + 影响力 × 40%。
 3. 每个评分项独立 1-5★；信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计，避免粗糙模型批量误判。
 4. 专业度评分项：①学历与学术背景、②行业资质与认证、③专业成果与经验。
-5. 影响力评分项：④社会荣誉与奖项、⑤职称、管理履历与行业地位。
+5. 影响力评分项：④社会荣誉与奖项、⑤职称/管理履历与行业地位。
 6. 综合评分 < 3★ 的专家自动进入观察库，不在前端展示。
 `.trim()

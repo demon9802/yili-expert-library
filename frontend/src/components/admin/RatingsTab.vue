@@ -24,7 +24,7 @@
 
       <div class="rule-summary plain">
         <div class="rule-line prof">专业度：①学历与学术背景、②行业资质与认证、③专业成果与经验</div>
-        <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称、管理履历与行业地位</div>
+        <div class="rule-line infl">影响力：④社会荣誉与奖项、⑤职称/管理履历与行业地位</div>
       </div>
 
       <p class="missing-tip">信息缺失（未填 / 未公开 / 无法核实）的评分项，默认按 2★ 计，避免粗糙模型批量误判。</p>
@@ -150,6 +150,7 @@ import { expertApi } from '@/api/expert'
 import { settingApi } from '@/api/setting'
 import { useAppStore } from '@/store/appStore'
 import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
+import { formatDateYMD } from '@/utils/helpers'
 import type { Expert, Scores, SubScores } from '@/types'
 
 const store = useAppStore()
@@ -370,7 +371,7 @@ function statusPayload(e: Expert, overall: number | null): Partial<Expert> | nul
   return {
     status: 'observation',
     observationStatus: wasObserving ? (e.observationStatus || 'evaluating') : 'evaluating',
-    observationDate: wasObserving && e.observationDate ? e.observationDate : new Date().toISOString(),
+    observationDate: wasObserving && e.observationDate ? formatDateYMD(e.observationDate) : formatDateYMD(new Date()),
   }
 }
 
@@ -379,7 +380,7 @@ async function moveToObservation(e: Expert) {
   const updated = await expertApi.update(e.id, {
     status: 'observation',
     observationStatus: wasObserving ? e.observationStatus || 'evaluating' : 'evaluating',
-    observationDate: wasObserving && e.observationDate ? e.observationDate : new Date().toISOString(),
+    observationDate: wasObserving && e.observationDate ? formatDateYMD(e.observationDate) : formatDateYMD(new Date()),
   })
   syncExpert(updated)
   store.recordObservationOperation({
