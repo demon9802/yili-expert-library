@@ -275,6 +275,19 @@ export const useAppStore = defineStore('app', () => {
     } catch {
       /* 忽略 */
     }
+
+    // 系统更新时间兜底：设置表中没有记录时，取数据最新更新时间，避免永久显示"尚未设置"
+    if (!updateTime.value) {
+      const latest = deriveUpdateTimeFromData()
+      if (latest) {
+        updateTime.value = latest
+        try {
+          settingApi.save('updateTime', latest)
+        } catch {
+          /* 忽略 */
+        }
+      }
+    }
   }
 
   async function setShowScores(v: boolean) {
@@ -353,6 +366,17 @@ export const useAppStore = defineStore('app', () => {
     } catch {
       /* 忽略 */
     }
+  }
+
+  // 从现有数据中推导最新的更新时间，作为系统更新时间的兜底值
+  function deriveUpdateTimeFromData(): string | null {
+    let latest = ''
+    const items: any[] = [...experts.value, ...yiliProjects.value]
+    items.forEach(item => {
+      const t = item?.updatedAt || item?.createdAt
+      if (t && (!latest || t > latest)) latest = t
+    })
+    return latest || null
   }
 
   async function setMobileAdaptation(enabled: boolean) {
@@ -439,6 +463,10 @@ export const useAppStore = defineStore('app', () => {
     currentUser.value = result.user
     authIsAdmin.value = result.user.isAdmin || false
     lsSet('yili_current_user', result.user)
+    // 管理员登录后立即重新加载完整项目列表，避免公开态只读列表（visible only）污染后台
+    if (authIsAdmin.value) {
+      await reloadProjects()
+    }
     return result
   }
 
@@ -496,10 +524,12 @@ export const useAppStore = defineStore('app', () => {
       const updated = await expertApi.update(expert.id, expert)
       const idx = experts.value.findIndex(e => e.id === expert.id)
       if (idx >= 0) experts.value[idx] = updated
+      await refreshUpdateTime()
       return updated
     } else {
       const created = await expertApi.create(expert)
       experts.value.push(created)
+      await refreshUpdateTime()
       return created
     }
   }
@@ -524,6 +554,7 @@ export const useAppStore = defineStore('app', () => {
     }
     await expertApi.delete(id)
     experts.value = experts.value.filter(x => x.id !== id)
+    await refreshUpdateTime()
   }
 
   // ===== 观察库操作记录 =====
@@ -677,6 +708,7 @@ export const useAppStore = defineStore('app', () => {
       if (idx >= 0) experts.value[idx] = updated
       count += 1
     }
+    await refreshUpdateTime()
     return count
   }
 
@@ -697,10 +729,12 @@ export const useAppStore = defineStore('app', () => {
       const updated = await projectApi.update(project.id, project)
       const idx = yiliProjects.value.findIndex(p => p.id === project.id)
       if (idx >= 0) yiliProjects.value[idx] = updated
+      await refreshUpdateTime()
       return updated
     } else {
       const created = await projectApi.create(project)
       yiliProjects.value.push(created)
+      await refreshUpdateTime()
       return created
     }
   }
@@ -713,6 +747,24 @@ export const useAppStore = defineStore('app', () => {
     }
     await projectApi.delete(id)
     yiliProjects.value = yiliProjects.value.filter(p => p.id !== id)
+    await refreshUpdateTime()
+  }
+
+  // 强制从后端重新加载合作项目列表（管理员登录/切到管理页时使用，避免被公开态只读列表污染）
+  async function reloadProjects() {
+    if (testMode.value) return
+    try {
+      const list = await projectApi.findAll()
+      yiliProjects.value = list
+      // 同步缓存，保证前后台数据一致
+      const cached = lsGet(STORAGE_KEY)
+      if (cached) {
+        cached.yiliProjects = list
+        lsSet(STORAGE_KEY, cached)
+      }
+    } catch (e) {
+      console.warn('刷新合作项目列表失败', e)
+    }
   }
 
   // ===== 领域 CRUD =====
@@ -753,6 +805,7 @@ export const useAppStore = defineStore('app', () => {
         fields: (e.fields || []).map(f => (f === oldName ? field.name! : f)),
       }))
     }
+    await refreshUpdateTime()
   }
 
   async function deleteField(name: string) {
@@ -772,6 +825,7 @@ export const useAppStore = defineStore('app', () => {
       ...e,
       fields: (e.fields || []).filter(f => f !== name),
     }))
+    await refreshUpdateTime()
   }
 
   // ===== 收藏 =====
@@ -895,7 +949,7 @@ export const useAppStore = defineStore('app', () => {
     // Actions
     loadAppData, checkAuthState, login, signUp, logout,
     saveExpert, deleteExpert, autoScoreExpertById, autoScoreAllExperts, recordObservationOperation,
-    saveProject, deleteProject,
+    saveProject, deleteProject, reloadProjects,
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
     setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, setMobileAdaptation, applyColorScheme,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,

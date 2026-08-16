@@ -6,6 +6,10 @@
     </div>
 
     <p v-if="message" class="message">{{ message }}</p>
+    <p v-if="error" class="error-box">
+      加载用户列表失败：{{ error }}
+      <button class="btn btn-secondary btn-sm" @click="loadUsers">重试</button>
+    </p>
     <table class="admin-table">
       <thead>
         <tr>
@@ -22,7 +26,7 @@
           <td>{{ formatDateTime(user.lastLoginAt ?? null) || '—' }}</td>
           <td><button class="btn btn-secondary btn-sm" @click="resetPassword(user)">重置密码</button></td>
         </tr>
-        <tr v-if="normalUsers.length === 0 && !loading">
+        <tr v-if="normalUsers.length === 0 && !loading && !error">
           <td colspan="4" class="empty">暂无普通用户</td>
         </tr>
       </tbody>
@@ -40,14 +44,18 @@ import type { UserDTO } from '@/types'
 const users = ref<UserDTO[]>([])
 const loading = ref(false)
 const message = ref('')
+const error = ref('')
 
 const normalUsers = computed(() => users.value.filter(u => u.role !== 'master' && u.role !== 'sub' && !u.isAdmin))
 
 async function loadUsers() {
   loading.value = true
   message.value = ''
+  error.value = ''
   try {
     users.value = await authApi.fetchUserList()
+  } catch (err: any) {
+    error.value = err?.message || '请求失败，请检查网络后重试'
   } finally {
     loading.value = false
   }
@@ -72,6 +80,7 @@ th { background: var(--bg, #f8fafc); font-weight: 600; color: var(--text-seconda
 .col-account { font-weight: 500; color: var(--text, #1e293b); }
 .empty { text-align: center; color: #888; padding: 24px; }
 .message { color: #059669; font-size: 13px; }
+.error-box { color: #b91c1c; font-size: 13px; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 
 /* 与平台统一按钮风格 */
 .btn { border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1.2; white-space: nowrap; }

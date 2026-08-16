@@ -446,6 +446,7 @@ async function submitScoreAdjust() {
   }
   const updated = await expertApi.update(expert.id, payload)
   syncExpert(updated)
+  await store.refreshUpdateTime()
   store.recordObservationOperation({
     expertId: expert.id,
     expertName: expert.name,
@@ -492,6 +493,7 @@ async function resetToAuto(e: Expert) {
   }
   const updated = await expertApi.update(e.id, payload)
   syncExpert(updated)
+  await store.refreshUpdateTime()
   store.recordObservationOperation({
     expertId: e.id,
     expertName: e.name,
@@ -684,6 +686,7 @@ async function confirmOpinionModal() {
       subScores: expert.subScores,
     })
     syncExpert(updated)
+    await store.refreshUpdateTime()
     store.recordObservationOperation({
       expertId: expert.id,
       expertName: expert.name,
@@ -705,6 +708,7 @@ async function confirmOpinionModal() {
       subScores: expert.subScores,
     })
     syncExpert(updated)
+    await store.refreshUpdateTime()
     store.recordObservationOperation({
       expertId: expert.id,
       expertName: expert.name,

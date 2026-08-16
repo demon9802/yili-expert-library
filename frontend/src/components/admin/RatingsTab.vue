@@ -4,7 +4,7 @@
 
     <!-- ① 前端展示控制 -->
     <div v-if="store.isMaster" class="config-card">
-      <h4>① 前端展示控制</h4>
+      <h4>{{ sectionNum('display') }} 前端展示控制</h4>
       <div class="toggle-row">
         <span>在前端展示评分信息（专家卡片 &amp; 详情页）：</span>
         <label class="checkbox-toggle">
@@ -18,7 +18,7 @@
     <!-- ② 评分配置（规则及文档） -->
     <div class="config-card">
       <div class="section-title-row">
-        <h4>② 评分配置（规则及文档）</h4>
+        <h4>{{ sectionNum('config') }} 评分配置（规则及文档）</h4>
         <button v-if="store.isMaster" class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
 
@@ -95,7 +95,7 @@
 
     <!-- ③ 专家评分调整 -->
     <div class="config-card">
-      <h4>③ 专家评分调整</h4>
+      <h4>{{ sectionNum('adjust') }} 专家评分调整</h4>
       <p class="hint adjust-hint">直接修改表格中 5 个评分项的整数分值（1-5，最高 5★）；专业度、影响力、综合得分由系统自动计算，不可直接编辑。</p>
       <div class="quick-row">
         <input v-model="searchQuery" type="search" placeholder="搜索专家姓名..." class="search-input" />
@@ -223,6 +223,18 @@ const openDropdownId = ref<number | null>(null)
 const dropdownPos = ref<{ top: number; left: number }>({ top: 0, left: 0 })
 const hasCloudBackup = ref(false)
 
+// 子管理员看不到「前端展示控制」，后续章节序号需动态重排
+const showDisplayControl = computed(() => store.isMaster)
+const circledNums = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨']
+function sectionNum(target: 'display' | 'config' | 'adjust') {
+  let idx = 0
+  if (target === 'display') return circledNums[idx]
+  if (showDisplayControl.value) idx++
+  if (target === 'config') return circledNums[idx]
+  idx++
+  return circledNums[idx]
+}
+
 const professionalItems = ['学历与学术背景', '行业资质与认证', '专业成果与经验'] as const
 const influenceItems = ['社会荣誉与奖项', '职称/管理履历与行业地位'] as const
 
@@ -326,6 +338,7 @@ async function onSubChange(e: Expert, dim: RatingDim, item: string, ev: Event) {
   if (sp) Object.assign(payload, sp)
   const updated = await expertApi.update(e.id, payload)
   syncExpert(updated)
+  await store.refreshUpdateTime()
 }
 
 function onToggleShow(e: Event) {
@@ -362,6 +375,7 @@ async function autoScoreOne(e: Expert) {
     if (sp) Object.assign(payload, sp)
     const updated = await expertApi.update(e.id, payload)
     syncExpert(updated)
+    await store.refreshUpdateTime()
   } finally {
     runningId.value = null
     openDropdownId.value = null
@@ -385,6 +399,7 @@ async function runBatchScoring() {
     }
     batchSuccess.value = true
     batchMessage.value = `已完成 ${count} 位专家的自动评分更新`
+    await store.refreshUpdateTime()
   } catch (err: any) {
     batchSuccess.value = false
     batchMessage.value = '批量评分失败：' + (err?.message || String(err))
@@ -457,6 +472,7 @@ async function moveToObservation(e: Expert) {
     subScores: e.subScores,
   })
   syncExpert(updated)
+  await store.refreshUpdateTime()
   store.recordObservationOperation({
     expertId: e.id,
     expertName: e.name,

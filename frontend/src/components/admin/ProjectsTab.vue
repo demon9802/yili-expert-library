@@ -253,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import type { Expert, Project } from '@/types'
 import { satisfactionDisplay, parseSatisfaction } from '@/utils/satisfaction'
@@ -317,6 +317,13 @@ watch([searchQuery, filterYear, filterQuarter, filterVisibility, sortMode], () =
 
 watch(totalPages, pages => {
   if (currentPage.value > pages) currentPage.value = pages
+})
+
+// 每次进入管理页都从后端重新拉取完整项目列表，根治公开态只读列表导致 13/23 反复波动
+onMounted(async () => {
+  if (store.isAdmin) {
+    await store.reloadProjects()
+  }
 })
 
 function sortProjects(list: Project[]) {

@@ -562,11 +562,14 @@ const paginatedExpertChanges = computed(() => {
   return allExpertChanges.value.slice(start, start + PAGE_SIZE)
 })
 
+// 关联口径与「合作项目管理」统计栏保持一致：
+// 已关联 = 已绑定真实专家（expertId 非空）；待关联 = 未绑定真实专家。
+// pendingExpertName 仅作占位记录，不算已关联。
 const linkedProjectCount = computed(
-  () => store.yiliProjects.filter(p => !!p.expertId || !!p.pendingExpertName).length
+  () => store.yiliProjects.filter(p => !!p.expertId).length
 )
 const pendingProjectCount = computed(
-  () => store.yiliProjects.filter(p => !p.expertId && !p.pendingExpertName).length
+  () => store.yiliProjects.filter(p => !p.expertId).length
 )
 
 // ===== 合作项目变动（新增 / 修改 / 删除） =====
