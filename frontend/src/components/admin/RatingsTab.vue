@@ -18,7 +18,7 @@
     <!-- ② 评分配置（规则及文档） -->
     <div class="config-card">
       <div class="section-title-row">
-        <h4>{{ sectionNum('config') }} 评分配置（规则及文档）</h4>
+        <h4>{{ sectionNum('config') }} 评分规则</h4>
         <button v-if="store.isMaster" class="doc-link" type="button" @click="showRuleDoc = true">查看完整文档 →</button>
       </div>
 
@@ -104,7 +104,7 @@
         </button>
       </div>
       <p v-if="store.isMaster && batchMessage" class="batch-message" :class="{ error: !batchSuccess }">{{ batchMessage }}</p>
-      <p v-if="store.isSubAdmin" class="hint view-only-hint">子管理员仅可查看评分，不可编辑评分项或调整展示开关。</p>
+      <p v-if="store.isSubAdmin" class="hint view-only-hint">子管理员可手动编辑每位专家的 5 个评分项分值；不可进行整体自动评分重置或调整前台展示开关。</p>
 
       <div class="table-scroll-wrapper">
         <table class="data-table">
@@ -131,7 +131,6 @@
                   max="5"
                   step="1"
                   :value="subsFor(e).professional[it]"
-                  :disabled="store.isSubAdmin"
                   @change="onSubChange(e, 'professional', it, $event)"
                 />
               </td>
@@ -143,7 +142,6 @@
                   max="5"
                   step="1"
                   :value="subsFor(e).influence[it]"
-                  :disabled="store.isSubAdmin"
                   @change="onSubChange(e, 'influence', it, $event)"
                 />
               </td>
