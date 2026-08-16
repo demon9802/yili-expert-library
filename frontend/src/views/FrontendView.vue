@@ -487,7 +487,9 @@ function toggleMobileMode() {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 1px 6px;
+  height: 28px;
+  padding: 0 6px;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -564,7 +566,8 @@ function toggleMobileMode() {
 }
 @media (max-width: 480px) {
   .page-navigation-float {
-    padding: 1px 4px;
+    height: 28px;
+    padding: 0 4px;
   }
   .page-navigation-float :deep(.page-navigation-inline) {
     gap: 4px;

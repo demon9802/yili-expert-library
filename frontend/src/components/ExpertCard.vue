@@ -216,16 +216,19 @@ function projectMeta(p: Project) {
 
 // V5 卡片资历高亮：优先 qualDisplay，fallback 解析 qualifications
 const qualItems = computed(() => {
-  const raw = String(props.expert.qualDisplay || props.expert.qualifications || '').trim()
+  let raw = String(props.expert.qualDisplay || props.expert.qualifications || '').trim()
   if (!raw) return []
+  // 防御：清洗 Excel 换行残留与行尾分号
+  raw = raw.replace(/_x000d_/gi, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   let items: string[] = []
   if (raw.includes('\n')) {
-    items = raw.split('\n').map(s => s.trim()).filter(Boolean)
+    items = raw.split('\n').map(s => s.trim().replace(/[;；]\s*$/, '').trim()).filter(Boolean)
   } else if (raw.includes('■')) {
     items = raw.split('■').map(s => s.trim()).filter(Boolean)
     items = items.map(it => {
       const m = it.match(/】\s*(.+)/)
-      return m ? m[1].trim() : it
+      const text = m ? m[1].trim() : it
+      return text.replace(/[;；]\s*$/, '').trim()
     })
   } else {
     items = raw.split(/[;；]/).map(s => s.trim()).filter(Boolean)
@@ -235,14 +238,18 @@ const qualItems = computed(() => {
 
 // V5 卡片优势：优先 advDisplay，fallback 解析 advantages
 const advItems = computed(() => {
-  const raw = String(props.expert.advDisplay || '').trim()
+  let raw = String(props.expert.advDisplay || '').trim()
   if (raw) {
-    return raw.split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4)
+    raw = raw.replace(/_x000d_/gi, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    return raw.split('\n').map(s => s.trim().replace(/[;；]\s*$/, '').trim()).filter(Boolean).slice(0, 4)
       .map(item => item.replace(/^\d+[、，．.\s]*/, ''))
   }
   if (!props.expert.advantages?.length) return []
   return props.expert.advantages.slice(0, 3).map(a => {
-    if (typeof a === 'string') return a.replace(/^\d+[、，．.\s]*/, '')
+    if (typeof a === 'string') {
+      const cleaned = a.replace(/_x000d_/gi, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      return cleaned.replace(/^\d+[、，．.\s]*/, '').replace(/[;；]\s*$/, '').trim()
+    }
     const title = (a as any).title || ''
     const desc = (a as any).desc || ''
     return title && desc ? `${title}：${desc}` : (desc || title)

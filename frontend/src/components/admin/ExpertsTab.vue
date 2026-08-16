@@ -181,15 +181,19 @@
         <!-- 资历资质（子标题 + 内容，可增删） -->
         <label>资历资质（选择子标题类型，填写对应内容）</label>
         <div class="repeat-list">
-          <div v-for="(pair, idx) in qualPairs" :key="'q' + idx" class="repeat-row">
-            <select v-model="pair.subtitle" class="repeat-select">
-              <option v-for="opt in qualSubtitleOptions" :key="opt" :value="opt">{{ opt }}</option>
-              <option v-if="pair.subtitle && !qualSubtitleOptions.includes(pair.subtitle)" :value="pair.subtitle">{{ pair.subtitle }}</option>
-            </select>
-            <input v-model="pair.content" class="repeat-input" placeholder="请填写内容" />
-            <button type="button" class="row-move" :disabled="idx === 0" @click="moveQual(idx, -1)">↑</button>
-            <button type="button" class="row-move" :disabled="idx === qualPairs.length - 1" @click="moveQual(idx, 1)">↓</button>
-            <button type="button" class="row-del" @click="removeQual(idx)">✕</button>
+          <div v-for="(pair, idx) in qualPairs" :key="'q' + idx" class="repeat-block">
+            <div class="repeat-block-header">
+              <select v-model="pair.subtitle" class="repeat-select" style="width:120px">
+                <option v-for="opt in qualSubtitleOptions" :key="opt" :value="opt">{{ opt }}</option>
+                <option v-if="pair.subtitle && !qualSubtitleOptions.includes(pair.subtitle)" :value="pair.subtitle">{{ pair.subtitle }}</option>
+              </select>
+              <div class="repeat-actions">
+                <button type="button" class="row-move" :disabled="idx === 0" @click="moveQual(idx, -1)">↑</button>
+                <button type="button" class="row-move" :disabled="idx === qualPairs.length - 1" @click="moveQual(idx, 1)">↓</button>
+                <button type="button" class="row-del" @click="removeQual(idx)">✕</button>
+              </div>
+            </div>
+            <textarea v-model="pair.content" rows="2" placeholder="请填写内容"></textarea>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" @click="addQual">+ 添加资历项</button>
         </div>
@@ -450,6 +454,12 @@ function exportExperts() {
   const rows = filteredExperts.value.map(e => {
     const contacts = getContactList(e)
     const contactStr = contacts.map(c => (c.person ? c.person + '：' : '') + c.info).join(' / ')
+    const qualParts = parsePairs(e.qualifications)
+    const caseParts = parsePairs(e.courses)
+    const qualMap: Record<string, string> = {}
+    qualParts.forEach(p => { qualMap[p.subtitle] = p.content })
+    const caseMap: Record<string, string> = {}
+    caseParts.forEach(p => { caseMap[p.subtitle] = p.content })
     return {
       姓名: e.name || '',
       适用领域: (e.fields || []).join('、'),
@@ -459,6 +469,11 @@ function exportExperts() {
       专家卡资历概括: e.qualDisplay || '',
       资历资质: e.qualifications || '',
       参考案例: e.courses || '',
+      '职称/荣誉头衔': qualMap['职称/荣誉头衔'] || '',
+      社会职务: qualMap['社会职务'] || '',
+      履历经历: qualMap['履历经历'] || qualMap['履职资历'] || '',
+      核心课程: caseMap['核心课程'] || '',
+      服务经历: caseMap['服务经历'] || '',
       库内供应商: e.isSupplier ? '是' : '否',
       内部推荐人: e.referrer || '',
       专业度: scoreForExport(e.scores?.professional),
@@ -481,10 +496,17 @@ function exportExperts() {
 function exportExpertsCSV() {
   const headers = [
     '姓名', '适用领域', '学历', '核心优势', '专家卡优势概括', '专家卡资历概括', '资历资质', '参考案例',
+    '职称/荣誉头衔', '社会职务', '履历经历', '核心课程', '服务经历',
     '库内供应商', '内部推荐人', '专业度', '影响力', '综合评分', '联系人', '联系方式', '状态', '录入时间', '录入者'
   ]
   const rows = filteredExperts.value.map(e => {
     const contacts = getContactList(e)
+    const qualParts = parsePairs(e.qualifications)
+    const caseParts = parsePairs(e.courses)
+    const qualMap: Record<string, string> = {}
+    qualParts.forEach(p => { qualMap[p.subtitle] = p.content })
+    const caseMap: Record<string, string> = {}
+    caseParts.forEach(p => { caseMap[p.subtitle] = p.content })
     return [
       e.name || '',
       (e.fields || []).join('、'),
@@ -494,6 +516,11 @@ function exportExpertsCSV() {
       e.qualDisplay || '',
       e.qualifications || '',
       e.courses || '',
+      qualMap['职称/荣誉头衔'] || '',
+      qualMap['社会职务'] || '',
+      qualMap['履历经历'] || qualMap['履职资历'] || '',
+      caseMap['核心课程'] || '',
+      caseMap['服务经历'] || '',
       e.isSupplier ? '是' : '否',
       e.referrer || '',
       scoreForExport(e.scores?.professional),
@@ -540,7 +567,7 @@ function onImportFileSelected(e: Event) {
 
 function downloadImportTemplate() {
   const fieldList = store.fields.map(f => f.name).join('、')
-  const cols = ['姓名', '适用领域', '学历', '库内供应商', '核心优势', '专家卡优势概括', '专家卡资历概括', '资历资质', '参考案例', '联系人', '联系方式', '内部推荐人']
+  const cols = ['姓名', '适用领域', '学历', '库内供应商', '核心优势', '专家卡优势概括', '专家卡资历概括', '资历资质', '参考案例', '职称/荣誉头衔', '社会职务', '履历经历', '核心课程', '服务经历', '联系人', '联系方式', '内部推荐人']
   const hints: Record<string, string> = {
     姓名: '',
     适用领域: '领域包括（多项请用逗号分隔）：' + fieldList,
@@ -549,8 +576,13 @@ function downloadImportTemplate() {
     核心优势: '每行一条，用■开头，如：■行业经验：20年乳业咨询',
     专家卡优势概括: '1-3条，每行一条，显示在专家卡片上',
     专家卡资历概括: '1-3条，每行一条，显示在专家卡片上',
-    资历资质: '【职称/荣誉头衔】\n【社会职务】\n【履历经历】',
-    参考案例: '【核心课程】\n【服务经历】',
+    资历资质: '（旧格式，兼容用）【职称/荣誉头衔】\n【社会职务】\n【履历经历】',
+    参考案例: '（旧格式，兼容用）【核心课程】\n【服务经历】',
+    '职称/荣誉头衔': '独立字段，每行一条',
+    社会职务: '独立字段，每行一条',
+    履历经历: '独立字段，每行一条',
+    核心课程: '独立字段，每行一条',
+    服务经历: '独立字段，每行一条',
     联系人: '必填，如不便提供，可填写内部推荐人联系方式',
     联系方式: '',
     内部推荐人: '非必填',
@@ -568,6 +600,16 @@ function uploadImportFile() {
   importExpertsFromFile(pendingImportFile.value)
 }
 
+// Excel 单元格常见残留清理：_x000d_ 换行符 -> \n，\r -> \n，去除行尾分号/空白/空行。
+function cleanImportText(s: string): string {
+  if (!s) return ''
+  let text = s.replace(/_x000d_/gi, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = text.split('\n')
+    .map(ln => ln.trim().replace(/[;；]\s*$/, '').trim())
+    .filter(ln => ln)
+  return lines.join('\n')
+}
+
 // 复合领域标签（内部以「/」分隔）不应被进一步拆分；若导入数据已被拆成碎片，
 // 在此合并还原，避免产生「战略规划 / 战略解码 / 战略落地」等错误领域。
 const STRATEGY_FRAGMENTS = ['战略规划', '战略解码', '战略落地']
@@ -583,6 +625,32 @@ function normalizeCompositeFields(fields: string[]): string[] {
   if (hasStrategy && !out.includes(STRATEGY_TAG)) out.push(STRATEGY_TAG)
   if (hasGeneric && !out.includes(GENERIC_TAG)) out.push(GENERIC_TAG)
   return out
+}
+
+// 优先读取独立字段；若无，再回退到旧版合并字段。
+function buildQualificationsFromRow(r: Record<string, any>): string {
+  const parts: { subtitle: string; content: string }[] = [
+    { subtitle: '职称/荣誉头衔', content: cleanImportText(String(r['职称/荣誉头衔'] || '')) },
+    { subtitle: '社会职务', content: cleanImportText(String(r['社会职务'] || '')) },
+    { subtitle: '履历经历', content: cleanImportText(String(r['履历经历'] || '')) },
+  ]
+  const hasSeparate = parts.some(p => p.content)
+  if (hasSeparate) {
+    return parts.filter(p => p.content).map(p => `【${p.subtitle}】${p.content}`).join('\n')
+  }
+  return cleanImportText(String(r['资历资质'] || r['qualifications'] || ''))
+}
+
+function buildCoursesFromRow(r: Record<string, any>): string {
+  const parts: { subtitle: string; content: string }[] = [
+    { subtitle: '核心课程', content: cleanImportText(String(r['核心课程'] || '')) },
+    { subtitle: '服务经历', content: cleanImportText(String(r['服务经历'] || '')) },
+  ]
+  const hasSeparate = parts.some(p => p.content)
+  if (hasSeparate) {
+    return parts.filter(p => p.content).map(p => `【${p.subtitle}】${p.content}`).join('\n')
+  }
+  return cleanImportText(String(r['参考案例'] || r['courses'] || ''))
 }
 
 function importExpertsFromFile(file: File) {
@@ -603,7 +671,7 @@ function importExpertsFromFile(file: File) {
           String(r['适用领域'] || r['fields'] || '')
             .split(/[、,，]/).map((s: string) => s.trim()).filter(Boolean)
         )
-        const advantages = String(r['核心优势'] || r['突出优势'] || r['advantages'] || '')
+        const advantages = cleanImportText(String(r['核心优势'] || r['突出优势'] || r['advantages'] || ''))
           .split('\n').map((s: string) => s.trim()).filter(Boolean)
         const contactsRaw = String(r['联系方式'] || r['contactInfo'] || '')
         const contacts: ContactInfo[] = contactsRaw
@@ -614,17 +682,17 @@ function importExpertsFromFile(file: File) {
         const payload: Partial<Expert> = {
           name,
           fields,
-          education: String(r['学历'] || r['education'] || ''),
+          education: cleanImportText(String(r['学历'] || r['education'] || '')),
           advantages,
-          advDisplay: String(r['专家卡优势概括'] || r['advDisplay'] || ''),
-          qualDisplay: String(r['专家卡资历概括'] || r['qualDisplay'] || ''),
-          qualifications: String(r['资历资质'] || r['qualifications'] || ''),
-          courses: String(r['参考案例'] || r['courses'] || ''),
+          advDisplay: cleanImportText(String(r['专家卡优势概括'] || r['advDisplay'] || '')),
+          qualDisplay: cleanImportText(String(r['专家卡资历概括'] || r['qualDisplay'] || '')),
+          qualifications: buildQualificationsFromRow(r),
+          courses: buildCoursesFromRow(r),
           contacts,
-          contactPerson: String(r['联系人'] || r['contactPerson'] || ''),
-          contactInfo: contactsRaw,
+          contactPerson: cleanImportText(String(r['联系人'] || r['contactPerson'] || '')),
+          contactInfo: cleanImportText(contactsRaw),
           contactType: 'phone',
-          referrer: String(r['内部推荐人'] || r['referrer'] || ''),
+          referrer: cleanImportText(String(r['内部推荐人'] || r['referrer'] || '')),
           isSupplier: String(r['库内供应商'] || r['isSupplier'] || '').includes('是'),
           status,
           scores: {
@@ -704,7 +772,12 @@ function resetForm(data: Partial<Expert> = emptyForm()) {
   advantagesText.value = (data.advantages || [])
     .map(a => (typeof a === 'string' ? a : a.title && a.desc ? `${a.title}：${a.desc}` : a.desc || a.title || ''))
     .join('\n')
-  qualPairs.value = parsePairs(data.qualifications).length ? parsePairs(data.qualifications) : [{ subtitle: '职称/荣誉头衔', content: '' }]
+  const subtitleNormalize: Record<string, string> = { '履职资历': '履历经历' }
+  const normalizedQual = parsePairs(data.qualifications).map(p => ({
+    subtitle: subtitleNormalize[p.subtitle] || p.subtitle || '职称/荣誉头衔',
+    content: p.content
+  }))
+  qualPairs.value = normalizedQual.length ? normalizedQual : [{ subtitle: '职称/荣誉头衔', content: '' }]
   casePairs.value = (['核心课程', '服务经历']).map(sub => {
     const found = parsePairs(data.courses).find(p => p.subtitle === sub)
     return found || { subtitle: sub, content: '' }
@@ -1097,28 +1170,30 @@ async function removeExpert(expert: Expert) {
 /* 可重复条目（资历/案例/联系方式） */
 .repeat-list { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; }
 .repeat-row { display: flex; gap: 8px; align-items: center; }
+.repeat-block { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--bg); }
+.repeat-block-header { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .repeat-select {
   padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: #fff;
 }
 .repeat-input {
   flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit;
 }
+.repeat-actions { display: flex; gap: 6px; align-items: center; }
 .row-del {
-  flex-shrink: 0; padding: 6px 10px; border: 1px solid #fecaca; border-radius: 6px;
+  flex-shrink: 0; padding: 4px 8px; border: 1px solid #fecaca; border-radius: 6px;
   background: #fef2f2; color: #dc2626; cursor: pointer; font-size: 12px;
 }
 .row-move {
-  flex-shrink: 0; padding: 6px 9px; border: 1px solid #bfdbfe; border-radius: 6px;
+  flex-shrink: 0; padding: 4px 7px; border: 1px solid #bfdbfe; border-radius: 6px;
   background: #eff6ff; color: #2563eb; cursor: pointer; font-size: 12px;
 }
 .row-move:disabled { opacity: 0.45; cursor: not-allowed; }
 .row-del:hover { background: #fee2e2; }
-.repeat-block { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--bg); }
 .repeat-subtitle {
   font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px;
   padding: 4px 8px; background: var(--bg); border-radius: 4px; border-left: 3px solid var(--primary);
 }
-.repeat-block textarea { width: 100%; margin-top: 0; }
+.repeat-block textarea { width: 100%; margin-top: 0; box-sizing: border-box; }
 .inline-check {
   display: flex;
   align-items: center;

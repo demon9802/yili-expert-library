@@ -122,6 +122,7 @@ export function lsRemove(key: string): void {
 // 将 V5 格式的富文本（含【子标题】、/ 分隔、URL）渲染为 HTML
 export function formatRichText(text: string): string {
   if (!text) return ''
+  text = text.replace(/_x000d_/gi, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
 
   function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -138,6 +139,8 @@ export function formatRichText(text: string): string {
 
   function cleanContent(s: string): string {
     let r = linkify(s)
+    // 去掉每行（<br>分隔）末尾的中英文分号
+    r = r.replace(/([^>\s])\s*[;；]\s*(<br>|$)/g, '$1$2')
     r = r.replace(/\n/g, '<br>')
     r = r.replace(/ \/ /g, '<br>')
     r = r.replace(/ \/<br>/g, '<br>')
