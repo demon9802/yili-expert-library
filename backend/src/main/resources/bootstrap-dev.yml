@@ -6,7 +6,7 @@ spring:
     password: E5yihwQDvcStZaJg
     host: 10.254.2.143
     port: 37937
-    database: 4
+    database: 2
   datasource:
     url: jdbc:mysql://cloudbh-transit-tencent.digitalyili.com:9059/data-center-ai-evaluation-sit?characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=Asia/Shanghai
     username: u230x5g

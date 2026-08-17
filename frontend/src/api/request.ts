@@ -4,7 +4,9 @@
  */
 import type { ApiResponse } from '@/types'
 
-const BASE_URL = '/api'
+// 生产/部署环境通过 VITE_API_BASE_URL 指定后端绝对域名（见 .env.production / .env.sit）
+// 本地开发未设置该变量时回退为 '/api'，由 vite.config.ts 的 proxy 转发到 localhost:8080
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const TOKEN_KEY = 'yili_expert_token'
 const REQUEST_TIMEOUT = 6000
 

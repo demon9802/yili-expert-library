@@ -3,12 +3,12 @@
 # ============================================================
 spring:
   redis:
-    password: E5yihwQDvcStZaJg
-    host: 10.254.2.143
-    port: 37937
-    database: 4
+    password: tf8C23nr4aCGy4H
+    host: 172.23.11.121
+    port: 6379
+    database: 2
   datasource:
-    url: jdbc:mysql://10.254.12.25:3306/data-center-ai-evaluation-sit?characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=Asia/Shanghai
-    username: data_center_app_sit
-    password: LQvgzhcE^3
+    url: jdbc:mysql://172.23.12.233:3306/data-center-ai-evaluation-prod?characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: prod_yldataapp_main
+    password: E2mW$9wmNkC!Nm
     driver-class-name: com.mysql.cj.jdbc.Driver
