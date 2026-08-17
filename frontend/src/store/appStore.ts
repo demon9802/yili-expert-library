@@ -17,9 +17,10 @@ import { lsGet, lsSet, lsRemove, debounce, formatDateYMD, addMonthsToDateYMD } f
 import { autoScoreExpert, OBSERVATION_THRESHOLD } from '@/utils/scoring'
 import { observationApi } from '@/api/observation'
 
-const STORAGE_KEY = 'yili_expert_db'
 const SEARCH_HISTORY_KEY = 'yili_search_history'
 const MAX_SEARCH_HISTORY = 5
+// 未登录用户的本地收藏键（无后端身份，仅作浏览器本地偏好，不属于业务数据集）
+const FAV_LOCAL_KEY = 'yili_favorites_local'
 
 // 测试模式：独立数据空间（本地快照），用于模拟不同角色视角，不影响正式数据
 const TEST_MODE_KEY = 'yili_test_mode'
@@ -63,6 +64,9 @@ export const useAppStore = defineStore('app', () => {
 
   // 加载状态
   const loading = ref(false)
+
+  // 数据加载失败（后端不可用）标记：绝不回退到本地静态数据，仅用于前端提示
+  const dataError = ref(false)
 
   // 前端评分展示开关（评分管理 → 前端展示控制）
   const showScores = ref<boolean>(true)
@@ -196,36 +200,27 @@ export const useAppStore = defineStore('app', () => {
   // ===== Actions =====
   async function loadAppData() {
     loading.value = true
+    dataError.value = false
     try {
+      // 唯一数据源：后端 /api/app-data（数据库）
       const data: AppData = await appDataApi.loadAppData()
       experts.value = data.experts || []
       fields.value = data.fields || []
       yiliProjects.value = data.yiliProjects || []
       favorites.value = data.favorites || []
-
-      // 缓存到 localStorage
-      lsSet(STORAGE_KEY, {
-        experts: experts.value,
-        fields: fields.value,
-        yiliProjects: yiliProjects.value,
-        favorites: favorites.value,
-      })
-    } catch (e) {
-      // 降级: 从 localStorage 加载缓存
-      const cached = lsGet(STORAGE_KEY)
-      if (cached) {
-        experts.value = cached.experts || []
-        fields.value = cached.fields || []
-        yiliProjects.value = cached.yiliProjects || []
-        favorites.value = cached.favorites || []
-      } else if (import.meta.env.DEV && window.EXPERT_DATA) {
-        // 仅开发环境无后端 fallback：使用原始 data.js
-        // 生产/SIT 不启用，避免后端异常时展示旧版 10 分制静态数据造成误导
-        experts.value = window.EXPERT_DATA.experts || []
-        fields.value = window.EXPERT_DATA.fields || []
-        yiliProjects.value = window.EXPERT_DATA.yiliProjects || []
-        favorites.value = window.EXPERT_DATA.favorites || []
+      // 未登录用户：合并浏览器本地收藏（无后端身份，仅本地偏好）
+      if (!currentUser.value) {
+        const localFav = lsGet(FAV_LOCAL_KEY)
+        if (Array.isArray(localFav)) favorites.value = localFav
       }
+    } catch (e) {
+      // 后端不可用：不回退任何本地静态数据，避免展示过时/伪造数据集
+      console.error('[appStore] 加载应用数据失败，数据须来自后端', e)
+      dataError.value = true
+      experts.value = []
+      fields.value = []
+      yiliProjects.value = []
+      favorites.value = []
     } finally {
       loading.value = false
     }
@@ -757,12 +752,6 @@ export const useAppStore = defineStore('app', () => {
     try {
       const list = await projectApi.findAll()
       yiliProjects.value = list
-      // 同步缓存，保证前后台数据一致
-      const cached = lsGet(STORAGE_KEY)
-      if (cached) {
-        cached.yiliProjects = list
-        lsSet(STORAGE_KEY, cached)
-      }
     } catch (e) {
       console.warn('刷新合作项目列表失败', e)
     }
@@ -831,21 +820,19 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 收藏 =====
   async function toggleFavorite(expertId: number) {
-    if (testMode.value) {
-      const isFav = favorites.value.includes(expertId)
-      if (isFav) favorites.value = favorites.value.filter(id => id !== expertId)
-      else favorites.value.push(expertId)
-      persistTest()
-      return
-    }
     const isFav = favorites.value.includes(expertId)
     if (isFav) {
       favorites.value = favorites.value.filter(id => id !== expertId)
     } else {
       favorites.value.push(expertId)
     }
-    // 如果已登录，同步到后端；否则仅存 localStorage
+    if (testMode.value) {
+      // 测试模式：仅本地快照，不触碰生产库
+      persistTest()
+      return
+    }
     if (currentUser.value) {
+      // 已登录：同步到后端（唯一数据源）
       try {
         if (isFav) {
           await favoriteApi.removeFavorite(expertId)
@@ -860,28 +847,14 @@ export const useAppStore = defineStore('app', () => {
           favorites.value = favorites.value.filter(id => id !== expertId)
         }
       }
+    } else {
+      // 未登录：仅浏览器本地收藏偏好
+      lsSet(FAV_LOCAL_KEY, favorites.value)
     }
-    // 持久化到 localStorage（无论是否登录）
-    lsSet(STORAGE_KEY, {
-      experts: experts.value,
-      fields: fields.value,
-      yiliProjects: yiliProjects.value,
-      favorites: favorites.value,
-    })
   }
 
   function isFavorited(expertId: number): boolean {
     return favorites.value.includes(expertId)
-  }
-
-  // 本地持久化（后端不可用时降级，保证导入/编辑在离线时也能落地到 localStorage）
-  function persistLocal() {
-    lsSet(STORAGE_KEY, {
-      experts: experts.value,
-      fields: fields.value,
-      yiliProjects: yiliProjects.value,
-      favorites: favorites.value,
-    })
   }
 
   // ===== 搜索历史 =====
@@ -941,7 +914,7 @@ export const useAppStore = defineStore('app', () => {
     currentSort, scoreFilter, fieldFilter, supplierFilter,
     favoritesFilter, cooperationFilter, searchQuery, adminSearchQuery,
     adminTab, adminSubTab, editingExpert, fieldsCollapsed,
-    currentPage, PAGE_SIZE, searchHistory, loading, showScores, sortOptions,
+    currentPage, PAGE_SIZE, searchHistory, loading, dataError, showScores, sortOptions,
     platformTitle, colorScheme, appDescription, updateTime, mobileAdaptation, COLOR_SCHEMES,
     // 测试模式
     testMode, testRole,
@@ -954,7 +927,7 @@ export const useAppStore = defineStore('app', () => {
     saveField, deleteField, toggleFavorite, isFavorited, setShowScores, saveSortOptions,
     setPlatformTitle, setColorScheme, setAppDescription, refreshUpdateTime, setMobileAdaptation, applyColorScheme,
     saveSearchHistory, removeSearchHistoryItem, clearSearchHistory,
-    toggleFieldFilter, clearFilters, setMode, setAdminTab, persistLocal,
+    toggleFieldFilter, clearFilters, setMode, setAdminTab,
     enterTestMode, exitTestMode, switchTestRole,
   }
 })

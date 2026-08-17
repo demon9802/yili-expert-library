@@ -292,8 +292,8 @@ async function exitTestMode() {
 }
 
 function clearCache() {
-  if (!confirm('确认清除本地缓存？将移除浏览器收藏等本地数据并重新加载。')) return
-  localStorage.removeItem('yili_expert_db')
+  if (!confirm('确认清除本地缓存？将移除浏览器本地收藏与搜索历史并重新加载。')) return
+  localStorage.removeItem('yili_favorites_local')
   localStorage.removeItem('yili_search_history')
   location.reload()
 }

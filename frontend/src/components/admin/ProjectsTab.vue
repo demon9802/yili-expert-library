@@ -638,8 +638,7 @@ function importProjectsFromFile(file: File) {
         try {
           await store.saveProject(payload)
         } catch {
-          store.yiliProjects.push({ ...payload, id: -Date.now() - ok } as Project)
-          store.persistLocal()
+          // 后端不可用时不再写入本地静态数据，跳过该条
         }
         ok++
       }

@@ -45,6 +45,11 @@
       </div>
     </header>
 
+    <!-- 后端数据加载失败提示 -->
+    <div v-if="store.dataError" style="background:#fde8e8;color:#9b1c1c;border:1px solid #f5c2c2;padding:10px 16px;margin:0 0 12px;font-size:14px;border-radius:8px">
+      ⚠️ 数据加载失败：无法从后端获取数据，请检查后端服务是否可用。
+    </div>
+
     <!-- Stats Bar -->
     <div class="stats-bar">
       <div class="stat-card stat-chart-card" style="flex:1;min-width:400px;padding:16px 20px">

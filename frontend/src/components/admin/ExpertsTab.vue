@@ -705,9 +705,7 @@ function importExpertsFromFile(file: File) {
           await store.saveExpert(payload)
           ok++
         } catch {
-          store.experts.push({ ...payload, id: -Date.now() - ok } as Expert)
-          store.persistLocal()
-          ok++
+          // 后端不可用时不再写入本地静态数据，跳过该条
         }
       }
       window.alert(`成功导入 ${ok} 条专家${skipped ? `，${skipped} 条重复姓名已跳过` : ''}`)
@@ -842,8 +840,8 @@ async function submitForm() {
   form.contactType = contactArr[0].type || 'phone'
   try {
     await store.saveExpert({ ...form })
-  } catch {
-    store.persistLocal()
+  } catch (err) {
+    window.alert('保存失败：' + (err as Error).message)
   }
   closeModal()
 }
