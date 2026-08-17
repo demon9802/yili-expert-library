@@ -95,11 +95,13 @@ export const useAppStore = defineStore('app', () => {
   const mobileAdaptation = ref<boolean>(true)
 
   // 测试模式（独立数据空间模拟不同角色视角）
-  // 初始值从 localStorage 恢复，避免刷新后丢失测试态
-  const testMode = ref<boolean>(lsGet(TEST_MODE_KEY) === true)
-  const testRole = ref<'master' | 'sub' | 'user'>(
-    (lsGet(TEST_ROLE_KEY) as 'master' | 'sub' | 'user') || 'master'
-  )
+  // ⚠️ 测试环境功能已于 2026-08-17 下线：不再从 localStorage 恢复测试态，
+  // 并主动清理历史残留标记，确保任何浏览器都不会再进入测试模式。
+  const testMode = ref<boolean>(false)
+  lsRemove(TEST_MODE_KEY)
+  lsRemove(TEST_ROLE_KEY)
+  lsRemove(TEST_DB_KEY)
+  const testRole = ref<'master' | 'sub' | 'user'>('master')
 
   // 配色方案预设（运行时改写 --primary / --primary-light / --primary-dark）
   const COLOR_SCHEMES: Record<string, { name: string; primary: string; light: string; dark: string }> = {
@@ -399,19 +401,9 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
-  async function enterTestMode(role: 'master' | 'sub' | 'user' = 'master') {
-    // 先快照当前生产数据（深拷贝，避免后续本地修改影响快照本身）
-    const snapshot = {
-      experts: JSON.parse(JSON.stringify(experts.value)),
-      fields: JSON.parse(JSON.stringify(fields.value)),
-      yiliProjects: JSON.parse(JSON.stringify(yiliProjects.value)),
-      favorites: JSON.parse(JSON.stringify(favorites.value)),
-    }
-    lsSet(TEST_DB_KEY, snapshot)
-    testRole.value = role
-    testMode.value = true
-    lsSet(TEST_MODE_KEY, true)
-    lsSet(TEST_ROLE_KEY, role)
+  async function enterTestMode(_role: 'master' | 'sub' | 'user' = 'master') {
+    // 测试环境功能已下线（2026-08-17）：入口已移除，此函数保留为空实现以防误调用
+    console.warn('测试环境功能已下线')
   }
 
   async function exitTestMode() {
@@ -502,6 +494,22 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 专家 CRUD =====
   async function saveExpert(expert: Partial<Expert>) {
+    // 新增专家未带评分时，按评分模型自动评分（无识别内容=各子项空缺2★）：
+    // 否则 scores 为空导致状态联动无从触发，专家停留在 active（后台显示"正常"），
+    // 与评分模型预期（空缺2★→综合2分→进观察库）不符。批量导入未填评分列时同理。
+    if (!expert.id && (expert.scores as any)?.overall == null) {
+      const auto = autoScoreExpert(expert as Expert, yiliProjects.value)
+      expert.scores = {
+        ...((expert.scores as any) || {}),
+        professional: auto.professional,
+        influence: auto.influence,
+        overall: auto.overall,
+      }
+      ;(expert as any).subScores = {
+        professional: auto.professionalItems,
+        influence: auto.influenceItems,
+      }
+    }
     // 评分→状态动态流动：所有带综合分的保存路径（单个新建/编辑/批量导入）统一联动，
     // 低分(<3)自动进观察库、达标自动退出；已淘汰不覆盖。此前仅"自动评分"路径联动，
     // 批量导入低分专家时 status 保持 active，导致观察库缺失、后台状态显示"正常"。

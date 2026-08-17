@@ -84,15 +84,7 @@
         </div>
       </div>
 
-      <!-- 测试环境 -->
-      <div class="form-block test-mode-block">
-        <label class="form-label">测试环境</label>
-        <p class="input-hint">进入后将在独立数据空间模拟主管理员 / 子管理员 / 前端用户三种视角，所有改动仅保存在本地、不影响正式库；退出时自动从生产库还原数据。角色切换请使用顶部橙色横幅。</p>
-        <div class="form-actions test-actions">
-          <button v-if="!store.testMode" class="btn btn-warning" :disabled="saving" @click="enterTestMode">进入测试环境</button>
-          <button v-else class="btn danger" :disabled="saving" @click="exitTestMode">退出测试环境</button>
-        </div>
-      </div>
+      <!-- 测试环境功能已于 2026-08-17 下线（用途有限且曾造成沙盒泄漏，入口移除） -->
 
       <!-- 部署信息 -->
       <div class="form-block">
@@ -269,26 +261,6 @@ function pickScheme(key: string) {
 async function refreshTime() {
   await store.refreshUpdateTime()
   message.value = '更新时间已刷新'
-}
-
-async function enterTestMode() {
-  saving.value = true
-  try {
-    await store.enterTestMode('master')
-    message.value = '已进入测试环境：可在顶部橙色横幅切换角色'
-  } finally {
-    saving.value = false
-  }
-}
-
-async function exitTestMode() {
-  saving.value = true
-  try {
-    await store.exitTestMode()
-    message.value = '已退出测试模式，正式数据已还原'
-  } finally {
-    saving.value = false
-  }
 }
 
 function clearCache() {
