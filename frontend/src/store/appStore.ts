@@ -502,24 +502,12 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 专家 CRUD =====
   async function saveExpert(expert: Partial<Expert>) {
-    if (testMode.value) {
-      // 测试模式：仅本地变更，写入独立数据空间，不触碰生产库
-      if (expert.id) {
-        const idx = experts.value.findIndex(e => e.id === expert.id)
-        if (idx >= 0) experts.value[idx] = { ...experts.value[idx], ...expert } as Expert
-        persistTest()
-        return experts.value[idx]
-      } else {
-        const created = { ...expert, id: Date.now() } as Expert
-        experts.value.push(created)
-        persistTest()
-        return created
-      }
-    }
     // 评分→状态动态流动：所有带综合分的保存路径（单个新建/编辑/批量导入）统一联动，
     // 低分(<3)自动进观察库、达标自动退出；已淘汰不覆盖。此前仅"自动评分"路径联动，
     // 批量导入低分专家时 status 保持 active，导致观察库缺失、后台状态显示"正常"。
     // guard：payload 显式带了 observationStatus（手动入库/自动评分/编辑继承）时不干预，仅联动"未指定观察状态"的保存。
+    // 注意：联动必须放在 testMode 分支之前——测试环境是行为模拟沙盒，模拟必须与真实保存一致，
+    // 否则在测试环境里验证不到该逻辑（experts.value 在测试态即沙盒数据，联动落沙盒，不污染正式库）。
     const overallVal = (expert.scores as any)?.overall
     if (
       overallVal !== null && overallVal !== undefined && !Number.isNaN(Number(overallVal)) &&
@@ -533,6 +521,20 @@ export const useAppStore = defineStore('app', () => {
         existing?.status ?? expert.status ?? 'active',
         existing?.observationStatus ?? null
       )
+    }
+    if (testMode.value) {
+      // 测试模式：仅本地变更，写入独立数据空间，不触碰生产库
+      if (expert.id) {
+        const idx = experts.value.findIndex(e => e.id === expert.id)
+        if (idx >= 0) experts.value[idx] = { ...experts.value[idx], ...expert } as Expert
+        persistTest()
+        return experts.value[idx]
+      } else {
+        const created = { ...expert, id: Date.now() } as Expert
+        experts.value.push(created)
+        persistTest()
+        return created
+      }
     }
     if (expert.id) {
       const updated = await expertApi.update(expert.id, expert)
@@ -573,6 +575,8 @@ export const useAppStore = defineStore('app', () => {
 
   // ===== 观察库操作记录 =====
   // 记录一次观察库操作（移入/淘汰/延期/调分等），后端不可用时静默失败不影响主操作。
+  // ⚠️ 测试环境（testMode）沙盒内绝不写真实后端日志：否则会污染月报"删除/观察/调整"统计
+  // （deleteExpert 等调用点位于 testMode 分支之前，必须在此统一拦截）。
   async function recordObservationOperation(payload: {
     expertId: number
     expertName: string
@@ -582,6 +586,7 @@ export const useAppStore = defineStore('app', () => {
     note: string
     tags?: string[]
   }) {
+    if (testMode.value) return
     const user = currentUser.value
     try {
       await observationApi.create({
