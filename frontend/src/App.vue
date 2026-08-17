@@ -7,6 +7,7 @@
         <h2 class="dy-denied-title">访问受限</h2>
         <p class="dy-denied-desc">{{ deniedReason }}</p>
         <p class="dy-denied-sub">如有疑问，请联系总部数字科技中心</p>
+        <button class="dy-denied-admin-btn" @click="goAdmin">管理员入口</button>
       </div>
     </div>
     <template v-else>
@@ -39,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import { getToken } from '@/api/request'
@@ -53,6 +54,27 @@ const router = useRouter()
 const accessDenied = ref(false)
 const deniedReason = ref('')
 
+// 后台体系（/admin-login、/admin）不参与数字伊利拦截：
+// 管理员走已有的邮箱+密码认证（双轨身份），保证部署者/管理员始终可进入
+function isAdminRoute(path: string): boolean {
+  return path === '/admin-login' || path.startsWith('/admin')
+}
+
+function goAdmin() {
+  router.push('/admin-login')
+}
+
+async function initApp() {
+  // 记录页面访问
+  pageViewApi.recordView().catch(() => {})
+  // 检查登录状态
+  if (getToken()) {
+    await store.checkAuthState()
+  }
+  // 加载应用数据
+  await store.loadAppData()
+}
+
 const roleLabel = computed(() => {
   if (store.testRole === 'master') return '主管理员'
   if (store.testRole === 'sub') return '子管理员'
@@ -65,7 +87,13 @@ async function exit() {
 }
 
 onMounted(async () => {
-  // 数字伊利身份校验（URL 携带 digitalYiliToken 时生效）
+  // 后台路由不做数字伊利拦截（管理员邮箱认证保护）
+  if (isAdminRoute(router.currentRoute.value.path)) {
+    await initApp()
+    return
+  }
+
+  // 数字伊利身份校验（URL 携带 digitalYiliToken 时验证；部署环境无 token 一律拦截）
   const access = await resolveDigitalYiliAccess()
   if (access.status === 'denied') {
     accessDenied.value = true
@@ -73,19 +101,19 @@ onMounted(async () => {
     return // 阻断：不记录访问、不加载应用数据
   }
 
-  // 记录页面访问
-  pageViewApi.recordView().catch(() => {})
-
-  // 检查登录状态
-  if (getToken()) {
-    await store.checkAuthState()
-  }
-
-  // 加载应用数据
-  await store.loadAppData()
-
-  // 路由权限统一在 router/index.ts 中处理，避免普通用户 token 被误判为后台权限
+  await initApp()
 })
+
+// 被拦截状态下切换到后台路由（管理员入口）时解除拦截并补初始化
+watch(
+  () => router.currentRoute.value.path,
+  async path => {
+    if (accessDenied.value && isAdminRoute(path)) {
+      accessDenied.value = false
+      await initApp()
+    }
+  }
+)
 </script>
 
 <style>
@@ -129,6 +157,22 @@ onMounted(async () => {
   margin: 0;
   font-size: 12px;
   color: #9ca3af;
+}
+.dy-denied-admin-btn {
+  margin-top: 22px;
+  padding: 9px 26px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dy-denied-admin-btn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
 }
 </style>
 
