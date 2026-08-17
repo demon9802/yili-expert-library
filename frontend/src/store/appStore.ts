@@ -516,6 +516,24 @@ export const useAppStore = defineStore('app', () => {
         return created
       }
     }
+    // 评分→状态动态流动：所有带综合分的保存路径（单个新建/编辑/批量导入）统一联动，
+    // 低分(<3)自动进观察库、达标自动退出；已淘汰不覆盖。此前仅"自动评分"路径联动，
+    // 批量导入低分专家时 status 保持 active，导致观察库缺失、后台状态显示"正常"。
+    // guard：payload 显式带了 observationStatus（手动入库/自动评分/编辑继承）时不干预，仅联动"未指定观察状态"的保存。
+    const overallVal = (expert.scores as any)?.overall
+    if (
+      overallVal !== null && overallVal !== undefined && !Number.isNaN(Number(overallVal)) &&
+      expert.status !== 'eliminated' &&
+      expert.observationStatus === undefined
+    ) {
+      const existing = expert.id ? experts.value.find(e => e.id === expert.id) : undefined
+      applyStatusPayload(
+        expert,
+        Number(overallVal),
+        existing?.status ?? expert.status ?? 'active',
+        existing?.observationStatus ?? null
+      )
+    }
     if (expert.id) {
       const updated = await expertApi.update(expert.id, expert)
       const idx = experts.value.findIndex(e => e.id === expert.id)
