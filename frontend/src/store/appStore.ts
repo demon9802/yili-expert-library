@@ -218,8 +218,9 @@ export const useAppStore = defineStore('app', () => {
         fields.value = cached.fields || []
         yiliProjects.value = cached.yiliProjects || []
         favorites.value = cached.favorites || []
-      } else if (window.EXPERT_DATA) {
-        // 开发/无后端 fallback: 使用原始 data.js
+      } else if (import.meta.env.DEV && window.EXPERT_DATA) {
+        // 仅开发环境无后端 fallback：使用原始 data.js
+        // 生产/SIT 不启用，避免后端异常时展示旧版 10 分制静态数据造成误导
         experts.value = window.EXPERT_DATA.experts || []
         fields.value = window.EXPERT_DATA.fields || []
         yiliProjects.value = window.EXPERT_DATA.yiliProjects || []

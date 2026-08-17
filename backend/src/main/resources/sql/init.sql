@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `yl_expert_resource_expert` (
   `is_supplier` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否供应商',
   `qual_display` TEXT DEFAULT NULL COMMENT '资质展示文本',
   `adv_display` TEXT DEFAULT NULL COMMENT '优势展示文本',
+  `rating_reference` VARCHAR(500) DEFAULT NULL COMMENT '评分依据/参考来源',
   `scores` JSON DEFAULT NULL COMMENT '评分{professional,influence,overall,subScores}',
   `status` VARCHAR(50) DEFAULT 'active' COMMENT '状态: active/inactive/observed',
   `observation_status` VARCHAR(100) DEFAULT NULL COMMENT '观察状态',
