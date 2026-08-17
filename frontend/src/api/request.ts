@@ -10,6 +10,8 @@ import type { ApiResponse } from '@/types'
 // 本地开发未设置该变量时回退为 '/api'，由 vite.config.ts 的 proxy 转发到 localhost:8080。
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 const BASE_URL = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
+// 暴露给系统设置-部署信息展示（当前构建实际指向的后端域名；本地开发为空=走 proxy）
+export { API_ORIGIN, BASE_URL }
 const TOKEN_KEY = 'yili_expert_token'
 const REQUEST_TIMEOUT = 6000
 

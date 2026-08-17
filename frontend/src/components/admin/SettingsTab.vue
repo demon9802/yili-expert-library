@@ -86,21 +86,25 @@
 
       <!-- 测试环境功能已于 2026-08-17 下线（用途有限且曾造成沙盒泄漏，入口移除） -->
 
-      <!-- 部署信息 -->
+      <!-- 部署信息（运行时自动识别，无需手动维护） -->
       <div class="form-block">
         <label class="form-label">部署信息</label>
         <div class="deploy-info">
           <div class="deploy-row">
-            <span class="deploy-label">正式链接</span>
-            <a class="deploy-value" :href="DEPLOY_URL" target="_blank" rel="noopener">{{ DEPLOY_URL }}</a>
+            <span class="deploy-label">当前入口</span>
+            <a class="deploy-value" :href="currentOrigin" target="_blank" rel="noopener">{{ currentOrigin }}</a>
+          </div>
+          <div class="deploy-row">
+            <span class="deploy-label">后端 API</span>
+            <span class="deploy-value">{{ apiOriginText }}</span>
+          </div>
+          <div class="deploy-row">
+            <span class="deploy-label">构建版本</span>
+            <span class="deploy-value">{{ buildVersionText }}</span>
           </div>
           <div class="deploy-row">
             <span class="deploy-label">代码仓库</span>
             <a class="deploy-value" :href="REPO_URL" target="_blank" rel="noopener">{{ REPO_URL }}</a>
-          </div>
-          <div class="deploy-row">
-            <span class="deploy-label">数据库</span>
-            <span class="deploy-value">Supabase（新加坡）</span>
           </div>
         </div>
       </div>
@@ -160,14 +164,20 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
+import { API_ORIGIN } from '@/api/request'
 
 const store = useAppStore()
 const DEFAULT_TITLE = 'DACC·数智化赋能优质专家资源库'
 
 const CORE_SOURCE_URL = 'https://docs.qq.com/sheet/DTUROVmZod2FxSGFO?tab=n99xou'
 const PROGRESS_SOURCE_URL = 'https://docs.qq.com/smartsheet/DTVJIWmh2ZXdBUE14?tab=t00i2h'
-const DEPLOY_URL = 'https://yili-expert-library-bvw2itdk.zh-cn.edgeone.cool/'
-const REPO_URL = 'https://github.com/demon9802/yili-expert-library'
+// 内部代码仓库（Coding）；入口/API/版本均已运行时自动识别，仅仓库地址需人工维护
+const REPO_URL = 'https://e.coding.yili.com/yldc/yilidata/ai-expert-resource-web'
+
+// 部署信息：运行时自动识别，消除硬编码偏差
+const currentOrigin = window.location.origin
+const apiOriginText = API_ORIGIN || '本地开发（proxy → localhost:8080）'
+const buildVersionText = `${__BUILD_COMMIT__}（构建于 ${__BUILD_TIME__}）`
 
 const titleInput = ref(store.platformTitle || DEFAULT_TITLE)
 const mobileAdaptationInput = ref(store.mobileAdaptation)
