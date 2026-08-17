@@ -74,10 +74,20 @@ async function fetchUserInfo(token: string): Promise<DigitalYiliUser | null> {
 /**
  * 主入口：解析当前访问的数字伊利身份并判定访问权限。
  * 调用时机：App 挂载时（页面加载/刷新）。
+ *
+ * 访问策略（2026-08-17 用户确认）：
+ * - 带 token：验证数科身份，非数科 → 访问受限
+ * - 不带 token：部署环境（SIT/PROD）一律"访问受限"（须从内部平台入口进入）；
+ *   仅 localhost 本地开发放行，保证开发调试不受影响。
  */
 export async function resolveDigitalYiliAccess(): Promise<DyAccessStatus> {
   const token = getDigitalYiliTokenFromUrl()
-  if (!token) return { status: 'no-token' }
+  if (!token) {
+    const h = window.location.hostname
+    const isLocalDev = h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '[::1]'
+    if (isLocalDev) return { status: 'no-token' }
+    return { status: 'denied', reason: '缺少身份凭证（digitalYiliToken），请从内部平台进入本系统' }
+  }
 
   // ① 本地缓存命中（24h 内同 token 直接复用，不调三方接口）
   const cached = readCache(token)
