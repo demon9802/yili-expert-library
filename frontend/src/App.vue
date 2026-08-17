@@ -1,5 +1,15 @@
 <template>
   <div id="app-root">
+    <!-- 数字伊利身份校验：非数科人员全屏阻断 -->
+    <div v-if="accessDenied" class="dy-denied-overlay">
+      <div class="dy-denied-card">
+        <div class="dy-denied-icon">🔒</div>
+        <h2 class="dy-denied-title">访问受限</h2>
+        <p class="dy-denied-desc">{{ deniedReason }}</p>
+        <p class="dy-denied-sub">如有疑问，请联系总部数字科技中心</p>
+      </div>
+    </div>
+    <template v-else>
     <!-- 测试模式全局横幅：模拟不同角色视角，并提供角色切换与退出（逃逸通道） -->
     <div v-if="store.testMode" class="test-mode-banner">
       <span class="test-mode-flag">🧪 测试模式</span>
@@ -24,18 +34,24 @@
       <button class="test-exit-btn" @click="exit">退出测试模式</button>
     </div>
     <router-view />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import { getToken } from '@/api/request'
 import { pageViewApi } from '@/api/pageView'
+import { resolveDigitalYiliAccess } from '@/api/digitalYili'
 
 const store = useAppStore()
 const router = useRouter()
+
+// 数字伊利身份校验结果（非数科人员 → 全屏"访问受限"，不加载任何业务数据）
+const accessDenied = ref(false)
+const deniedReason = ref('')
 
 const roleLabel = computed(() => {
   if (store.testRole === 'master') return '主管理员'
@@ -49,6 +65,14 @@ async function exit() {
 }
 
 onMounted(async () => {
+  // 数字伊利身份校验（URL 携带 digitalYiliToken 时生效）
+  const access = await resolveDigitalYiliAccess()
+  if (access.status === 'denied') {
+    accessDenied.value = true
+    deniedReason.value = access.reason
+    return // 阻断：不记录访问、不加载应用数据
+  }
+
   // 记录页面访问
   pageViewApi.recordView().catch(() => {})
 
@@ -63,6 +87,50 @@ onMounted(async () => {
   // 路由权限统一在 router/index.ts 中处理，避免普通用户 token 被误判为后台权限
 })
 </script>
+
+<style>
+.dy-denied-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.92);
+}
+.dy-denied-card {
+  max-width: 420px;
+  margin: 0 24px;
+  padding: 48px 40px;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+.dy-denied-icon {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 18px;
+}
+.dy-denied-title {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+.dy-denied-desc {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #4b5563;
+  line-height: 1.7;
+  word-break: break-all;
+}
+.dy-denied-sub {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+</style>
 
 <style>
 .test-mode-banner {
