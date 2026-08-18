@@ -3,7 +3,7 @@
     <!-- 默认不挂载任何路由内容，身份明确通过后才展示业务页面。 -->
     <div v-if="!accessChecked" class="dy-checking-overlay" aria-live="polite">
       <div class="dy-checking-spinner"></div>
-      <p>正在验证访问权限...</p>
+      <p>{{ entryRedirecting ? '正在跳转，请稍候...' : '正在验证访问权限...' }}</p>
     </div>
     <div v-else-if="accessDenied" class="dy-denied-overlay">
       <div class="dy-denied-card">
@@ -49,6 +49,7 @@ import { useAppStore } from '@/store/appStore'
 import { getToken } from '@/api/request'
 import { pageViewApi } from '@/api/pageView'
 import { resolveDigitalYiliAccess } from '@/api/digitalYili'
+import { resolveEntryDecision, collectBrowserEntryEnv, executeEntryRedirect } from '@/utils/entryGuard'
 
 const store = useAppStore()
 const router = useRouter()
@@ -57,11 +58,37 @@ const router = useRouter()
 const accessChecked = ref(false)
 const accessDenied = ref(false)
 const deniedReason = ref('')
+// 入口分流跳转中（业务端生产环境）：保持遮罩并显示跳转文案，不挂载任何业务内容
+const entryRedirecting = ref(false)
 let accessCheckId = 0
 let initPromise: Promise<void> | null = null
 
 function isAdminRoute(path: string): boolean {
   return path === '/admin-login' || path.startsWith('/admin')
+}
+
+// 业务端入口分流范围：仅路由 meta 显式标记 businessEntryRedirect 的路由（当前为前台 "/"）。
+// 管理后台路由不带该标记，完全不适用分流逻辑。
+function isBusinessEntryRoute(path: string): boolean {
+  const route = router.resolve(path).matched[0]
+  return route?.meta?.businessEntryRedirect === true
+}
+
+/**
+ * 入口分流（《数字伊利推送中转跳转页面.docx》）：
+ * 仅生产构建 + 业务端路由生效。决策为跳转时：
+ * - 保持启动遮罩（checking/redirecting），不挂载业务页面
+ * - 直接 return，不执行身份校验/initApp，保证跳转前业务接口请求为 0
+ */
+function applyEntryRedirectIfNeeded(path: string): boolean {
+  entryRedirecting.value = false
+  if (!isBusinessEntryRoute(path)) return false
+  const decision = resolveEntryDecision(collectBrowserEntryEnv())
+  if (decision.action === 'render') return false
+  entryRedirecting.value = true
+  // replace 避免返回键再次进入当前页形成跳转循环
+  executeEntryRedirect(decision.url)
+  return true
 }
 
 // 注：访问受限页不再提供"管理员入口"按钮（2026-08-18 用户要求移除公开入口）；
@@ -110,6 +137,11 @@ async function checkRouteAccess(path: string) {
   accessChecked.value = false
   accessDenied.value = false
   deniedReason.value = ''
+
+  // 入口分流（最先执行）：生产环境业务端按 APP/iframe/私有企微/PC 规则决策；
+  // 决定跳转时保持遮罩并直接返回——不做身份校验、不 initApp，跳转前业务请求为 0。
+  if (applyEntryRedirectIfNeeded(path)) return
+
   const access = await resolveDigitalYiliAccess()
   if (checkId !== accessCheckId) return
 

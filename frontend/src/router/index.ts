@@ -8,6 +8,9 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'frontend',
     component: () => import('@/views/FrontendView.vue'),
+    // 业务端入口分流标记：生产环境下按 APP/iframe/私有企微/PC 规则分流（见 utils/entryGuard.ts）
+    // 管理后台路由不得添加此标记
+    meta: { businessEntryRedirect: true },
   },
   {
     path: '/admin-login',
