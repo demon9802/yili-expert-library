@@ -39,8 +39,8 @@ export const useAppStore = defineStore('app', () => {
   const yiliProjects = ref<Project[]>([])
   const favorites = ref<number[]>([])
 
-  // 筛选状态
-  const currentSort = ref('default')
+  // 筛选状态（默认按综合评分从高到低）
+  const currentSort = ref('overall')
   const scoreFilter = ref<{ min: number | null; max: number | null }>({ min: null, max: null })
   const fieldFilter = ref<Set<string>>(new Set())
   const supplierFilter = ref<boolean | null>(null)
@@ -71,10 +71,10 @@ export const useAppStore = defineStore('app', () => {
   // 前端评分展示开关（评分管理 → 前端展示控制）
   const showScores = ref<boolean>(true)
 
-  // 排序选项（V5 管理后台可配置）
+  // 排序选项（V5 管理后台可配置）；default=按姓名首字母，展示名"按姓氏字母"（不再叫"默认排序"）
   const sortOptions = ref<{ id: string; name: string }[]>([
-    { id: 'default', name: '默认排序' },
     { id: 'overall', name: '按综合评分' },
+    { id: 'default', name: '按姓氏字母' },
     { id: 'professional', name: '按专业度' },
     { id: 'influence', name: '按影响力' }
   ])
@@ -241,7 +241,10 @@ export const useAppStore = defineStore('app', () => {
       if (v) {
         const parsed = JSON.parse(v)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          sortOptions.value = parsed
+          // 兜底：历史配置中 default 项可能仍叫"默认排序"，统一改为"按姓氏字母"
+          sortOptions.value = parsed.map((o: { id: string; name: string }) =>
+            o.id === 'default' ? { ...o, name: '按姓氏字母' } : o
+          )
         }
       }
     } catch {

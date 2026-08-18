@@ -11,7 +11,6 @@
         <h2 class="dy-denied-title">访问受限</h2>
         <p class="dy-denied-desc">{{ deniedReason }}</p>
         <p class="dy-denied-sub">如有疑问，请联系总部数字科技中心</p>
-        <button class="dy-denied-admin-btn" @click="goAdmin">管理员入口</button>
       </div>
     </div>
     <template v-else>
@@ -65,9 +64,8 @@ function isAdminRoute(path: string): boolean {
   return path === '/admin-login' || path.startsWith('/admin')
 }
 
-function goAdmin() {
-  router.push('/admin-login')
-}
+// 注：访问受限页不再提供"管理员入口"按钮（2026-08-18 用户要求移除公开入口）；
+// 后台管理员仍可直接访问 /admin-login（由邮箱+密码认证保护，隐性通道）。
 
 async function initApp() {
   // 记录页面访问
@@ -197,22 +195,6 @@ watch(
   margin: 0;
   font-size: 12px;
   color: #9ca3af;
-}
-.dy-denied-admin-btn {
-  margin-top: 22px;
-  padding: 9px 26px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #f9fafb;
-  color: #4b5563;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.dy-denied-admin-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff6ff;
 }
 </style>
 

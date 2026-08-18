@@ -144,7 +144,6 @@
         <select v-model="store.currentSort" class="filter-select" @change="store.currentPage = 1">
           <option v-for="opt in sortOptions" :key="opt.id" :value="opt.id">{{ opt.name }}</option>
         </select>
-        <span class="sort-hint">默认排序按照姓名字母排序，不区分排名先后</span>
       </div>
     </div>
 
