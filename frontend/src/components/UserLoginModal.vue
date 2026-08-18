@@ -16,7 +16,7 @@
         <input
           v-model="loginEmail"
           type="text"
-          placeholder="邮箱地址"
+          placeholder="账号名称"
           @keydown.enter="handleLogin"
         />
         <input
@@ -36,11 +36,11 @@
       <!-- Signup Form -->
       <div v-else-if="mode === 'signup'" class="auth-form">
         <h3>用户注册</h3>
-        <p class="auth-hint">使用邮箱注册即可，注册后自动登录。<br />邮箱仅作为登录账号，不读取任何信息，请放心使用。</p>
+        <p class="auth-hint">自定义账号名称、设置密码，即可完成注册。<br />账号仅作为登录凭据，不读取任何信息，请放心使用。</p>
         <input
           v-model="signupEmail"
           type="text"
-          placeholder="邮箱地址"
+          placeholder="账号名称"
           @keydown.enter="handleSignup"
         />
         <input
@@ -128,7 +128,7 @@ const successMsg = ref('')
 async function handleLogin() {
   error.value = ''
   if (!loginEmail.value.trim()) {
-    error.value = '请输入邮箱'
+    error.value = '请输入账号名称'
     return
   }
   if (!loginPassword.value) {
@@ -148,12 +148,14 @@ async function handleLogin() {
 
 async function handleSignup() {
   error.value = ''
+  // 账号名为任意自定义字符串（不再要求邮箱格式）；唯一性由后端注册查重+DB唯一索引保障，
+  // 重复时后端返回"该账号已注册，请直接登录"并展示在下方错误区
   if (!signupEmail.value.trim()) {
-    error.value = '请输入邮箱'
+    error.value = '请输入账号名称'
     return
   }
-  if (!signupEmail.value.includes('@')) {
-    error.value = '邮箱格式不正确'
+  if (signupEmail.value.trim().length < 2) {
+    error.value = '账号名称至少2个字符'
     return
   }
   if (!signupPassword.value || signupPassword.value.length < 6) {

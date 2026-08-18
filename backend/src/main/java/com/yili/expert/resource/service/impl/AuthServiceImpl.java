@@ -34,7 +34,7 @@ public class AuthServiceImpl implements AuthService {
         String password = request.getPassword();
 
         if (email == null || email.trim().isEmpty()) {
-            throw new RuntimeException("邮箱不能为空");
+            throw new RuntimeException("账号不能为空");
         }
         if (password == null || password.length() < 6) {
             throw new RuntimeException("密码至少6位");
@@ -44,7 +44,7 @@ public class AuthServiceImpl implements AuthService {
         UserEntity existing = userMapper.selectOne(
                 new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
         if (existing != null) {
-            throw new RuntimeException("该邮箱已注册，请直接登录");
+            throw new RuntimeException("该账号已注册，请直接登录");
         }
 
         UserEntity user = new UserEntity();
@@ -108,7 +108,7 @@ public class AuthServiceImpl implements AuthService {
         UserEntity user = userMapper.selectOne(
                 new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
         if (user == null) {
-            throw new RuntimeException("该邮箱未注册");
+            throw new RuntimeException("该账号未注册");
         }
         // 生成临时密码并标记强制改密
         String tempPassword = "yl" + (int) (Math.random() * 1000000);
@@ -335,7 +335,7 @@ public class AuthServiceImpl implements AuthService {
         String password = request.getPassword();
 
         if (email == null || email.trim().isEmpty()) {
-            throw new RuntimeException("邮箱不能为空");
+            throw new RuntimeException("账号不能为空");
         }
         if (password == null || password.length() < 6) {
             throw new RuntimeException("密码至少6位");
@@ -344,7 +344,7 @@ public class AuthServiceImpl implements AuthService {
         UserEntity existing = userMapper.selectOne(
                 new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email));
         if (existing != null) {
-            throw new RuntimeException("该邮箱已存在");
+            throw new RuntimeException("该账号已存在");
         }
 
         UserEntity user = new UserEntity();
