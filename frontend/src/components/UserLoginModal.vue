@@ -41,8 +41,10 @@
           v-model="signupEmail"
           type="text"
           placeholder="账号名称"
+          @blur="checkAccountAvailable"
           @keydown.enter="handleSignup"
         />
+        <div v-if="accountTip" :class="['account-tip', { taken: accountTaken }]">{{ accountTip }}</div>
         <input
           v-model="signupPassword"
           type="password"
@@ -124,6 +126,27 @@ const confirmPassword = ref('')
 const loading = ref(false)
 const error = ref('')
 const successMsg = ref('')
+// 账号实时占用校验（注册输入框失焦触发；接口不可用时静默降级为提交时校验）
+const accountTip = ref('')
+const accountTaken = ref(false)
+
+async function checkAccountAvailable() {
+  accountTip.value = ''
+  accountTaken.value = false
+  const name = signupEmail.value.trim()
+  if (!name || name.length < 2) return
+  try {
+    const exists = await authApi.checkAccount(name)
+    if (exists) {
+      accountTaken.value = true
+      accountTip.value = '该账号已注册，请直接登录'
+    } else {
+      accountTip.value = '账号可用 ✓'
+    }
+  } catch {
+    /* 接口不可用（如后端未更新）：静默，交给提交时后端校验兜底 */
+  }
+}
 
 async function handleLogin() {
   error.value = ''
@@ -168,6 +191,14 @@ async function handleSignup() {
   }
   loading.value = true
   try {
+    // 提交前再校验一次占用（防止失焦校验未触发/结果过期）
+    const exists = await authApi.checkAccount(signupEmail.value.trim()).catch(() => false)
+    if (exists) {
+      accountTaken.value = true
+      accountTip.value = '该账号已注册，请直接登录'
+      error.value = '该账号已注册，请直接登录'
+      return
+    }
     await store.signUp(signupEmail.value.trim(), signupPassword.value)
     emit('success')
   } catch (e: any) {
@@ -358,5 +389,16 @@ async function handleChangePassword() {
   font-size: 13px;
   margin-bottom: 12px;
   line-height: 1.5;
+}
+
+.account-tip {
+  font-size: 12px;
+  color: #16A34A;
+  margin: -6px 0 10px 2px;
+  line-height: 1.4;
+}
+
+.account-tip.taken {
+  color: #DC2626;
 }
 </style>

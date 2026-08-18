@@ -26,6 +26,11 @@ public class AuthController {
         return ApiResponse.success(authService.signUp(request));
     }
 
+    @GetMapping("/check-account")
+    public ApiResponse<Boolean> checkAccount(@RequestParam("account") String account) {
+        return ApiResponse.success(authService.checkAccountExists(account));
+    }
+
     @PostMapping("/login")
     public ApiResponse<Object> login(@RequestBody LoginRequest request) {
         return ApiResponse.success(authService.login(request));

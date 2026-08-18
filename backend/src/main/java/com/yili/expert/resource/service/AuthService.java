@@ -5,6 +5,9 @@ import java.util.List;
 
 public interface AuthService {
     Object signUp(SignUpRequest request);
+
+    /** 注册输入框实时校验：账号是否已被占用（仅返回存在与否，不泄露其他信息） */
+    boolean checkAccountExists(String email);
     Object login(LoginRequest request);
     void logout();
     void resetPassword(String email);

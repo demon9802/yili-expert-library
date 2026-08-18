@@ -29,6 +29,16 @@ public class AuthServiceImpl implements AuthService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Override
+    public boolean checkAccountExists(String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return false;
+        }
+        UserEntity existing = userMapper.selectOne(
+                new LambdaQueryWrapper<UserEntity>().eq(UserEntity::getEmail, email.trim()));
+        return existing != null;
+    }
+
+    @Override
     public Object signUp(SignUpRequest request) {
         String email = request.getEmail();
         String password = request.getPassword();

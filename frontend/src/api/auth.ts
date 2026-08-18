@@ -13,6 +13,11 @@ export const authApi = {
     return api.post('/auth/login', { email, password })
   },
 
+  /** 注册输入框实时校验：账号是否已被占用（仅返回存在与否） */
+  checkAccount(email: string): Promise<boolean> {
+    return api.get(`/auth/check-account?account=${encodeURIComponent(email)}`)
+  },
+
   logout(): Promise<void> {
     return api.post('/auth/logout')
   },
