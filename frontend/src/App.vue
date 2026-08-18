@@ -1,7 +1,11 @@
 <template>
   <div id="app-root">
-    <!-- 数字伊利身份校验：非数科人员全屏阻断 -->
-    <div v-if="accessDenied" class="dy-denied-overlay">
+    <!-- 默认不挂载任何路由内容，身份明确通过后才展示业务页面。 -->
+    <div v-if="!accessChecked" class="dy-checking-overlay" aria-live="polite">
+      <div class="dy-checking-spinner"></div>
+      <p>正在验证访问权限...</p>
+    </div>
+    <div v-else-if="accessDenied" class="dy-denied-overlay">
       <div class="dy-denied-card">
         <div class="dy-denied-icon">🔒</div>
         <h2 class="dy-denied-title">访问受限</h2>
@@ -40,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store/appStore'
 import { getToken } from '@/api/request'
@@ -50,12 +54,13 @@ import { resolveDigitalYiliAccess } from '@/api/digitalYili'
 const store = useAppStore()
 const router = useRouter()
 
-// 数字伊利身份校验结果（非数科人员 → 全屏"访问受限"，不加载任何业务数据）
+// 鉴权完成前保持全屏等待，不挂载 router-view，也不加载任何业务数据。
+const accessChecked = ref(false)
 const accessDenied = ref(false)
 const deniedReason = ref('')
+let accessCheckId = 0
+let initPromise: Promise<void> | null = null
 
-// 后台体系（/admin-login、/admin）不参与数字伊利拦截：
-// 管理员走已有的邮箱+密码认证（双轨身份），保证部署者/管理员始终可进入
 function isAdminRoute(path: string): boolean {
   return path === '/admin-login' || path.startsWith('/admin')
 }
@@ -75,6 +80,11 @@ async function initApp() {
   await store.loadAppData()
 }
 
+function initAppOnce(): Promise<void> {
+  if (!initPromise) initPromise = initApp()
+  return initPromise
+}
+
 const roleLabel = computed(() => {
   if (store.testRole === 'master') return '主管理员'
   if (store.testRole === 'sub') return '子管理员'
@@ -86,37 +96,47 @@ async function exit() {
   router.push('/')
 }
 
-onMounted(async () => {
-  // 后台路由不做数字伊利拦截（管理员邮箱认证保护）
-  if (isAdminRoute(router.currentRoute.value.path)) {
-    await initApp()
+async function checkRouteAccess(path: string) {
+  const checkId = ++accessCheckId
+
+  // 管理后台保留原有账号密码/JWT 鉴权，由路由守卫负责保护。
+  if (isAdminRoute(path)) {
+    accessDenied.value = false
+    deniedReason.value = ''
+    accessChecked.value = true
+    await initAppOnce()
     return
   }
 
-  // 数字伊利身份校验（URL 携带 digitalYiliToken 时验证；部署环境无 token 一律拦截）
+  // 前台在每次进入时先隐藏路由内容，明确通过数字伊利鉴权后再展示。
+  accessChecked.value = false
+  accessDenied.value = false
+  deniedReason.value = ''
   const access = await resolveDigitalYiliAccess()
+  if (checkId !== accessCheckId) return
+
   if (access.status === 'denied') {
     accessDenied.value = true
     deniedReason.value = access.reason
-    return // 阻断：不记录访问、不加载应用数据
+    accessChecked.value = true
+    return
   }
 
-  await initApp()
-})
+  accessChecked.value = true
+  await initAppOnce()
+}
 
-// 被拦截状态下切换到后台路由（管理员入口）时解除拦截并补初始化
 watch(
-  () => router.currentRoute.value.path,
-  async path => {
-    if (accessDenied.value && isAdminRoute(path)) {
-      accessDenied.value = false
-      await initApp()
-    }
-  }
+  () => [router.currentRoute.value.path, router.currentRoute.value.query.digitalYiliToken] as const,
+  ([path]) => {
+    void checkRouteAccess(path)
+  },
+  { flush: 'sync', immediate: true }
 )
 </script>
 
 <style>
+.dy-checking-overlay,
 .dy-denied-overlay {
   position: fixed;
   inset: 0;
@@ -125,6 +145,26 @@ watch(
   align-items: center;
   justify-content: center;
   background: rgba(15, 23, 42, 0.92);
+}
+.dy-checking-overlay {
+  flex-direction: column;
+  gap: 16px;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+.dy-checking-overlay p {
+  margin: 0;
+}
+.dy-checking-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: dy-spin 0.8s linear infinite;
+}
+@keyframes dy-spin {
+  to { transform: rotate(360deg); }
 }
 .dy-denied-card {
   max-width: 420px;

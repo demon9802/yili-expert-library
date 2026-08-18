@@ -5,14 +5,15 @@
  * - H5 链接后可能拼接参数 digitalYiliToken（也可能不带，需判空）
  * - 用该 token 调 POST /api/auth/digital-yili/getUserInfo（body: { digital_yili_token }）
  *   换取用户信息 { userCode, userName, deptCode, deptName, buName }
- * - 用户信息本地缓存 24 小时（token 作 key），过期自动刷新，避免频繁调用三方接口
+ * - 用户信息仅在当前页面内存中缓存（token 作 key），刷新页面后重新校验
  *
  * 访问控制（业务要求）：非数科人员（deptName 不含"数字科技"）→ 前端显示"访问受限"。
  */
-import { BASE_URL } from '@/api/request'
-
-const DY_USER_CACHE_KEY = 'yili_dy_user_cache'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 小时
+const DEFAULT_EVALUATION_API_ORIGIN = 'https://yilidata-ai-evaluation-api-sit.dctest.digitalyili.com'
+const EVALUATION_API_ORIGIN = (
+  import.meta.env.VITE_EVALUATION_API_BASE_URL || DEFAULT_EVALUATION_API_ORIGIN
+).replace(/\/+$/, '')
 
 export interface DigitalYiliUser {
   userCode: string
@@ -22,11 +23,12 @@ export interface DigitalYiliUser {
   buName?: string
 }
 
+let memoryCache: { token: string; user: DigitalYiliUser; expireAt: number } | null = null
+
 export type DyAccessStatus =
   | { status: 'no-token' }                                    // URL 未携带 token：不做校验（本地/直连场景）
   | { status: 'ok'; user: DigitalYiliUser; fromCache: boolean } // 数科人员，正常访问
-  | { status: 'denied'; reason: string }                      // 非数科人员 / token 无效 → 访问受限
-  | { status: 'unknown'; reason: string }                     // 接口不可达等：降级放行并告警（联调期不被卡死）
+  | { status: 'denied'; reason: string }                      // 非数科人员 / token 无效 / 校验失败 → 访问受限
 
 /** 数科人员判定：部门名包含"数字科技"（示例 deptName=总部数字科技中心） */
 export function isShuKeUser(user: DigitalYiliUser): boolean {
@@ -39,28 +41,31 @@ export function getDigitalYiliTokenFromUrl(): string | null {
   return v && v.trim() ? v.trim() : null
 }
 
-/** 读取本地缓存（token 匹配且未过 24h 才有效） */
+/** 读取当前页面的内存缓存（token 匹配且未过期才有效） */
 function readCache(token: string): DigitalYiliUser | null {
-  try {
-    const raw = localStorage.getItem(DY_USER_CACHE_KEY)
-    if (!raw) return null
-    const c = JSON.parse(raw) as { token: string; user: DigitalYiliUser; expireAt: number }
-    if (c.token !== token || Date.now() > c.expireAt) return null
-    return c.user
-  } catch {
+  if (!memoryCache || memoryCache.token !== token) return null
+  if (Date.now() > memoryCache.expireAt) {
+    memoryCache = null
     return null
   }
+  return memoryCache.user
 }
 
 function writeCache(token: string, user: DigitalYiliUser) {
-  try {
-    localStorage.setItem(DY_USER_CACHE_KEY, JSON.stringify({ token, user, expireAt: Date.now() + CACHE_TTL_MS }))
-  } catch { /* 缓存失败不影响主流程 */ }
+  memoryCache = { token, user, expireAt: Date.now() + CACHE_TTL_MS }
+}
+
+function removeCache() {
+  memoryCache = null
+}
+
+function deniedReasonForUser(user: DigitalYiliUser): string {
+  return `${user.userName || userCodeFallback(user)}（${user.deptName || '未知部门'}）无访问权限，本系统仅限数字科技中心人员使用`
 }
 
 /** 调用对接方获取用户信息接口（裸 fetch，返回 null 表示业务失败） */
 async function fetchUserInfo(token: string): Promise<DigitalYiliUser | null> {
-  const res = await fetch(`${BASE_URL}/auth/digital-yili/getUserInfo`, {
+  const res = await fetch(`${EVALUATION_API_ORIGIN}/api/auth/digital-yili/getUserInfo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ digital_yili_token: token }),
@@ -89,9 +94,15 @@ export async function resolveDigitalYiliAccess(): Promise<DyAccessStatus> {
     return { status: 'denied', reason: '缺少身份凭证（digitalYiliToken），请从内部平台进入本系统' }
   }
 
-  // ① 本地缓存命中（24h 内同 token 直接复用，不调三方接口）
+  // ① 当前页面内存缓存命中（同 token 直接复用，不调三方接口）
   const cached = readCache(token)
-  if (cached) return { status: 'ok', user: cached, fromCache: true }
+  if (cached) {
+    if (!isShuKeUser(cached)) {
+      removeCache()
+      return { status: 'denied', reason: deniedReasonForUser(cached) }
+    }
+    return { status: 'ok', user: cached, fromCache: true }
+  }
 
   // ② 调接口换取用户信息
   try {
@@ -100,16 +111,16 @@ export async function resolveDigitalYiliAccess(): Promise<DyAccessStatus> {
       // 接口明确业务失败（token 无效/过期）：无法确认身份 → 拒绝访问
       return { status: 'denied', reason: '身份令牌无效或已过期，请从内部平台重新进入' }
     }
-    writeCache(token, user)
     if (!isShuKeUser(user)) {
-      return { status: 'denied', reason: `${user.userName || userCodeFallback(user)}（${user.deptName || '未知部门'}）无访问权限，本系统仅限数字科技中心人员使用` }
+      removeCache()
+      return { status: 'denied', reason: deniedReasonForUser(user) }
     }
+    writeCache(token, user)
     return { status: 'ok', user, fromCache: false }
   } catch (e) {
-    // 网络/接口未就绪（404、超时等）：无法验证 → 降级放行并告警，避免联调期阻断全部访问
-    // TODO: 接口稳定后可改为严格模式（拒绝并提示稍后再试）
-    console.warn('[digitalYili] 用户信息接口不可用，本次降级放行：', e)
-    return { status: 'unknown', reason: String(e) }
+    // 无法确认身份时默认拒绝，避免网络故障或接口异常绕过鉴权。
+    console.warn('[digitalYili] 用户信息接口不可用，已阻止访问：', e)
+    return { status: 'denied', reason: '身份校验服务暂时不可用，请稍后重试' }
   }
 }
 
