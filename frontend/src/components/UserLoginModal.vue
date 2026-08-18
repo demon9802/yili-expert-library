@@ -3,8 +3,8 @@
     <div class="user-login-modal">
       <button class="close-btn" title="关闭" @click="$emit('close')">✕</button>
 
-      <!-- Tab Switch -->
-      <div class="auth-tabs">
+      <!-- Tab Switch（修改密码模式不显示 Tab） -->
+      <div v-if="mode !== 'changePassword'" class="auth-tabs">
         <button :class="['auth-tab', { active: mode === 'login' }]" @click="mode = 'login'">登录</button>
         <button :class="['auth-tab', { active: mode === 'signup' }]" @click="mode = 'signup'">注册</button>
       </div>
@@ -12,7 +12,7 @@
       <!-- Login Form -->
       <div v-if="mode === 'login'" class="auth-form">
         <h3>用户登录</h3>
-        <p class="auth-hint">登录后可同步收藏的专家到云端，换设备不丢失。</p>
+        <p class="auth-hint">登录后可同步收藏的专家到云端，换设备不丢失。<br />未注册，不影响其他功能使用。</p>
         <input
           v-model="loginEmail"
           type="text"
@@ -30,12 +30,13 @@
           {{ loading ? '登录中...' : '登录' }}
         </button>
         <button class="auth-switch" @click="mode = 'signup'">没有账号？去注册 →</button>
+        <p class="auth-footnote">忘记密码，请联系DACC重置</p>
       </div>
 
       <!-- Signup Form -->
-      <div v-else class="auth-form">
+      <div v-else-if="mode === 'signup'" class="auth-form">
         <h3>用户注册</h3>
-        <p class="auth-hint">使用邮箱注册即可，注册后自动登录。</p>
+        <p class="auth-hint">使用邮箱注册即可，注册后自动登录。<br />邮箱仅作为登录账号，不读取任何信息，请放心使用。</p>
         <input
           v-model="signupEmail"
           type="text"
@@ -60,6 +61,36 @@
         </button>
         <button class="auth-switch" @click="mode = 'login'">已有账号？去登录 →</button>
       </div>
+
+      <!-- Change Password Form（登录后修改密码） -->
+      <div v-else class="auth-form">
+        <h3>修改密码</h3>
+        <p class="auth-hint">当前账号：{{ store.currentUser?.email || '' }}，修改成功后请使用新密码登录。</p>
+        <input
+          v-model="oldPassword"
+          type="password"
+          placeholder="当前密码"
+          @keydown.enter="handleChangePassword"
+        />
+        <input
+          v-model="newPassword"
+          type="password"
+          placeholder="新密码（至少6位）"
+          @keydown.enter="handleChangePassword"
+        />
+        <input
+          v-model="confirmPassword"
+          type="password"
+          placeholder="确认新密码"
+          @keydown.enter="handleChangePassword"
+        />
+        <div v-if="error" class="auth-error">{{ error }}</div>
+        <div v-if="successMsg" class="auth-success">{{ successMsg }}</div>
+        <button class="btn btn-primary auth-submit" :disabled="loading" @click="handleChangePassword">
+          {{ loading ? '提交中...' : '确认修改' }}
+        </button>
+        <button class="auth-switch" @click="$emit('close')">完成 / 关闭</button>
+      </div>
     </div>
   </div>
 </template>
@@ -67,6 +98,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useAppStore } from '@/store/appStore'
+import { authApi } from '@/api/auth'
+
+const props = defineProps<{
+  /** 初始模式：login / signup / changePassword（登录后修改密码） */
+  startMode?: 'login' | 'signup' | 'changePassword'
+}>()
 
 const emit = defineEmits<{
   close: []
@@ -75,14 +112,18 @@ const emit = defineEmits<{
 
 const store = useAppStore()
 
-const mode = ref<'login' | 'signup'>('login')
+const mode = ref<'login' | 'signup' | 'changePassword'>(props.startMode || 'login')
 const loginEmail = ref('')
 const loginPassword = ref('')
 const signupEmail = ref('')
 const signupPassword = ref('')
 const signupConfirm = ref('')
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
 const loading = ref(false)
 const error = ref('')
+const successMsg = ref('')
 
 async function handleLogin() {
   error.value = ''
@@ -129,6 +170,36 @@ async function handleSignup() {
     emit('success')
   } catch (e: any) {
     error.value = e.message || '注册失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+// 登录后修改密码：仅需当前密码+新密码，不调取用户其他信息
+async function handleChangePassword() {
+  error.value = ''
+  successMsg.value = ''
+  if (!oldPassword.value) {
+    error.value = '请输入当前密码'
+    return
+  }
+  if (!newPassword.value || newPassword.value.length < 6) {
+    error.value = '新密码至少6位'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    error.value = '两次新密码不一致'
+    return
+  }
+  loading.value = true
+  try {
+    await authApi.changePassword(oldPassword.value, newPassword.value)
+    successMsg.value = '密码修改成功，下次登录请使用新密码'
+    oldPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+  } catch (e: any) {
+    error.value = e.message || '修改失败，请检查当前密码是否正确'
   } finally {
     loading.value = false
   }
@@ -267,5 +338,23 @@ async function handleSignup() {
 
 .auth-switch:hover {
   text-decoration: underline;
+}
+
+.auth-footnote {
+  text-align: center;
+  font-size: 12px;
+  color: #94A3B8;
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.auth-success {
+  background: #F0FDF4;
+  color: #16A34A;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  line-height: 1.5;
 }
 </style>

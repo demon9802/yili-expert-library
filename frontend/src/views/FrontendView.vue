@@ -37,6 +37,9 @@
             </button>
           </template>
           <template v-else-if="store.currentUser">
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="showChangePassword = true">
+              修改密码
+            </button>
             <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;font-size:12px;border:1px solid rgba(255,255,255,0.2)" @click="handleLogout">
               退出登录
             </button>
@@ -246,6 +249,7 @@
 
     <!-- User Login Modal -->
     <UserLoginModal v-if="showUserLogin" @close="showUserLogin = false" @success="onUserLoginSuccess" />
+    <UserLoginModal v-if="showChangePassword" start-mode="changePassword" @close="showChangePassword = false" />
   </div>
 </template>
 
@@ -280,6 +284,7 @@ watch(() => store.mobileAdaptation, enabled => {
 
 const showDashboardModal = ref(false)
 const showUserLogin = ref(false)
+const showChangePassword = ref(false)
 const showFloatingNav = ref(false)
 
 // V5: 浮动页码导航在顶部筛选栏滚出视口后显示
